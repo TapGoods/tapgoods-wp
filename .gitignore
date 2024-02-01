@@ -30,3 +30,6 @@ xdebug/*
 .CVS
 .idea
 cache
+
+# Dev Config Folder
+dev/certs/*
