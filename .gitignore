@@ -30,6 +30,12 @@ xdebug/*
 .CVS
 .idea
 cache
+/node_modules
+tapgoods-wp/vendor
 
 # Dev Config Folder
 dev/certs/*
+
+# Temp ignore composer
+composer.json
+composer.lock
