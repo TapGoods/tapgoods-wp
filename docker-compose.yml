@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+
+  wordpress:
+    image: wordpress:latest
+    restart: always
+    ports:
+      - 8080:80
+    depends_on:
+      - db
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: exampleuser
+      WORDPRESS_DB_PASSWORD: examplepass
+      WORDPRESS_DB_NAME: exampledb
+    volumes:
+      - wordpress:/var/www/html
+      - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+    extra_hosts:
+      - wordpress.local:host-gateway
+
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_DATABASE: exampledb
+      MYSQL_USER: exampleuser
+      MYSQL_PASSWORD: examplepass
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      - db:/var/lib/mysql
+
+  nginx:
+    image: nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./dev/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./dev/certs:/etc/nginx/certs
+    depends_on:
+      - wordpress
+
+  wpcli:
+    image: wordpress:cli-php7.4
+    command: "wp --info"
+    working_dir: /var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: exampleuser
+      WORDPRESS_DB_PASSWORD: examplepass
+      WORDPRESS_DB_NAME: exampledb
+    volumes:
+      - wordpress:/var/www/html
+      - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+    depends_on:
+      - db
+      - wordpress
+
+  # generate-certs:
+  #   image: ubuntu:20.04
+  #   entrypoint: /bin/sh
+  #   command: ./generate-certs.sh
+  #   profiles:
+  #     - "doNotStart"
+  #   volumes:
+  #     - ./dev/generate-certs.sh:/generate-certs.sh:rw
+  #     - ./dev/certs:/certs:rw
+
+volumes:
+  wordpress:
+  db:
+  nginx-config:
