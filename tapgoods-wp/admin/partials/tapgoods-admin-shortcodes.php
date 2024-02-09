@@ -1,12 +1,13 @@
 <?php
 
 
-$shortcodes = Tapgoods_Shortcodes::$shortcodes_info;
+$shortcodes = Tapgoods_Shortcodes::get_instance();
+$shortcodes_info = $shortcodes->get_shortcodes();
 
 ?>
 <h2>Shortcodes</h2>
 <div class="container">
-<?php foreach($shortcodes as $shortcode => $info) : ?>
+<?php foreach($shortcodes_info as $shortcode => $info) : ?>
 <div class="row justify-content-start align-items-center mb-3">
     <div class="col-2">
         <label><?php echo $shortcode ?></label>
