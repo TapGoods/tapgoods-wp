@@ -1,0 +1,87 @@
+:root {
+    --tg-blue: #278ADA;
+    --tg-purple: #936FAF;
+    --text-dark: #0E2C44;
+}
+.tapgoods {
+    font-family: 'Heebo', sans-serif;
+    max-width: 909px;
+    color: var(--text-dark);    
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    & .bg-blue {
+        background-color: var(--tg-blue);
+    }
+
+    & .bg-purple {
+        background-color: var(--tg-purple);
+    }
+    
+    & .nav-link {
+        color: var(--text-dark);
+    }
+    
+    & .nav-link.active {
+        font-weight: bold;
+    }
+    
+    & .round {
+        border-radius: 20px;
+    }
+
+    .api-key {
+        line-height: 1;
+        border: none;
+        background: #E5E8E9;
+        font-size: 12px;
+    }
+
+    & input[type="submit"] {
+        font-size: 12px;
+    }
+
+    & label {
+        font-size: 1rem;
+    }
+    #shortcodes .input-group button {
+        border-color: rgba(220,220,222,1);
+        background-color: #dae2e9;
+        & span {
+            color: #8fa9be;
+        }
+        &:hover {
+            background-color: #c1cfdb;
+            & span {
+                color: #0e2b42;
+            }
+        }
+    }
+}
+
+.toplevel_page_tapgoods > div.dashicons-before {
+    background-image: url(../../assets/img/tg-icon.png) !important;
+    background-size: 65% auto;
+    background-position: center center;
+    background-repeat: no-repeat;
+}
+
+.toplevel_page_tapgoods > div.dashicons-before::before { display: none !important; }
+
+.tapgoods-links {
+    & .card {
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    & .icon {
+        height: auto;
+        width: auto;
+        font-size: 40px;
+    }
+}
+

@@ -9,6 +9,10 @@
 *.vi
 *~
 *.sass-cache
+.nvmrc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS or Editor folders
 .DS_Store
@@ -26,6 +30,7 @@ xdebug/*
 !xdebug/.gitkeep
 
 # Folders to ignore
+/node_modules
 .svn
 .CVS
 .idea
