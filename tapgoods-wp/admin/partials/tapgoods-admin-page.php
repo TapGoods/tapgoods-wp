@@ -19,20 +19,21 @@ if (defined('TAPGOODS_KEY')) {
     $api_key = TAPGOODS_KEY;
 }
 
-if( $success ) {
-    wp_admin_notice(
-        __( 'Company Key Updated.', 'tapgoods' ),
-        array(
-        'type'               => 'success',
-        'dismissible'        => true,
-        'additional_classes' => array( 'inline', 'notice-alt' ),
-        'attributes'         => array( 'data-slug' => 'plugin-slug' )
-        )
-    );
-}
-
 ?>
 <div class="wrap tapgoods">
+<?php 
+    if( $success ) {
+        wp_admin_notice(
+            __( 'Company Key Updated.', 'tapgoods' ),
+            array(
+            'type'               => 'success',
+            'dismissible'        => true,
+            'additional_classes' => array( 'inline', 'notice-alt' ),
+            'attributes'         => array( 'data-slug' => 'plugin-slug' )
+            )
+        );
+    }
+?>
     <h1 class="wp-heading-inline">TapGoods Settings</h1>
     <hr class="wp-header-end">
     <?php 
