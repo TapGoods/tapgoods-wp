@@ -71,7 +71,7 @@ register_deactivation_hook(__FILE__, 'tapgoods_deactivate');
 function init_tapgoods_wp() {
 
     require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-wp.php';
-    $tapgoods = new Tapgoods_WP();
+    $tapgoods = new Tapgoods_WP(TAPGOODSWP_VERSION, 'tapgoods');
     $tapgoods->init();
 
 }

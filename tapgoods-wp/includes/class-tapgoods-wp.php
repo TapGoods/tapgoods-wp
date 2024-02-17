@@ -5,20 +5,15 @@ class Tapgoods_WP {
     protected $loader;
     protected $plugin_name;
     protected $version;
+	protected $shortcodes;
 
-    public function __construct() {
-        if( defined( 'TAPGOODSWP_VERSION') ) {
-            $this->version = TAPGOODSWP_VERSION;
-        }
-        $this->plugin_name = 'tapgoods';
-        
+    public function __construct( $version, $plugin_name ) {
+		$this->version = $version;
+        $this->plugin_name = $plugin_name;
         $this->load_dependencies();
 		$this->set_locale();
-
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
-		$this->register_shortcodes();
-		
     }
 
     private function load_dependencies() {
@@ -60,12 +55,9 @@ class Tapgoods_WP {
 
 	}
 
-	private function register_shortcodes() {
-		$shortcodes = Tapgoods_Shortcodes::get_instance();
-	}
-
     public function init() {
         $this->loader->run();
+		$this->shortcodes = Tapgoods_Shortcodes::get_instance();
     }
 
     public function get_plugin_name() {
@@ -73,7 +65,6 @@ class Tapgoods_WP {
 	}
 
 	// The reference to the class that orchestrates the hooks with the plugin.
-
 	public function get_loader() {
 		return $this->loader;
 	}
