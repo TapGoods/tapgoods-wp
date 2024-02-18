@@ -2,47 +2,66 @@
 
 class Tapgoods_WP {
 
+	private static $instance = null;
     protected $loader;
     protected $plugin_name;
     protected $version;
 	protected $shortcodes;
+	private $plugin_admin;
 
-    public function __construct( $version, $plugin_name ) {
-		$this->version = $version;
-        $this->plugin_name = $plugin_name;
+    private function __construct( ) {
+		$this->version = TAPGOODSWP_VERSION;
+        $this->plugin_name = 'tapgoods';
         $this->load_dependencies();
-		$this->set_locale();
+		$this->set_locale($this->plugin_name);
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
     }
 
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __clone () {}
+	private function __wakeup() {}
+
     private function load_dependencies() {
-        require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-loader.php';
-        require_once TAPGOODS_PLUGIN_PATH . 'admin/class-tapgoods-admin.php';
-		require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-i18n.php';
-		require_once TAPGOODS_PLUGIN_PATH . 'admin/class-tapgoods-admin.php';
-		require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-shortcodes.php';
-		require_once TAPGOODS_PLUGIN_PATH . 'public/class-tapgoods-public.php';
+		$includes = [
+			'includes/class-tapgoods-loader.php', 		// Class for adding actions and filers
+			'admin/class-tapgoods-admin.php',			// Class for WP Admin features
+			'includes/class-tapgoods-i18n.php',			// Loads text domain for localization
+			'includes/class-tapgoods-shortcodes.php',	// Registers Shortcodes
+			'public/class-tapgoods-public.php',			// Class for frontend features
+			'includes/class-tapgoods-filesystem.php', 	// Filesystem utility class
+			'includes/class-tapgoods-helpers.php', 	// Filesystem utility class
+		];
+
+		foreach ($includes as $file) {
+	        require_once TAPGOODS_PLUGIN_PATH . $file;
+		}
+
         $this->loader = new Tapgoods_WP_Loader();
     }
 
-	private function set_locale() {
-
-		$tapgoods_i18n = new Tapgoods_WP_i18n();
+	private function set_locale($domain) {
+		$tapgoods_i18n = new Tapgoods_WP_i18n($domain);
 		$this->loader->add_action( 'plugins_loaded', $tapgoods_i18n, 'load_plugin_textdomain' );
 
 	}
 
     private function define_admin_hooks() {
 
-		$plugin_admin = new Tapgoods_WP_Admin( $this->get_plugin_name(), $this->get_version() );
+		$this->plugin_admin = new Tapgoods_WP_Admin( $this->get_plugin_name(), $this->get_version() );
 
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
-		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
-		$this->loader->add_action('admin_menu', $plugin_admin, 'tapgoods_admin_menu');
+		$this->loader->add_action( 'admin_enqueue_scripts', $this->plugin_admin, 'enqueue_styles' );
+		$this->loader->add_action( 'admin_enqueue_scripts', $this->plugin_admin, 'enqueue_scripts' );
+		$this->loader->add_action('admin_menu', $this->plugin_admin, 'tapgoods_admin_menu');
 		
         $plugin_basename = plugin_basename(plugin_dir_path(__DIR__) . $this->plugin_name . '.php');
-		$this->loader->add_filter('plugin_action_links_' . $plugin_basename, $plugin_admin, 'add_action_links');
+		$this->loader->add_filter('plugin_action_links_' . $plugin_basename, $this->plugin_admin, 'add_action_links');
 
 	}
 
@@ -55,10 +74,9 @@ class Tapgoods_WP {
 
 	}
 
-    public function init() {
-        $this->loader->run();
-		$this->shortcodes = Tapgoods_Shortcodes::get_instance();
-    }
+	public function get_admin() {
+		return $this->plugin_admin;
+	}
 
     public function get_plugin_name() {
 		return $this->plugin_name;
@@ -72,5 +90,10 @@ class Tapgoods_WP {
 	public function get_version() {
 		return $this->version;
 	}
+
+	public function init() {
+        $this->loader->run();
+		$this->shortcodes = Tapgoods_Shortcodes::get_instance();
+    }
 
 }

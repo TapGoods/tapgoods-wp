@@ -1,30 +1,32 @@
 <?php
 
 //$loader = $tapgoods->get_loader();
+
 $card_class = 'card text-light d-block pt-3 pb-4 px-1 h-100 my-0';
 $key_disabled = '';
+$success = false;
+$notice = false;
+$admin = Tapgoods_WP::get_instance()->get_admin();
+
+if( isset($_POST['tapgoods_hidden']) && $_POST['tapgoods_hidden'] == 1) {
+    $api_key = sanitize_text_field($_POST['tapgoods_api_key']);
+    $success = update_option('tapgoods_key', $api_key);
+} else {
+    $api_key = (get_option('tapgoods_key')) ? get_option('tapgoods_key') : '';
+}
 
 // if the key was defined in config use that and disable input
 if (defined('TAPGOODS_KEY')) {
     $key_disabled = 'disabled';
     $api_key = TAPGOODS_KEY;
-} else {
-    // are we saving the key now?
-    if($_POST['tapgoods_hidden'] == 1) {
-        $api_key = sanitize_text_field($_POST['tapgoods_api_key']);
-        $success = update_option('tapgoods_key', $api_key);
-    } else {
-        $api_key = (get_option('tapgoods_key')) ? get_option('tapgoods_key') : '';
-    }
 }
-
 if( $success ) {
     $notice = Tapgoods_WP_Admin::tapgoods_admin_notice("Company Key Updated.");
 }
 
 ?>
 <div class="wrap tapgoods">
-    <?php echo $notice; ?>
+    <?php echo ($notice) ? $notice : ''; ?>
     <h1 class="wp-heading-inline">TapGoods Settings</h1>
     <hr class="wp-header-end">
     <?php 

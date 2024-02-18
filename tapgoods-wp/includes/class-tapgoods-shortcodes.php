@@ -7,54 +7,65 @@ class Tapgoods_Shortcodes {
     public static $shortcodes_info;
 
     private function __construct() {
-        $shortcodes = $this->get_shortcodes();
+
+        $shortcodes = self::get_shortcodes();
+        $this->register_shortcodes( $shortcodes );
+    }
+
+    private function register_shortcodes( $shortcodes ) {
+        
         foreach( $shortcodes as $shortcode => $info ) {
-            if (! shortcode_exists($info['tag'])) {
-                add_shortcode($info['tag'], $info['callback'] );
+            $template = self::get_template( $shortcode );
+            if (! shortcode_exists( $shortcode )) {
+                if( is_file( $template ) && file_exists( $template ) ){
+                    add_shortcode( $shortcode, [ $this, $shortcode ] );
+                }
             }
+        }    
+    }
+
+    public function __call( $tag, $args) {
+
+        if ( array_key_exists( $tag, self::get_shortcodes() ) ) {
+
+            return $this->genericHandler( self::get_template($tag), $args );
         }
     }
 
-    public function tg_cart_func($atts) {
-        return 'cart';
+    private static function get_template($tag) {
+
+        return TAPGOODS_PLUGIN_PATH . 'public/partials/' . str_replace('_','-', $tag) . '.php';
     }
 
-    public function tg_inventory_func($atts) {
-        return 'inventory';
-    }
+    // This function receives the arguments passed to the shortcode callback and loads the PHP template from /public/partials
+    protected function genericHandler( $template, $args ) {
 
-    public function tg_sign_in_func($atts) {
-        return 'sign in';
-    }
+        $tag = $args[2];
+        $content = ("" !== $args[1]) ? $args[1] : false;
+        $atts = Tapgoods_Shortcodes::get_atts($tag);
+        $atts = shortcode_atts( $atts, $args[0], $tag);
 
-    public function tg_sign_up_func($atts) {
-        return 'sign up';
+        ob_start();
+		include $template;
+		return do_shortcode(ob_get_clean());
     }
 
     public static function get_shortcodes() {
-        $shortcodes_info = [
-            'Cart' => [
-                'tag' => 'tg-cart',
-                'callback' => 'tg_cart_func',
-                'description' => 'Displays the TapGoods Cart Button',
-            ],
-            'Inventory' => [
-                'tag' => 'tg-inventory',
-                'callback' => 'tg_inventory_func',
-                'description' => 'Displays the TapGoods Shop with Inventory, Categories, and Search',
-            ],
-            'Sign In' => [
-                'tag' => 'tg-sign-in', 
-                'callback' => 'tg_sign_in_func', 
-                'description' => 'Displays the Sign-In button',
-            ],
-            'Sign Up' => [
-                'tag' => 'tg-sign-up',
-                'callback' => 'tg_sign_up_func',
-                'description' => 'Displays the Sign-Up button',
-            ],
-        ];
-        return $shortcodes_info;
+       
+        $path = TAPGOODS_PLUGIN_PATH . '/includes/shortcodes.json';
+        $json = Tapgoods_Filesystem::get_file($path);
+        $shortcodes = json_decode($json, true);
+        return $shortcodes;
+    }
+
+    public static function get_atts($shortcode) {
+
+        $shortcodes = self::get_shortcodes();
+        $atts = [];
+        foreach ($shortcodes[$shortcode]['atts'] as $att => $data) {
+            $atts[$att] = $data['default']; 
+        }
+        return $atts;
     }
 
     public function __clone() { }

@@ -1,13 +1,13 @@
 <?php 
 
-// use the WP Filesystem for file operations
+// Load our filesystem class for file operations
+require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-filesystem.php';
+
 $input_submit = 'save_styles';
 $nonce = 'tapgoods-save-custom-css';
 $success = false;
-$tapgoods_css = Tapgoods_WP_Admin::tapgoods_admin_get_file( TAPGOODS_PLUGIN_PATH . '/assets/css/tg-bootstrap.css' );
+$tapgoods_css = Tapgoods_Filesystem::get_file( TAPGOODS_PLUGIN_PATH . '/assets/css/tg-bootstrap.css' );
 $save_text = 'Save';
-
-// $custom_css = file_get_contents( TAPGOODS_PLUGIN_PATH . '/assets/css/custom.css');
 
 ?>
 <h2>Styling</h2>
@@ -18,13 +18,13 @@ $save_text = 'Save';
 <?php
 
 if (isset($_POST[$input_submit] )) {
-    $success = Tapgoods_WP_Admin::tapgoods_admin_put_file( $input_submit, $_POST['tg-custom-css'], TAPGOODS_UPLOADS . 'custom.css',  $nonce);
+    $success = Tapgoods_Filesystem::put_file( $input_submit, $_POST['tg-custom-css'], TAPGOODS_UPLOADS . 'custom.css',  $nonce);
     if (! $success) {
         var_dump($success); die();
     }
     $save_text = ($success) ? 'Saved' : $save_text;
 }
-$custom_css = Tapgoods_WP_Admin::tapgoods_admin_get_file( TAPGOODS_UPLOADS . 'custom.css');
+$custom_css = Tapgoods_Filesystem::get_file( TAPGOODS_UPLOADS . 'custom.css');
 
 ?>
 <form name="tapgoods_styling" method="post", action="">

@@ -15,6 +15,7 @@ class Tapgoods_WP_Admin {
 
 	private $plugin_name;
 	private $version;
+	private $filesystem;
 
 	public function __construct( $plugin_name, $version ) {
 
@@ -95,15 +96,6 @@ class Tapgoods_WP_Admin {
 		include_once('partials/tapgoods-admin-page.php');
 	}
 
-	// Load file, used to load the CSS files for viewing/editing styles
-	public static function tapgoods_admin_get_file($path) {
-		global $wp_filesystem;
-		include_once ABSPATH . 'wp-admin/includes/file.php';
-		WP_Filesystem();
-		
-		return $wp_filesystem->get_contents( $path );
-	}
-
 	// Used to print admin notices
 	public static function tapgoods_admin_notice($message, $args = []) {
 		
@@ -120,43 +112,6 @@ class Tapgoods_WP_Admin {
 		$output = ob_get_contents();
 		ob_end_clean();
 		return $output;
-	}
-
-	public static function tapgoods_admin_put_file($submit, $contents, $filepath, $nonce) {
-		if (empty($_POST)) return false;
-		check_admin_referer($nonce);
-
-		$method = '';
-		$form_fields = array($submit, $contents);
-		$url = wp_nonce_url('options.php?page=tapgoods', $nonce );
-		
-		// Check if we have credentials to write files
-		if (false === ($creds = request_filesystem_credentials($url, $method, false, false, $form_fields, true) ) ) {
-			return true;
-		}
-
-		if ( ! WP_Filesystem($creds) ) {
-			// our credentials were no good, ask the user for them again
-			request_filesystem_credentials($url, $method, true, false, $form_fields, true);
-			return true;
-		}
-
-		global $wp_filesystem;
-		include_once ABSPATH . 'wp-admin/includes/file.php';
-		WP_Filesystem();
-
-		$folder_exists = $wp_filesystem->exists(TAPGOODS_UPLOADS);
-		if ( ! $folder_exists ) {
-			$make_folder = $wp_filesystem->mkdir($tg_uploads);
-			echo "couldn't make folder";
-			if( ! $make_folder ) return false;
-		}
-		
-		$success = $wp_filesystem->put_contents( $filepath, $contents, FS_CHMOD_FILE);
-		if( ! $success  ) {
-			echo 'error saving file!';
-		}
-		return $success;
 	}
 
 }

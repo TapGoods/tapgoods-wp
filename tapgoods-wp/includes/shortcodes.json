@@ -1,0 +1,31 @@
+{
+    "tg_cart": {
+        "name": "Cart",
+        "description": "Displays the TapGoods Cart Button",
+        "atts": {
+            "foo": {
+                "att": "Foo",
+                "desc": "Describes Foo Att",
+                "default": "bar",
+                "type": "input"                
+            }
+        }
+    },
+    "tg_inventory": {
+        "name": "Inventory",
+        "description": "Displays the TapGoods Shop with Inventory, Categories, and Search",
+        "atts": {
+            "show_search": true
+        }
+    },
+    "tg_sign_in": {
+        "name": "Sign In",
+        "description": "Displays the Sign-In button",
+        "atts": []
+    },
+    "tg_sign_up": {
+        "name": "Sign Up",
+        "description": "Displays the Sign-Up button",
+        "atts": []
+    }
+}
