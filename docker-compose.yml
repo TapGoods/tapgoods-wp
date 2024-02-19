@@ -43,7 +43,7 @@ services:
       - wordpress
 
   wpcli:
-    image: wordpress:cli-php7.4
+    image: wordpress:cli
     command: "wp --info"
     working_dir: /var/www/html
     environment:
