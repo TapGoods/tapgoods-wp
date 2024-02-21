@@ -58,6 +58,19 @@ services:
       - db
       - wordpress
 
+  composer:
+      image: composer/composer
+      working_dir: /var/www/html/
+      command: "install"
+      restart: 'no'
+      volumes:
+        - wordpress:/var/www/html:rw,cache
+        - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+        - ./composer.json:/var/www/html/composer.json
+        - ./dev/phpcs.xml:/var/www/html/phpcs.xml
+      depends_on:
+        - wordpress
+
   # generate-certs:
   #   image: ubuntu:20.04
   #   entrypoint: /bin/sh

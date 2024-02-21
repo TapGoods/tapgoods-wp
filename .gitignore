@@ -42,5 +42,8 @@ tapgoods-wp/vendor
 dev/certs/*
 
 # Temp ignore composer
-composer.json
+# composer.json
 composer.lock
+
+# Dev utilities
+dev.php
