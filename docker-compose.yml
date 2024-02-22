@@ -17,6 +17,7 @@ services:
     volumes:
       - wordpress:/var/www/html
       - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+      - /tmp:/tmp
     extra_hosts:
       - wordpress.local:host-gateway
 
