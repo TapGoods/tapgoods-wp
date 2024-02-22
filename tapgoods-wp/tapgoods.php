@@ -27,55 +27,49 @@
  */
 
 // define( 'WP_DEBUG', true);
-//define('TAPGOODS_KEY', 'foo');
-define('TAPGOODS_DEV', true);
+// define('TAPGOODS_KEY', 'foo');
+define( 'TAPGOODS_DEV', true );
 
 // exit if accessed directly
-if (!defined('WPINC')) {
-    die;
+if ( ! defined( 'WPINC' ) ) {
+	die;
 }
 
-define('TAPGOODSWP_VERSION', '0.1.0');
+define( 'TAPGOODSWP_VERSION', '0.1.0' );
 
 /**
  * Path to the plugin root directory.
  */
-define('TAPGOODS_PLUGIN_PATH', plugin_dir_path(__FILE__));
+define( 'TAPGOODS_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 /**
  * Url to the plugin root directory.
  */
-define('TAPGOODS_PLUGIN_URL', plugin_dir_url(__FILE__));
+define( 'TAPGOODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 $uploads = wp_upload_dir();
-define('TAPGOODS_UPLOADS', trailingslashit($uploads[ 'basedir' ] . '/tapgoods'));
+define( 'TAPGOODS_UPLOADS', trailingslashit( $uploads['basedir'] . '/tapgoods' ) );
 
 // TODO: register activate hook
-function tapgoods_activate()
-{
+function tapgoods_activate() {
 
-    require_once plugin_dir_path(__FILE__) . 'includes/class-tapgoods-activator.php';
-    Tapgoods_WP_Activator::activate();
-
+	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-activator.php';
+	Tapgoods_WP_Activator::activate();
 }
 
-function tapgoods_deactivate()
-{
+function tapgoods_deactivate() {
 
-    require_once plugin_dir_path(__FILE__) . 'includes/class-tapgoods-deactivator.php';
-    Tapgoods_WP_Deactivator::deactivate();
-
+	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-deactivator.php';
+	Tapgoods_WP_Deactivator::deactivate();
 }
 
-register_activation_hook(__FILE__, 'tapgoods_activate');
-register_deactivation_hook(__FILE__, 'tapgoods_deactivate');
+register_activation_hook( __FILE__, 'tapgoods_activate' );
+register_deactivation_hook( __FILE__, 'tapgoods_deactivate' );
 
-function init_tapgoods_wp()
-{
+function init_tapgoods_wp() {
 
-    require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-wp.php';
-    $tapgoods = Tapgoods_WP::get_instance();
+	require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-wp.php';
+	$tapgoods = Tapgoods_WP::get_instance();
 	$tapgoods->init();
-
 }
 
-add_action('plugins_loaded', 'init_tapgoods_wp');
+add_action( 'plugins_loaded', 'init_tapgoods_wp' );
