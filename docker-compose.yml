@@ -4,6 +4,7 @@ services:
 
   wordpress:
     image: wordpress:latest
+    container_name: wordpress
     restart: always
     ports:
       - 8080:80
@@ -57,6 +58,17 @@ services:
     depends_on:
       - db
       - wordpress
+
+  composer:
+      image: composer/composer
+      working_dir: /var/www/html/wp-content/plugins/tapgoods-wp
+      command: "install"
+      restart: 'no'
+      volumes:
+        - wordpress:/var/www/html:rw,cache
+        - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+      depends_on:
+        - wordpress
 
   # generate-certs:
   #   image: ubuntu:20.04
