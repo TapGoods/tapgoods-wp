@@ -96,7 +96,7 @@ class Tapgoods_WP_Admin {
 	}
 
 	// Used to print admin notices
-	public static function tapgoods_admin_notice( ( str ) $message, $args = [], $return = false ) {
+	public static function tapgoods_admin_notice( string $message, $args = [], $return = false ) {
 
 		$args = array_merge(
 			array(
