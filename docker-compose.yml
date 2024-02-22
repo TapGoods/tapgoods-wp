@@ -4,6 +4,7 @@ services:
 
   wordpress:
     image: wordpress:latest
+    container_name: wordpress
     restart: always
     ports:
       - 8080:80
@@ -17,7 +18,6 @@ services:
     volumes:
       - wordpress:/var/www/html
       - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
-      - /tmp:/tmp
     extra_hosts:
       - wordpress.local:host-gateway
 
@@ -61,14 +61,12 @@ services:
 
   composer:
       image: composer/composer
-      working_dir: /var/www/html/
+      working_dir: /var/www/html/wp-content/plugins/tapgoods-wp
       command: "install"
       restart: 'no'
       volumes:
         - wordpress:/var/www/html:rw,cache
         - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
-        - ./composer.json:/var/www/html/composer.json
-        - ./dev/phpcs.xml:/var/www/html/phpcs.xml
       depends_on:
         - wordpress
 
