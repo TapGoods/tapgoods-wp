@@ -1,0 +1,6 @@
+{
+	"recommendations": [
+		"mtbdata.vscode-phpsab-docker",
+		"ms-vscode-remote.remote-containers",
+	]
+}
