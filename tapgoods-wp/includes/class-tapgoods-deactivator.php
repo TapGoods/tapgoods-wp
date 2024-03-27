@@ -4,7 +4,6 @@
 
 class Tapgoods_WP_Deactivator {
 
-    public static function deactivate() {
-
-    }
+	public static function deactivate() {
+	}
 }

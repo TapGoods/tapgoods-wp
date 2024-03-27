@@ -1,0 +1,11 @@
+{
+    "php.validate.executablePath": "./dev/php.sh",
+    "editor.insertSpaces": false,
+    "phpsab.docker.dockerEnabled": true,
+    "phpsab.docker.dockerContainer": "wordpress",
+    "phpsab.docker.dockerWorkspaceRoot": "/var/www/html/wp-content/plugins",
+    "phpsab.docker.snifferMode": "onType",
+    "phpsab.docker.composerJsonPath": "tapgoods-wp/composer.json",
+    "phpsab.docker.snifferShowSources": true,
+    "phpsab.docker.standard": "/var/www/html/wp-content/plugins/tapgoods-wp/phpcs.xml",
+}
