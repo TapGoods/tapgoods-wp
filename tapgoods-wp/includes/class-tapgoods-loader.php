@@ -6,8 +6,8 @@
  * @link       http://example.com
  * @since      0.1.0
  *
- * @package    Tapgoods_WP
- * @subpackage Tapgoods_WP/includes
+ * @package    Tapgoods
+ * @subpackage Tapgoods/includes
  */
 
 /**
@@ -17,11 +17,11 @@
  * the plugin, and register them with the WordPress API. Call the
  * run function to execute the list of actions and filters.
  *
- * @package    Tapgoods_WP
- * @subpackage Tapgoods_WP/includes
+ * @package    Tapgoods
+ * @subpackage Tapgoods/includes
  * @author     Jeremy Benson <jeremy.benson@tapgoods.com>
  */
-class Tapgoods_WP_Loader {
+class Tapgoods_Loader {
 
 	/**
 	 * The array of actions registered with WordPress.
@@ -62,8 +62,8 @@ class Tapgoods_WP_Loader {
 	 * @param    int    $priority         Optional. The priority at which the function should be fired. Default is 10.
 	 * @param    int    $accepted_args    Optional. The number of arguments that should be passed to the $callback. Default is 1.
 	 */
-	public function add_action( $hook, $component, $callback, $priority = 10, $accepted_args = 1 ) {
-		$this->actions = $this->add( $this->actions, $hook, $component, $callback, $priority, $accepted_args );
+	public function add_action( $hook, $component, $callback, $priority = 10, $accepted_args = 1, $is_static = false ) {
+		$this->actions = $this->add( $this->actions, $hook, $component, $callback, $priority, $accepted_args, $is_static );
 	}
 
 	/**
@@ -76,8 +76,8 @@ class Tapgoods_WP_Loader {
 	 * @param    int    $priority         Optional. The priority at which the function should be fired. Default is 10.
 	 * @param    int    $accepted_args    Optional. The number of arguments that should be passed to the $callback. Default is 1.
 	 */
-	public function add_filter( $hook, $component, $callback, $priority = 10, $accepted_args = 1 ) {
-		$this->filters = $this->add( $this->filters, $hook, $component, $callback, $priority, $accepted_args );
+	public function add_filter( $hook, $component, $callback, $priority = 10, $accepted_args = 1, $is_static = false ) {
+		$this->filters = $this->add( $this->filters, $hook, $component, $callback, $priority, $accepted_args, $is_static );
 	}
 
 	/**
@@ -94,7 +94,7 @@ class Tapgoods_WP_Loader {
 	 * @param    int    $accepted_args    The number of arguments that should be passed to the $callback.
 	 * @return   array                                  The collection of actions and filters registered with WordPress.
 	 */
-	private function add( $hooks, $hook, $component, $callback, $priority, $accepted_args ) {
+	private function add( $hooks, $hook, $component, $callback, $priority, $accepted_args, $is_static ) {
 
 		$hooks[] = array(
 			'hook'          => $hook,
@@ -102,6 +102,7 @@ class Tapgoods_WP_Loader {
 			'callback'      => $callback,
 			'priority'      => $priority,
 			'accepted_args' => $accepted_args,
+			'is_static'     => $is_static,
 		);
 
 		return $hooks;
@@ -115,11 +116,11 @@ class Tapgoods_WP_Loader {
 	public function run() {
 
 		foreach ( $this->filters as $hook ) {
-			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+			add_filter( $hook['hook'], array( ( $hook['is_static'] ) ? 'static::' . $hook['component'] : $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 
 		foreach ( $this->actions as $hook ) {
-			add_action( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+			add_action( $hook['hook'], array( ( $hook['is_static'] ) ? 'static::' . $hook['component'] : $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 	}
 }

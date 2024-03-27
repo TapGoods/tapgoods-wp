@@ -24,14 +24,14 @@ class Tapgoods_Filesystem {
 	}
 
 
-	public static function put_file( $submit, $contents, $filepath, $nonce ) {
+	public static function put_file( $submit, $contents, $filepath, $nonce, $nonce_name ) {
 
 		// return false if not handling a POST request
 		if ( empty( $_POST ) ) {
 			return false;
 		}
 
-		check_admin_referer( $nonce );
+		check_admin_referer( $nonce, $nonce_name );
 
 		$method      = '';
 		$form_fields = array( $submit, $contents );

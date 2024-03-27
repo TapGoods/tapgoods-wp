@@ -2,7 +2,7 @@
 
 // Loads and defines internationalization files for this plugin
 
-class Tapgoods_WP_i18n {
+class Tapgoods_i18n {
 	private $domain;
 
 	public function __construct( $domain ) {

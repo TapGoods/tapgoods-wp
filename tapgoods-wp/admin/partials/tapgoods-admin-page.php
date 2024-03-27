@@ -6,27 +6,14 @@ $card_class   = 'card text-light d-block pt-3 pb-4 px-1 h-100 my-0';
 $key_disabled = '';
 $success      = false;
 $notice       = false;
-$admin        = Tapgoods_WP::get_instance()->get_admin();
-
-if ( isset( $_POST['tapgoods_hidden'] ) && $_POST['tapgoods_hidden'] == 1 ) {
-	$api_key = sanitize_text_field( $_POST['tapgoods_api_key'] );
-	$success = update_option( 'tapgoods_key', $api_key );
-} else {
-	$api_key = ( get_option( 'tapgoods_key' ) ) ? get_option( 'tapgoods_key' ) : '';
-}
-
-// if the key was defined in config use that and disable input
-if ( defined( 'TAPGOODS_KEY' ) ) {
-	$key_disabled = 'disabled';
-	$api_key      = TAPGOODS_KEY;
-}
-if ( $success ) {
-	$notice = Tapgoods_WP_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ) );
-}
+$tg_admin     = Tapgoods::get_instance()->get_admin();
+$connected    = false;
+$button_text  = 'CONNECT';
+$dev          = defined( 'TAPGOODS_DEV' ) && true === TAPGOODS_DEV;
+$form_action  = get_admin_url() . '?page=tapgoods';
 
 ?>
-<div class="wrap tapgoods">
-	<?php echo ( $success ) ? $notice : ''; ?>
+<div id="tapgoods-settings" class="wrap tapgoods">
 	<h1 class="wp-heading-inline">TapGoods Settings</h1>
 	<hr class="wp-header-end">
 	<?php
@@ -66,25 +53,10 @@ if ( $success ) {
 	// TapGoods Settings Form
 	?>
 	<div class="tapgoods-settings mt-4">
-	<div class="nav nav-links" id="nav-tab" role="tablist">
-		<button class="nav-link active" id="nav-connection-tab" data-bs-toggle="tab" data-bs-target="#connection" type="button" role="tab" aria-controls="nav-connection" aria-selected="true">Connection</button>
-		<button class="nav-link" id="nav-styling-tab" data-bs-toggle="tab" data-bs-target="#styling" type="button" role="tab" aria-controls="nav-styling" aria-selected="false">Styling</button>
-		<button class="nav-link" id="nav-shortcodes-tab" data-bs-toggle="tab" data-bs-target="#shortcodes" type="button" role="tab" aria-controls="nav-shortcodes" aria-selected="false">Shortcodes</button>
-		<button class="nav-link" id="nav-advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab" aria-controls="nav-advanced" aria-selected="false">Advanced</button>
-		<button class="nav-link" id="nav-dev-tab" data-bs-toggle="tab" data-bs-target="#dev" type="button" role="tab" aria-controls="nav-dev" aria-selected="false">Dev</button>
-	</div>
+		<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-navlinks.php'; ?>
 	<div class="tab-content container-fluid" id="nav-tabContent">
 		<div class="tab-pane fade bg-white p-4 show active" id="connection" role="tabpanel" aria-labelledby="nav-connection-tab" tabindex="0">
-			<h2>Connect to your TapGoods account</h2>
-			<form name="tapgoods_connection" method="post", action="<?php echo $_SERVER['REQUEST_URI']; ?>">
-				<input type="hidden" name="tapgoods_hidden" value="1">
-				<input type="text" name="tapgoods_api_key" value="<?php echo $api_key; ?>" size="60" class="round bg-gray px-3 py-2 api-key" <?php echo $key_disabled; ?>>
-				<input type="submit" name="Connect" value="<?php _e( 'CONNECT', 'tapgoods-wp' ); ?>" class="btn btn-primary bg-blue px-5 py-2 round" <?php echo $key_disabled; ?>>
-				<?php if ( '' !== $key_disabled ) { ?>
-					<p class="help-text">Company Key was defined in config files and cannot be changed here</p>
-				<?php } ?>
-				<p class="help-text">Find your Company ID in your TapGoods account under…</p>
-			</form>
+			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-connection.php'; ?>
 		</div>
 		<div class="tab-pane fade bg-white p-4" id="styling" role="tabpanel" aria-labelledby="nav-styling-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-styling.php'; ?>
@@ -93,11 +65,13 @@ if ( $success ) {
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-shortcodes.php'; ?>
 		</div>
 		<div class="tab-pane fade bg-white p-4" id="advanced" role="tabpanel" aria-labelledby="nav-advanced-tab" tabindex="0">
-			<h2>Advanced</h2>
+			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-advanced.php'; ?>
 		</div>
+		<?php if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) : ?>
 		<div class="tab-pane fade bg-white p-4 shortcodes-tab" id="dev" role="tabpanel" aria-labelledby="nav-dev-tab" tabindex="0">
-			<h2>Development</h2>
+			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-debug.php'; ?>
 		</div>
+		<?php endif; ?>
 	</div>
 	</div>
 </div>

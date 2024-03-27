@@ -2,7 +2,7 @@
 
 // Public facing functionality
 
-class Tapgoods_WP_Public {
+class Tapgoods_Public {
 
 	private $plugin_name;
 	private $version;

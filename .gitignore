@@ -37,8 +37,9 @@ cache
 /node_modules
 tapgoods-wp/vendor
 
-# Dev Config Folder
+# Dev Configs
 dev/certs/*
+localdev.env
 
 # Temp ignore composer
 # composer.json

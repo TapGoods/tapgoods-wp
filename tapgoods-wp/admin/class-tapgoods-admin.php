@@ -5,11 +5,11 @@
  * Defines the plugin name, version, and two examples hooks for how to
  * enqueue the admin-specific stylesheet and JavaScript.
  *
- * @package    Tapgoods_WP
- * @subpackage Tapgoods_WP/admin
+ * @package    Tapgoods
+ * @subpackage Tapgoods/admin
  * @author     Jeremy Benson <jeremy.benson@tapgoods.com>
  */
-class Tapgoods_WP_Admin {
+class Tapgoods_Admin {
 
 	private $plugin_name;
 	private $version;
@@ -21,20 +21,33 @@ class Tapgoods_WP_Admin {
 		$this->version     = $version;
 	}
 
+	public function conditional_includes() {
+		$screen = get_current_screen();
+
+		if ( ! $screen ) {
+			return;
+		}
+
+		switch ( $screen->id ) {
+			case 'options-permalink':
+				include __DIR__ . '/class-tapgoods-admin-permalinks.php';
+				break;
+		}
+	}
+
 	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    1.0.0
 	 */
-	public function enqueue_styles() {
+	public function enqueue_styles( $hook ) {
 		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), $this->version, 'all' );
 
 		// only enqueue these styles if on our settings pages
-		if ( $_GET['page'] == $this->plugin_name ) {
+		if ( 'toplevel_page_tapgoods' === $hook ) {
 			wp_enqueue_style( $this->plugin_name . '-bootstrap', TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', null, false );
 			wp_enqueue_style( $this->plugin_name . '-font-heebo', 'https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap', null, false );
 			wp_enqueue_style( 'wp-codemirror' );
-
 		}
 	}
 
@@ -43,10 +56,18 @@ class Tapgoods_WP_Admin {
 	 *
 	 * @since    1.0.0
 	 */
-	public function enqueue_scripts() {
-		if ( $_GET['page'] == $this->plugin_name ) {
+	public function enqueue_scripts( $hook ) {
+		if ( 'toplevel_page_tapgoods' === $hook ) {
 
-			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), $this->version, false );
+			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), $this->version, false );
+			wp_localize_script(
+				$this->plugin_name . '-admin',
+				'tg_ajax',
+				array(
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				)
+			);
+
 			wp_enqueue_script( $this->plugin_name . '-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), false );
 
 			// codemirror for custom css
@@ -64,6 +85,122 @@ class Tapgoods_WP_Admin {
 			wp_localize_script( 'jquery', 'tg_viewer_settings', $viewer_settings );
 
 		}
+	}
+
+	/**
+	 * Ajax function to encrypt and save API key
+	 *
+	 * @return void
+	 */
+	public static function tg_update_connection() {
+
+		check_ajax_referer( 'save', '_tgnonce_connection' );
+
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			die();
+		}
+
+		$api_key = '';
+		if ( isset( $_REQUEST['tapgoods_api_key'] ) ) {
+			$encryption        = new Tapgoods_Encryption();
+			$submitted_api_key = sanitize_text_field( wp_unslash( $_REQUEST['tapgoods_api_key'] ) );
+			$api_key           = $encryption->tg_encrypt( $submitted_api_key );
+		}
+
+		$success = update_option( 'tg_key', $api_key );
+
+		// TEST API KEY, if success, save, if fail, return error
+		$api = Tapgoods_Connection::get_instance();
+
+		// setting the second param to true will cause this to fail (for testing).
+		$response = $api->test_connection( null, false );
+
+		if ( is_wp_error( $response ) || 200 !== $response['response']['code'] ) {
+			update_option( 'tg_api_connected', false );
+			$args = array(
+				'type' => 'error',
+			);
+			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect, make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
+			wp_send_json_error( $notice );
+			die();
+		}
+
+		if ( $success ) {
+			update_option( 'tg_api_connected', true );
+			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
+			wp_send_json_success( $notice );
+		}
+
+		die();
+	}
+
+	public function tg_save_advanced() {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		if ( ! isset( $_REQUEST['_tgnonce_advanced'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['_tgnonce_advanced'] ) ), 'save' ) ) {
+			return false;
+		}
+
+		Tapgoods_Helpers::tgqm( 'tg_save_advanced' );
+		Tapgoods_Helpers::tgqm( '$_REQUEST:' );
+		Tapgoods_Helpers::tgqm( $_REQUEST );
+
+		Tapgoods_Helpers::tgqm( '$_POST:' );
+		Tapgoods_Helpers::tgqm( $_POST );
+	}
+
+	public function tg_save_dev() {
+
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		if ( ! isset( $_REQUEST['_tgnonce_dev'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['_tgnonce_dev'] ) ), 'save' ) ) {
+			return false;
+		}
+
+		Tapgoods_Helpers::tgqm( 'tg_save_dev' );
+		Tapgoods_Helpers::tgqm( '$_REQUEST:' );
+		Tapgoods_Helpers::tgqm( $_REQUEST );
+
+		Tapgoods_Helpers::tgqm( '$_POST:' );
+		Tapgoods_Helpers::tgqm( $_POST );
+	}
+
+	public function tg_save_styles( $input_submit ) {
+		// exit if we're not handling a post request.
+		if ( empty( $_POST ) ) {
+			return false;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		$action     = 'save';
+		$nonce_name = '_tgnonce_css';
+
+		if ( isset( $_REQUEST[ $nonce_name ] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST[ $nonce_name ] ) ), $action ) ) {
+
+			$custom_css = ( isset( $_REQUEST['tg-custom-css'] ) ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['tg-custom-css'] ) ) : false;
+			$success    = ( $custom_css ) ? Tapgoods_Filesystem::put_file( $input_submit, $custom_css, TAPGOODS_UPLOADS . 'custom.css', $action, $nonce_name ) : false;
+
+			return $success;
+		}
+	}
+
+	public function taxonomy_intercept() {
+		$screen = get_current_screen();
+		if ( 'edit-tg_category' !== $screen->id || 'edit-tg_tags' !== $screen->id ) {
+			return;
+		}
+		require_once TAPGOODS_PLUGIN_PATH . '/includes/tg_edit-tags.php';
+	}
+
+	public function tax_args_filter( $args, $taxonomy ) {
+		return $args;
 	}
 
 	public function tapgoods_admin_menu() {
@@ -96,11 +233,11 @@ class Tapgoods_WP_Admin {
 	}
 
 	// Used to print admin notices
-	public static function tapgoods_admin_notice( string $message, $args = [], $return = false ) {
+	public static function tapgoods_admin_notice( string $message, $args = [], $output = true ) {
 
 		$args = array_merge(
 			array(
-				'type'               => 'success',
+				'type'               => 'success', // Available types: error, success, warning, info.
 				'dismissible'        => true,
 				'additional_classes' => array( 'inline', 'notice-alt' ),
 				'attributes'         => array( 'data-slug' => 'plugin-slug' ),
@@ -109,14 +246,14 @@ class Tapgoods_WP_Admin {
 		);
 
 		// Buffer the output so we can return it wherever its needed
-		if ( $return ) {
+		if ( ! $output ) {
 			ob_start();
 		}
 		wp_admin_notice( $message, $args );
-		if ( $return ) {
-			$output = ob_get_contents();
+		if ( ! $output ) {
+			$notice = ob_get_contents();
 			ob_end_clean();
-			return $output;
+			return $notice;
 		}
 	}
 }

@@ -1,4 +1,5 @@
 "use strict";
+
 (function($,window,document,undefined) {
     $( document ).ready(function() {
         // show the current tab based on the hash fragment
@@ -17,12 +18,66 @@
             }
         });
 
+        const connectButton = $('#tg_update_connection');
+        const connectInput = $('#tapgoods_api_key');
+
         // show the correct tab if the url changes
         window.addEventListener( "hashchange", () => { show_hash_tab(get_hash()) } , false, );
         init_tooltips();
 
+        connectInput.on('change input', function(e) {
+            if( e.target.value === e.target.dataset.original ) {
+                connectButton.prop('disabled', true ).text( connectButton.data('original') );
+                return;
+            }
+            connectButton.removeAttr('disabled').text('CONNECT');
+        });
+
+        $('#tg_connection_form').on('submit', function(e) {
+            e.preventDefault();
+            connectButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> CONNECTING');
+            let data = $('#tg_connection_form').serialize() + '&action=tg_update_connection';
+            
+            $.ajax({
+                url: tg_ajax.ajaxurl,
+                type: 'post',
+                data: data,
+                success: function( response ) {
+                    console.log(response);
+                    if ( response.success ) {
+                        connectButton.prop('disabled', true).text('CONNECTED');
+                        const newVal = connectInput.val();
+                        connectInput.attr('data-original', newVal).attr('value', newVal );
+                    } else {
+                        connectButton.removeAttr('disabled').text('CONNECT');
+                    }
+                    const el = document.getElementById( "connection" );
+                    show_notice( response.data, el );
+
+                },
+                error: function( response ){
+                    console.log( response );
+                }
+            })
+        });
     });
 })(jQuery,window,document)
+
+function show_notice( notice, el ) 
+{
+    const template = document.createElement('div');
+    template.innerHTML = notice;
+    if( template.firstChild.classList.contains('is-dismissible') ) {
+        template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tg_dissmiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
+    }
+    el.insertAdjacentElement( 'afterbegin', template.firstChild );
+}
+
+function tg_dissmiss_notice( notice )
+{
+    jQuery( notice ).parent().slideUp("normal", function() {jQuery(this).remove();});
+    return false;
+}
 
 function get_hash() 
 {
