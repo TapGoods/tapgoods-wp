@@ -19,9 +19,7 @@ $notice            = Tapgoods_Admin::tapgoods_admin_notice(
 <form name="tapgoods_advanced" method="post", action="">
 	<?php wp_nonce_field( 'save', '_tgnonce_advanced' ); ?>
 	<div class="mb-3">
-		<label for="tg_inventory_permalink" class="form-label">TapGoods Inventory Post Type Permalink Setting</label>
-		<div class="form-text">This will control the rewrite setting for the TapGoods Inventory post type. By default we set the following structure <code>shop/%tg_category%/%postname%/</code></div>
-		<input type="text" class="form-control" name="tg_inventory_permalink" value="<?php echo esc_attr( $rewrite_permalink ); ?>">
+		<!-- Advanced Settings -->
 	</div>
 	<input type="submit" name="Connect" value="<?php echo esc_attr( $submit_text ); ?>" class="btn btn-primary bg-blue px-5 py-2 round">
 </form>

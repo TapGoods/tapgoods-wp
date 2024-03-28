@@ -6,8 +6,5 @@
 	<button class="nav-link" id="nav-styling-tab" data-bs-toggle="tab" data-bs-target="#styling" type="button" role="tab" aria-controls="nav-styling" aria-selected="false">Styling</button>
 	<button class="nav-link" id="nav-shortcodes-tab" data-bs-toggle="tab" data-bs-target="#shortcodes" type="button" role="tab" aria-controls="nav-shortcodes" aria-selected="false">Shortcodes</button>
 	<button class="nav-link" id="nav-advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab" aria-controls="nav-advanced" aria-selected="false">Advanced</button>
-	<?php if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) : ?>
-	<button class="nav-link" id="nav-dev-tab" data-bs-toggle="tab" data-bs-target="#dev" type="button" role="tab" aria-controls="nav-dev" aria-selected="false">Dev</button>
-	<?php endif; ?>
 </div>
 <?php

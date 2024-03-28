@@ -67,11 +67,6 @@ $form_action  = get_admin_url() . '?page=tapgoods';
 		<div class="tab-pane fade bg-white p-4" id="advanced" role="tabpanel" aria-labelledby="nav-advanced-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-advanced.php'; ?>
 		</div>
-		<?php if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) : ?>
-		<div class="tab-pane fade bg-white p-4 shortcodes-tab" id="dev" role="tabpanel" aria-labelledby="nav-dev-tab" tabindex="0">
-			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-debug.php'; ?>
-		</div>
-		<?php endif; ?>
 	</div>
 	</div>
 </div>
