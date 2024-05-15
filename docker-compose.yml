@@ -4,6 +4,7 @@ services:
 
   wordpress:
     image: wordpress:latest
+    container_name: wordpress
     restart: always
     ports:
       - 8080:80
@@ -19,6 +20,8 @@ services:
       - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
     extra_hosts:
       - wordpress.local:host-gateway
+    env_file:
+    - localdev.env
 
   db:
     image: mysql:8.0
@@ -30,6 +33,19 @@ services:
       MYSQL_RANDOM_ROOT_PASSWORD: '1'
     volumes:
       - db:/var/lib/mysql
+
+  phpmyadmin:
+    depends_on:
+      - db
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    links:
+    - db:mysql
+    ports:
+      - '8181:80'
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: password 
 
   nginx:
     image: nginx
@@ -43,7 +59,7 @@ services:
       - wordpress
 
   wpcli:
-    image: wordpress:cli-php7.4
+    image: wordpress:cli
     command: "wp --info"
     working_dir: /var/www/html
     environment:
@@ -57,6 +73,17 @@ services:
     depends_on:
       - db
       - wordpress
+
+  composer:
+      image: composer/composer
+      working_dir: /var/www/html/wp-content/plugins/tapgoods-wp
+      command: "install"
+      restart: 'no'
+      volumes:
+        - wordpress:/var/www/html:rw,cache
+        - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+      depends_on:
+        - wordpress
 
   # generate-certs:
   #   image: ubuntu:20.04
