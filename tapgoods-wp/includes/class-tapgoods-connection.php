@@ -34,8 +34,8 @@ class Tapgoods_Connection {
 		// Merge the passed conigs with defaults
 		$config = array_merge(
 			array(
-				'base_url'        => getenv_docker( 'base_url', 'https://openapi.tapgoods.com' ),
-				'tg_env'          => getenv_docker( 'tg_env', 'tapgoods.com' ),
+				'base_url'        => getenv_docker( 'base_url', 'https://openapi.stage.tapgoods.dev' ),
+				'tg_env'          => getenv_docker( 'tg_env', 'stage.tapgoods.dev' ),
 				'api_key'         => $this->key,
 				'no_cache_routes' => array(
 					'api/admin_auth/sign_in',
