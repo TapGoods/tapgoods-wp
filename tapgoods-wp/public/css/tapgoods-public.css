@@ -11183,11 +11183,11 @@ a > .tapgoods code {
 .tapgoods.tapgoods-inventory figure {
   border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
-.tapgoods.tapgoods-inventory .item {
+.tapgoods.tapgoods-inventory .item-wrap {
   background: white;
   padding: 10px;
 }
-.tapgoods.tapgoods-inventory .item br {
+.tapgoods.tapgoods-inventory .item-wrap br {
   display: none;
 }
 .tapgoods.tapgoods-inventory .item figure a {

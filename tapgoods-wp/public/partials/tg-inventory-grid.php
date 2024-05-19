@@ -68,8 +68,8 @@ $tg_pages = $query->max_num_pages;
 		<?php
 
 		$product_id = get_the_ID();
-
-		$price = tg_get_single_display_price( $product_id );
+		$tg_id      = get_post_meta( $product_id, 'tg_id', true );
+		$price      = tg_get_single_display_price( $product_id );
 
 		$url_params = array(
 			'redirectUrl' => $current_url,
@@ -88,8 +88,8 @@ $tg_pages = $query->max_num_pages;
 			$img_tag = Tapgoods_Public::get_img_tag( $pictures[0]['imgixUrl'], '254', '150' );
 		}
 		?>
-		<div class="col">
-			<div class="item">
+		<div id="tg-item-<?php echo esc_attr( $tg_id ); ?>" class="col item" data-tgId="<?php echo esc_attr( $tg_id ); ?>">
+			<div class="item-wrap">
 				<figure>
 					<a class="d-block" href="<?php the_permalink(); ?>">
 						<?php if ( ! empty( $pictures ) ) : ?>
