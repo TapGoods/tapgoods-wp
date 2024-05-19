@@ -531,7 +531,16 @@ function tg_get_sf_domain( $wp_location_id ) {
 }
 
 function tg_get_cart_url( $wp_location_id ) {
-	return get_term_meta( $wp_location_id, 'tg_cart_url', true );
+	$url = get_term_meta( $wp_location_id, 'tg_cart_url', true );
+	$event_start = tg_get_start_date() . 'T' . tg_get_start_time();
+	$event_end = tg_get_end_date() . 'T' . tg_get_end_time();
+	$params = array(
+		'eventStart' => $event_start,
+		'eventEnd'   => $event_end,
+	);
+
+	$cart_url = add_query_arg( $params, $url );
+	return $cart_url;
 }
 
 function tg_get_sign_in_url() {
@@ -568,6 +577,30 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
 
 	$url = add_query_arg( $params, $base_url );
 	return $url;
+}
+
+function tg_date_format() {
+	return 'Y-m-d';
+}
+
+function tg_time_format() {
+	return 'H:i';
+}
+
+function tg_get_start_date() {
+	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+}
+
+function tg_get_start_time() {
+	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 10:00 AM' ) );
+}
+
+function tg_get_end_date() {
+	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+}
+
+function tg_get_end_time() {
+	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 15:00' ) );
 }
 
 function tg_get_template_part() {

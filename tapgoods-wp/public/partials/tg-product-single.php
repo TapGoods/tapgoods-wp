@@ -20,6 +20,9 @@ $tg_per_page = ( isset( $_COOKIE['tg-per-page'] ) ) ? sanitize_text_field( wp_un
 
 $tg_id = get_post_meta( $post->ID, 'tg_id', true );
 
+$date_format = tg_date_format();
+$today       = wp_date( $date_format );
+
 global $wp;
 $current_page = home_url( $wp->request );
 $cart_url = tg_get_product_add_to_cart_url( $post->ID, array( 'redirectUrl' => $current_page ) );
@@ -64,16 +67,16 @@ $cart_url = tg_get_product_add_to_cart_url( $post->ID, array( 'redirectUrl' => $
 			<section class="misc col">
 				<div class="date-range">
 					<p>Know your event date/time? Set it now.</p>
-					<div class="dates-selector">
+					<div id="tg-dates-selector" class="dates-selector">
 						<div class="date-input-wrapper order-start">
 							<label><?php _e( 'Order Start', 'tapgoods' ); //phpcs:ignore ?></label>
-							<input type="date" name="eventStartDate" class="date-input form-control round">
-							<input name="eventStartTime" type="time" class="time-input form-control round">
+							<input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>">
+							<input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr( tg_get_start_time() ); ?>">
 						</div>
 						<div class="date-input-wrapper order-end">
 							<label><?php _e( 'Order End', 'tapgoods' ); //phpcs:ignore ?></label>
-							<input type="date" name="eventEndDate" class="date-input form-control round">
-							<input name="eventEndTime" type="time" class="time-input form-control round">
+							<input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>">
+							<input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr( tg_get_end_time() ); ?>">
 						</div>
 					</div>
 				</div>

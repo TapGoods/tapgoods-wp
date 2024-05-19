@@ -64,11 +64,24 @@
 		}
 
 		if ( $('#tg-per-page').length > 0 ) {
-			$('#tg-per-page').on( 'change', function(e){
+			$('#tg-per-page').on( 'change', function(e) {
 				let perPage = e.target.value;
-				console.log( perPage );
-				document.cookie = "tg-per-page="+perPage+";expires=0;domain="+tg_ajax.domain+";path=/"
+				document.cookie = "tg-per-page="+perPage+";expires=0;domain="+tg_ajax.domain+";path=/";
 				window.location.reload();
+			});
+		}
+
+		if( $('#tg-dates-selector').length>0 ) {
+			$('#tg-dates-selector input').on('change', function() {
+				let startDateVal = $('input[name="eventStartDate"]').val();
+				let startTimeVal = $('input[name="eventStartTime"]').val();
+				let eventStart = startDateVal + 'T' + startTimeVal;
+				let endDateVal = $('input[name="eventEndDate"]').val();
+				let endTimeVal = $('input[name="eventEndTime"]').val();
+				let eventEnd = endDateVal + 'T' + endTimeVal;
+				document.cookie = "tg-eventStart="+eventStart+";expires=0;domain="+tg_ajax.domain+";path=/";
+				document.cookie = "tg-eventEnd="+eventEnd+";expires=0;domain="+tg_ajax.domain+";path=/";
+				update_cart_url();
 			});
 		}
 
@@ -128,6 +141,19 @@
 			});
 		}
 
+		function update_cart_url() {
+			if ( $('#tg_cart').length > 0 ) {
+				let eventStart = ( tgGetCookie('tg-eventStart') );
+				let eventEnd = ( tgGetCookie('tg-eventEnd') );
+				let url = new URL( $('#tg_cart').data('target') );
+				let params = new URLSearchParams( url.search );
+				params.set( 'eventStart', eventStart );
+				params.set( 'eventEnd', eventEnd );
+				url.search = params;
+				$('#tg_cart').attr('data-target', url);
+			}
+		}
+
 		function tapgoods_search( event ) {
 			// event.preventDefault();
 			// console.log( event );
@@ -142,7 +168,9 @@
 		}
 
 		function tgGetCookie(name) {
-			return (name = (document.cookie + ';').match(new RegExp(name + '=.*;'))) && name[0].split(/=|;/)[1];
+			let value = (name = (document.cookie + ';').match(new RegExp(name + '=.*;'))) && name[0].split(/=|;/)[1];
+			if ( null === value ) return false;
+			return value;
 		}
 	});
 })( jQuery, window, document );
