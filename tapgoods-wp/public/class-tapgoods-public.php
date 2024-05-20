@@ -125,7 +125,7 @@ class Tapgoods_Public {
 			return $template;
 		}
 
-		$template = self::tg_locate_template( 'tg-search-results' );
+		$template = tg_locate_template( 'tg-search-results' );
 		return $template;
 	}
 

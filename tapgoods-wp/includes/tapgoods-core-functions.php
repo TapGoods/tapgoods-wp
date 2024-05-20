@@ -603,40 +603,6 @@ function tg_get_end_time() {
 	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 15:00' ) );
 }
 
-function tg_get_template_part() {
-	return false;
-}
-
-function tg_get_template() {
-	return false;
-}
-
-function tg_get_template_html() {
-	ob_start();
-	tg_get_template();
-	return ob_get_clean();
-}
-
-function tg_set_cookie() {
-	return false;
-}
-
-function tg_get_page_id() {
-	return false;
-}
-
-function tg_get_page_children() {
-	return false;
-}
-
-function tg_flush_rewrites_on_shop_page_save() {
-	return false;
-}
-
-function tg_fix_rewrite_rules() {
-	return false;
-}
-
 function tg_get_user_agent() {
 	return isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 }

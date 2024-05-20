@@ -32,7 +32,9 @@ class Tapgoods_Shortcodes {
 
 	private static function get_template( $tag ) {
 		$tag = str_replace( 'tapgoods-', 'tg-', $tag );
-		return TAPGOODS_PLUGIN_PATH . 'public/partials/' . str_replace( '_', '-', $tag ) . '.php';
+		$template_name = str_replace( '_', '-', $tag );
+
+		return tg_locate_template( $template_name );
 	}
 
 	// This function receives the arguments passed to the shortcode callback and loads the PHP template from /public/partials
