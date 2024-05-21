@@ -11,6 +11,7 @@ $connected    = false;
 $button_text  = 'CONNECT';
 $dev          = defined( 'TAPGOODS_DEV' ) && true === TAPGOODS_DEV;
 $form_action  = get_admin_url() . '?page=tapgoods';
+$tg_env       = getenv_docker( 'tg_env', 'stage.tapgoods.dev' );
 
 $enable_advanced = get_option( 'tg_enable_advanced', false );
 
@@ -27,22 +28,22 @@ $enable_advanced = get_option( 'tg_enable_advanced', false );
 		<div class="container text-center text-light px-0 mx-0">
 			<div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 gx-4 gy-3 m-0 p-0 justify-content-start align-items-stretch">
 				<div class="col">            
-					<a class='<?php echo $card_class; ?> bg-blue' href='https://business.tapgoods.com/admin/settings/order' target=”_blank”>
+					<a class='<?php echo esc_attr( $card_class ); ?> bg-blue' href='https://business.<?php echo esc_attr( $tg_env ); ?>/admin/settings/order' target=”_blank”>
 						<span class="dashicons dashicons-products icon py-2"></span><br>My Order Settings
 					</a>
 				</div>
 				<div class="col">
-					<a class='<?php echo $card_class; ?> bg-blue' href='https://business.tapgoods.com/admin/storefront/pages/shop' target=”_blank”>
+					<a class='<?php echo esc_attr( $card_class ); ?> bg-blue' href='https://business.<?php echo esc_attr( $tg_env ); ?>/admin/storefront/pages/shop' target=”_blank”>
 						<span class="dashicons dashicons-cart icon py-2"></span><br>Shop + Cart Settings
 					</a>
 				</div>
 				<div class="col">
-					<a class='<?php echo $card_class; ?> bg-blue' href='https://business.tapgoods.com/inventory' target=”_blank”>
+					<a class='<?php echo esc_attr( $card_class ); ?> bg-blue' href='https://business.<?php echo esc_attr( $tg_env ); ?>/inventory' target=”_blank”>
 						<span class="dashicons dashicons-screenoptions icon py-2"></span><br>Manage Inventory
 					</a>            
 				</div>
 				<div class="col">
-					<a class='<?php echo $card_class; ?> bg-purple' href='https://tapgoods.zendesk.com' target=”_blank”>
+					<a class='<?php echo esc_attr( $card_class ); ?> bg-purple' href='https://tapgoods.zendesk.com' target=”_blank”>
 						<span class="dashicons dashicons-editor-help icon py-2"></span><br>Help Articles
 					</a>
 				</div>
