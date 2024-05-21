@@ -34,7 +34,7 @@ $today       = wp_date( $date_format );
 				<?php _e( 'Categories', 'tapgoods' ); //phpcs:ignore ?>
 				</button>
 			</h2>
-			<div id="collapseOne" class="accordion-collapse collapse category-links">
+			<div id="collapseOne" class="accordion-collapse collapse category-links show">
 				<?php foreach ( $categories as $category ) : ?>
 					<a class="category-link" href="<?php echo esc_url( get_term_link( $category, 'tg_category' ) ); ?>">
 					<?php echo esc_html( $category->name ); ?>
