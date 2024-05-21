@@ -587,6 +587,11 @@ function tg_time_format() {
 	return 'H:i';
 }
 
+function tg_get_page_id( $page ) {
+	$page_id = get_option( $page, false );
+	return $page_id;
+}
+
 function tg_get_start_date() {
 	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
 }
