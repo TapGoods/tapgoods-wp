@@ -31,18 +31,14 @@ class Tapgoods_Connection {
 
 	private function get_connection( $configs = array() ) {
 
+		$env = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
 		// Merge the passed conigs with defaults
 		$config = array_merge(
 			array(
-				'base_url'        => getenv_docker( 'base_url', 'https://openapi.stage.tapgoods.dev' ),
-				'tg_env'          => getenv_docker( 'tg_env', 'stage.tapgoods.dev' ),
+				'base_url'        => "https://openapi.{$env}",
+				'tg_env'          => $env,
 				'api_key'         => $this->key,
-				'no_cache_routes' => array(
-					'api/admin_auth/sign_in',
-					'api/auth/sign_in',
-					'api/auth/validate_token',
-					'api/admin_auth/validate_token',
-				),
+				'no_cache_routes' => array(),
 			),
 			$configs
 		);
@@ -795,6 +791,11 @@ class Tapgoods_Connection {
 			}
 		}
 		return $count;
+	}
+
+	public function get_client() {
+		$client = $this->get_connection();
+		return $client;
 	}
 
 	public function tg_get_colors_from_rest() {
