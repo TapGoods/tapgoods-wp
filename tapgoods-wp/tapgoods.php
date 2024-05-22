@@ -72,3 +72,15 @@ function init_tapgoods_wp() {
 }
 
 add_action( 'plugins_loaded', 'init_tapgoods_wp' );
+
+if ( ! function_exists( 'getenv_docker' ) ) {
+	function getenv_docker( $env, $default ) {
+		if ( $fileEnv = getenv( $env . '_FILE' ) ) {
+			return rtrim( file_get_contents( $fileEnv ), "\r\n" );
+		} elseif ( ( $val = getenv( $env ) ) !== false ) {
+			return $val;
+		} else {
+			return $default;
+		}
+	}
+}
