@@ -11176,6 +11176,19 @@ a > .tapgoods code {
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
   text-decoration: none;
 }
+.tapgoods.location-select {
+  background: #fff;
+  border-radius: 2px;
+}
+.tapgoods.location-select .wrapper {
+  background-color: #fff;
+}
+.tapgoods.location-select .icon {
+  color: var(--tg-color-primary);
+}
+.tapgoods.location-select br {
+  display: none;
+}
 .tapgoods.tapgoods-inventory img {
   max-height: 100%;
   max-width: 100%;

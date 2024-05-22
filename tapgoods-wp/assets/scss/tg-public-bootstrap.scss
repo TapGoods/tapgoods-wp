@@ -177,6 +177,19 @@
 		border-bottom: 1px solid rgba(0,0,0,.2);
 		text-decoration: none;
 	}
+	&.location-select {
+		background: #fff;
+		border-radius: 2px;
+		.wrapper {
+			background-color: #fff;
+		}
+		.icon {
+			color: var(--tg-color-primary);
+		}
+		br {
+			display: none;
+		}
+	}
 
 	&.tapgoods-inventory {
 		img {

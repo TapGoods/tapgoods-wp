@@ -288,6 +288,7 @@ class Tapgoods_Connection {
 				}
 
 				$location_details['slug'] = sanitize_title( $location_details['physicalAddress']['city'] . '-' . $location_details['physicalAddress']['locale'] );
+				$location_details['display_locale'] = ucwords( $location_details['physicalAddress']['city'] ) . ', ' . strtoupper( $location_details['physicalAddress']['locale'] );
 
 				$sf_shop_settings = (array) $location_details['storefrontShopSettings'];
 				$settings_count   = count( $sf_shop_settings );

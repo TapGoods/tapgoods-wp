@@ -47,7 +47,7 @@ class Tapgoods_Shortcodes {
 
 		ob_start();
 		include $template;
-		return do_shortcode( ob_get_clean() );
+		return do_shortcode( shortcode_unautop( ob_get_clean() ) );
 	}
 
 	public static function get_shortcodes() {

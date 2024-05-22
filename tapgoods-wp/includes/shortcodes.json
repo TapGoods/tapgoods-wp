@@ -44,6 +44,15 @@
         "description": "Displays the Inventory Search input",
         "atts": {}
     },
+    "tapgoods-location-select": {
+        "name": "Location Select",
+        "description": "Displays location select",
+        "atts": {
+            "display_name": {
+                "default": false
+            }
+        }
+    },
     "tapgoods-inventory-grid": {
         "name": "Inventory Grid",
         "description": "Displays the inventory grid",
