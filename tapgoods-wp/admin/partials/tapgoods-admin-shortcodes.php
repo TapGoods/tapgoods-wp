@@ -8,7 +8,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 <div class="container">
 <?php foreach ( $shortcodes_info as $shortcode => $info ) : ?>
 <div class="row justify-content-start align-items-center mb-3">
-	<div class="col-2">
+	<div class="col-2 ps-0">
 		<label><?php echo $info['name']; ?></label>
 	</div>
 	<div class="col-8">
