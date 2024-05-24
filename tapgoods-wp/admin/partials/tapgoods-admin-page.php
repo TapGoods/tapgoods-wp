@@ -11,7 +11,7 @@ $connected    = false;
 $button_text  = 'CONNECT';
 $dev          = defined( 'TAPGOODS_DEV' ) && true === TAPGOODS_DEV;
 $form_action  = get_admin_url() . '?page=tapgoods';
-$tg_env       = getenv_docker( 'tg_env', 'stage.tapgoods.dev' );
+$tg_env       = getenv_docker( 'tg_env', 'tapgoods.com' );
 
 $enable_advanced = get_option( 'tg_enable_advanced', false );
 
