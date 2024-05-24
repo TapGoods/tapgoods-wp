@@ -22,6 +22,7 @@
         // setup the inputs for the connection form
         const connectButton = $('#tg_update_connection');
         const connectInput = $('#tapgoods_api_key');
+        const syncButton = $('#tg_api_sync');
 
         // show the correct tab if the url changes
         window.addEventListener( "hashchange", () => { show_hash_tab(get_hash()) } , false, );
@@ -30,22 +31,28 @@
         connectInput.on('change input', function(e) {
             if( e.target.value === e.target.dataset.original ) {
                 connectButton.prop('disabled', true ).text( connectButton.data('original') );
+                if( '' !== e.target.value) {
+                    syncButton.show();
+                }
                 return;
             }
             connectButton.removeAttr('disabled').text('CONNECT');
+            syncButton.hide();
         });
 
         $('#tg_connection_form').on('submit', { btn: connectButton, input: connectInput }, tg_connect);
-        $('#tg_api_sync').on('click', tg_sync);
+        syncButton.on('click', tg_sync);
     });
 
     function tg_connect(event) {
         event.preventDefault();
         let connectButton = event.data.btn;
         let connectInput = event.data.input;
+        const syncButton = $('#tg_api_sync');
         connectButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> CONNECTING');
         let data = $('#tg_connection_form').serialize() + '&action=tg_update_connection';
-        
+        const el = document.getElementById( "tg_ajax_connection" );
+
         console.log(tg_ajax.ajaxurl);
         console.log(data);
         $.ajax({
@@ -59,15 +66,17 @@
                         connectButton.prop('disabled', true).text('CONNECTED');
                         const newVal = connectInput.val();
                         connectInput.attr('data-original', newVal).attr('value', newVal );
+                        syncButton.show();
                     } else {
                         connectButton.removeAttr('disabled').text('CONNECT');
+                        syncButton.hide();
                     }
-                    const el = document.getElementById( "tg_connection_test" );
                     show_notice( response.data, el );    
                 // }, 1000 );   
             },
             error: function( response ){
                 show_notice( response.data, el );
+                syncButton.hide();
                 console.log( response );
             }
         })
@@ -79,8 +88,8 @@
         const nonce = $('#_tgnonce_connection').val();
         const syncBtn = $('#tg_api_sync');
         syncBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> WORKING');
-
         const url = tg_ajax.ajaxurl + '?action=tg_api_sync&_tgnonce_connection=' + nonce;
+        const statusEl = document.getElementById('tg_connection_test');
         $.ajax({
             url: url,
             type: 'get',
@@ -88,27 +97,33 @@
                 console.log(response);
                 // setTimeout( function(){
                     syncBtn.removeAttr('disabled').text('SYNC');
+                    show_notice( response.data, statusEl );
+
                 // }, 2000 );
             },
             error: function( response ){
-                console.log('error');
-                console.log( response );
-            }
+                show_notice( response.data, statusEl );
+            },
         });
+    }
+
+    function show_notice( notice, el )
+    {
+        console.log(el);
+        const template = document.createElement('div');
+        template.innerHTML = notice;
+        if( template.firstChild.classList.contains('is-dismissible') ) {
+            template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tg_dissmiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
+        }
+        // el.insertAdjacentElement( 'afterbegin', template.firstChild );
+        el.innerHTML = notice;
+        $(el).removeAttr('hidden');
     }
 })(jQuery,window,document)
 
 
 
-function show_notice( notice, el ) 
-{
-    const template = document.createElement('div');
-    template.innerHTML = notice;
-    if( template.firstChild.classList.contains('is-dismissible') ) {
-        template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tg_dissmiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
-    }
-    el.insertAdjacentElement( 'afterbegin', template.firstChild );
-}
+
 
 function tg_dissmiss_notice( notice )
 {

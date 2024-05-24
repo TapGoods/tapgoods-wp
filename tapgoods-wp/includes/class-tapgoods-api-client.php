@@ -47,6 +47,10 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 			return false;
 		}
 
+		if ( array_key_exists( 'message', $response ) ) {
+			return false;
+		}
+
 		$location_ids   = $response['data']['bearerTokenValidator']['locationIds'];
 		$transient_name = $this->transient_name( 'location_ids' );
 		set_transient( $transient_name, $location_ids, 300 );
@@ -65,7 +69,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 			return $transient;
 		}
 
-		$request  = $this->validate_key();
+		$request = $this->validate_key();
 
 		if ( false === $request ) {
 			return false;
@@ -765,9 +769,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 	public function tgdev_test_api() {
 		$test = $this->validate_key();
-		// $tokens  = $this->tgdev_get_location_tokens();
-		// $success = $this->validate_location_token( $tokens );
-		Tapgoods_Helpers::tgqm( $success );
+		Tapgoods_Helpers::tgqm( $test );
 
 		if ( false === $test ) {
 			return false;

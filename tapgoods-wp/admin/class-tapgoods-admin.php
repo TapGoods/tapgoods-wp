@@ -112,18 +112,16 @@ class Tapgoods_Admin {
 		$client = Tapgoods_Connection::get_instance();
 
 		// setting the second param to true will cause this to fail (for testing).
-		$response = $client->test_connection();
+
+		try {
+			$response = $client->test_connection( $submitted_api_key );
+		} catch ( error $e ) {
+			self::connection_failed();
+		}
 		// $response = true;
 
-		// if ( is_wp_error( $response ) || 200 !== $response['response']['code'] ) {
-		if ( is_wp_error( $response ) ) {
-			update_option( 'tg_api_connected', false );
-			$args = array(
-				'type' => 'error',
-			);
-			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect, make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
-			wp_send_json_error( $notice );
-			die();
+		if ( false === $response || is_wp_error( $response ) ) {
+			self::connection_failed();
 		}
 
 		if ( $success ) {
@@ -132,6 +130,17 @@ class Tapgoods_Admin {
 			wp_send_json_success( $notice );
 		}
 
+		die();
+	}
+
+	private static function connection_failed() {
+		tg_write_log( 'test_connection failed' );
+		update_option( 'tg_api_connected', false );
+		$args = array(
+			'type' => 'error',
+		);
+		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect, make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
+		wp_send_json_error( $notice );
 		die();
 	}
 

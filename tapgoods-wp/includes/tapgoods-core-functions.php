@@ -201,6 +201,9 @@ function tg_write_log( $data ) {
 		if ( is_array( $data ) || is_object( $data ) ) {
 			error_log( 'tgwpdev: ' . print_r( $data, true ) );
 		} else {
+			ob_start();
+			var_dump( $data );
+			$data = ob_get_clean();
 			error_log( 'tgwpdev: ' . $data );
 		}
 	}
@@ -220,7 +223,7 @@ function tg_parse_request( $wp ) {
 		// Do a term query before the main query to see if the term is found
 		$slug      = $wp->query_vars['tg_category'];
 		$args      = array(
-			'taxonomy' => array( 'tg_category' ),
+			'taxonomy' => array( 'tg_category', 'tg_tags' ),
 			'slug'     => $slug,
 			'count'    => 1,
 			'hide_empty' => false,
