@@ -2,17 +2,30 @@
     --tg-blue: #278ADA;
     --tg-purple: #936FAF;
     --text-dark: #0E2C44;
+    --tg-inactive: #7D98B0;
+    --tg-disabled: #7194AC;
+
 }
 
 .tapgoods {
     font-family: 'Heebo', sans-serif;
     max-width: 909px;
-    color: var(--text-dark);    
+    color: var(--text-dark);
 
     *,
     *::before,
     *::after {
       box-sizing: border-box;
+    }
+
+    & button#tg_update_connection {
+        font-size: 1em;
+        border-color: transparent;
+        &:disabled { background-color: #7194AC; }
+    }
+    
+    & button#tg_api_sync {
+        font-size: 1em;
     }
 
     & .bg-blue {
@@ -24,9 +37,9 @@
     }
     
     & .nav-link {
-        color: var(--text-dark);
+        color: var(--tg-inactive);
     }
-    
+    * .nav-link:hover { color: var(--tg-blue); }
     & .nav-link.active {
         color: var(--tg-blue);
         font-weight: bold;

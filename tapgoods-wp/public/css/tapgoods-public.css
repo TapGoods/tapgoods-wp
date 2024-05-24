@@ -11240,6 +11240,9 @@ a > .tapgoods code {
   border-top: 1px solid var(--tg-light-secondary);
   border-bottom: 1px solid var(--tg-light-secondary);
 }
+.tapgoods .categories br {
+  display: none;
+}
 .tapgoods .tg-filter a.category-link {
   display: block;
   padding: 1rem 60px;

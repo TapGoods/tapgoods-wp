@@ -245,9 +245,12 @@
 		}
 	}
 
-	.categories h4 {
-		border-top: 1px solid var(--tg-light-secondary);
-		border-bottom: 1px solid var(--tg-light-secondary);
+	.categories {
+		h4 {
+			border-top: 1px solid var(--tg-light-secondary);
+			border-bottom: 1px solid var(--tg-light-secondary);
+		}
+		br { display: none; }
 	}
 
 	.tg-filter a.category-link {
