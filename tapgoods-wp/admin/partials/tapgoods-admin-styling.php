@@ -14,9 +14,11 @@ $nonce        = 'tapgoods-save-custom-css';
 $success      = false;
 $tapgoods_css = Tapgoods_Filesystem::get_file( TAPGOODS_PLUGIN_PATH . '/public/css/tapgoods-public.css' );
 $save_text    = 'Save';
+$tg_env       = getenv_docker( 'tg_env', 'tapgoods.com' );
 
 ?>
 <h2>Styling</h2>
+<p>This will override the styling in your <a href="https://business.<?php echo $tg_env; //phpcs:ignore ?>/admin/storefront/wordpress" target="_blank" class="link">TapGoods Storefront Settings</a>.</p>
 <h3>TapGoods Styles</h3>
 <textarea placeholder="" id="tg-css" spellcheck="false"><?php echo esc_textarea( $tapgoods_css ); ?></textarea>
 
@@ -33,6 +35,6 @@ $custom_css = Tapgoods_Filesystem::get_file( TAPGOODS_UPLOADS . 'custom.css' );
 	<?php wp_nonce_field( 'save', '_tgnonce_css' ); ?>
 	<textarea placeholder="" name="tg-custom-css" id="tg-custom-css" class="mb-2" spellcheck="false"><?php echo esc_textarea( $custom_css ); ?></textarea>
 	<hr class="mb-2">
-	<input name="<?php echo esc_attr( $input_submit ); ?>" type="submit" class="btn btn-primary round" value="<?php esc_attr_e( 'Save', 'tapgoods' ); ?>">
+	<input name="<?php echo esc_attr( $input_submit ); ?>" type="submit" class="btn btn-primary round px-5" value="<?php esc_attr_e( 'SAVE', 'tapgoods' ); ?>">
 <form>
 <?php

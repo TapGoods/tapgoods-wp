@@ -28,6 +28,7 @@
     }
     
     & .nav-link.active {
+        color: var(--tg-blue);
         font-weight: bold;
     }
     
@@ -65,6 +66,9 @@
     #styling pre {
         max-height: 50vh;
     }
+    & h3 {
+        font-size: 1em;
+    }
 }
 
 .toplevel_page_tapgoods > div.dashicons-before {
@@ -89,3 +93,11 @@
     }
 }
 
+.btn.btn-primary {
+    background-color: var(--tg-blue);
+    font-weight: bold;
+}
+
+.btn.btn-primary:hover {
+    background-color: var(--tg-blue);
+}
