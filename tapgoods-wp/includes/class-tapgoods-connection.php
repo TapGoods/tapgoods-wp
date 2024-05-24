@@ -115,7 +115,6 @@ class Tapgoods_Connection {
 		$this->hash         = wp_hash( current_time( 'mysql' ) );
 		$this->is_active    = 1;
 		$this->u_sync_start = current_time( 'timestamp' );
-		tg_write_log('sync start: ' . $this->u_sync_start );
 
 		do_action( 'tg_start_api_sync', $this->u_sync_start );
 
@@ -170,13 +169,7 @@ class Tapgoods_Connection {
 		$time      = current_time( 'timestamp' ); // phpcs:ignore
 		$sync_info = get_option( 'tg_last_sync_info' );
 
-		tg_write_log( $time );
-		tg_write_log( $sync_info['last_sync_end'] );
-
 		$time_ago     = $time - $sync_info['last_sync_end'];
-
-		tg_write_log( $time_ago );
-
 		$time_ago_str = tg_seconds_to_string( $time_ago );
 		$duration_str = tg_seconds_to_string( $sync_info['last_sync_duration'] );
 
@@ -272,7 +265,7 @@ class Tapgoods_Connection {
 
 		// we should already be connected and have this info, but if we don't then try to validate the key and grab the ids one more time
 		if ( empty( $location_ids ) || empty( $business_id ) ) {
-			tg_write_log( 'no ids' );
+
 			$business = $this->get_business();
 			if ( false === $business ) {
 				return false;
@@ -291,8 +284,6 @@ class Tapgoods_Connection {
 
 		$location_info = get_transient( $location_transient );
 		$location_info = false;
-
-		tg_write_log( $location_ids );
 
 		if ( false === $location_info || '' === $location_info || null === $location_info ) {
 
