@@ -1,0 +1,446 @@
+.tapgoods {
+	// scss-docs-start import-stack
+	// Configuration
+	// 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
+	@import "../../../node_modules/bootstrap/scss/functions";
+
+	// 2. Include any default variable overrides here
+
+	// 3. Include remainder of required Bootstrap stylesheets
+	@import "../../../node_modules/bootstrap/scss/variables";
+	@import "../../../node_modules/bootstrap/scss/variables-dark";
+
+	// 4. Include any default map overrides here
+	// $primary: #278ADA;
+	// $danger: #CA2135;
+	// $success: #54C06E;
+	// $warning: #FF886D;
+	// $pink: #D3347F;
+	// $purple: #966CB8;
+
+	//button variables
+	// $btn-padding-x: 30px;
+	// $btn-padding-y: 5px;
+	// $btn-border-width: 2px;
+	// $btn-border-radius: 2px;
+	// $btn-color: white;
+
+	// Create your own map
+	$custom-colors: (
+	"whitegray": #E0E5E9,
+	"lightgray": #C1CDD7,
+	// 	"midgray": #8FA9BE,
+	// 	"cobalt": #466B88,
+	// 	"slate": #1E3E58,
+	// 	"navy": #0E2C44,
+	// 	"midnight": #071827,
+	// 	"offwhite": #EAEAEA,
+	// 	"rollover": #EDF0F3,
+	// 	"pink": $pink,
+	// 	"purple": $purple,
+	// 	"primary": $primary,
+	// 	"danger": $danger,
+	// 	"success": $success,
+	// 	"warning": $warning
+	);
+
+	$accordion-icon-color: lightgray;
+	$accordion-icon-active-color: lightgray;
+
+
+	// Merge the maps
+	$theme-colors: map-merge($theme-colors, $custom-colors);
+
+	// 5. Include remainder of required parts
+	@import "../../../node_modules/bootstrap/scss/maps";
+	@import "../../../node_modules/bootstrap/scss/mixins";
+	@import "../../../node_modules/bootstrap/scss/root";
+
+	// 6. Optional includes
+
+	@import "../../../node_modules/bootstrap/scss/utilities";
+	@import "../../../node_modules/bootstrap/scss/buttons";
+	@import "../../../node_modules/bootstrap/scss/card";
+	@import "../../../node_modules/bootstrap/scss/nav";
+	@import "../../../node_modules/bootstrap/scss/navbar";
+	@import "../../../node_modules/bootstrap/scss/forms";
+	@import "../../../node_modules/bootstrap/scss/tooltip";
+	@import "../../../node_modules/bootstrap/scss/spinners";
+	@import "../../../node_modules/bootstrap/scss/button-group";
+	@import "../../../node_modules/bootstrap/scss/reboot";
+	@import "../../../node_modules/bootstrap/scss/type";
+	@import "../../../node_modules/bootstrap/scss/images";
+	@import "../../../node_modules/bootstrap/scss/containers";
+	@import "../../../node_modules/bootstrap/scss/grid";
+	@import "../../../node_modules/bootstrap/scss/tables";
+	@import "../../../node_modules/bootstrap/scss/transitions";
+	@import "../../../node_modules/bootstrap/scss/dropdown";
+	@import "../../../node_modules/bootstrap/scss/accordion";
+	@import "../../../node_modules/bootstrap/scss/breadcrumb";
+	@import "../../../node_modules/bootstrap/scss/pagination";
+	@import "../../../node_modules/bootstrap/scss/badge";
+	@import "../../../node_modules/bootstrap/scss/alert";
+	@import "../../../node_modules/bootstrap/scss/progress";
+	@import "../../../node_modules/bootstrap/scss/list-group";
+	@import "../../../node_modules/bootstrap/scss/close";
+	@import "../../../node_modules/bootstrap/scss/toasts";
+	@import "../../../node_modules/bootstrap/scss/modal";
+	@import "../../../node_modules/bootstrap/scss/popover";
+	@import "../../../node_modules/bootstrap/scss/carousel";
+	@import "../../../node_modules/bootstrap/scss/offcanvas";
+	@import "../../../node_modules/bootstrap/scss/placeholders";
+	@import "../../../node_modules/bootstrap/scss/helpers";
+
+	// 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
+	@import "../../../node_modules/bootstrap/scss/utilities/api";
+
+	$accordion-icon-color: light;
+	$accordion-icon-active-color: light;
+
+	// 8. Additional custom styles
+	max-width: 100% !important;
+	
+	&#tg_cart {
+	    border-radius: var(--tg-button-border);
+		border: none;
+		padding: 2px 10px;	
+		.icon {
+			color: var(--tg-color-primary);
+		}
+		&.has-items {
+			background-color: var(--tg-color-primary);
+			.icon {
+				color: var(--tg-light-font);
+			}
+		}
+		&:focus {
+			outline-color: var(--tg-dark-secondary);
+		}
+	}
+
+	.tg-search-container {
+		position: relative;
+	}
+	
+	#tg-search.form-control {
+		border: 2px solid;
+		border-radius: 2px;
+		border-color: var(--tg-color-primary);
+	}
+
+	#tg-search-form {
+		display: grid;
+		grid-template-columns: 1fr 92px;
+		align-items: center;
+		grid-gap: 42px;
+
+		select {
+			border-radius: var(--tg-button-border);
+			width: 50px;
+			height: 30px;
+			background-color: var(--tg-color-primary);
+			color: var(--tg-light-font);
+			font-size: 12px;
+			padding-left: 4px;
+			place-self: center end;
+		}
+		br {
+			display: none;
+		}
+	}
+	
+	.suggestion-box {
+		position: absolute;
+		background: white;width: 100%;
+		transition: max-height 0.5s;
+		overflow-y: auto;
+		max-height: 0px;
+		z-index: 999;
+		border-radius: 2px;
+		box-shadow: 1px 2px 5px rgba(0, 0, 0, .15);
+	}
+
+	.suggestion-box:has(li) {
+		max-height: 200px;
+	}
+	
+	#suggestion-list {
+		list-style: none;
+		display: block;
+		padding-left: 0;
+		margin-bottom: 0;
+		height: auto;
+	}
+
+	.suggestion-list .result-item .result-link {
+		display: block;
+		border-bottom: 1px solid rgba(0,0,0,.2);
+		text-decoration: none;
+	}
+	&.location-select {
+		background: #fff;
+		border-radius: 2px;
+		.wrapper {
+			background-color: #fff;
+		}
+		.icon {
+			color: var(--tg-color-primary);
+		}
+		br {
+			display: none;
+		}
+	}
+
+	&.tapgoods-inventory {
+		img {
+			max-height: 100%;
+			max-width: 100%;
+		}
+		
+		figure {
+			border-bottom: 1px solid rgb(0 0 0 / 7%);
+		}
+
+		.item-wrap {
+			background: white;
+			padding: 10px;
+			br { display: none; }
+		}
+
+		.item figure a {
+			min-height: 150px;
+		}
+
+		.date-input-wrapper {
+			display: grid;
+			grid-gap: 10px 5px;
+			grid-template-columns: 2fr 3fr 2fr;
+			align-items: center;
+			margin-bottom: 20px;
+			font-size: 12px;
+			br { display: none; }
+		}
+
+		.dates-selector .form-control {
+			border-radius: var(--tg-button-border);
+			background-color: white;
+			font-size: 12px;
+			color: var(--tg-dark-font);
+		}
+	
+		.dates-selector label {
+			color: var(--tg-light-font);
+		}
+	
+		.tg-filter {
+			background-color: var(--tg-color-primary);
+			color: var(--tg-light-font);
+		}
+	
+		.tg-filter h4 {
+			font-size: 14px;
+			font-weight: bolder;
+			line-height: 40px;
+			padding-left: 20px;
+		}
+	}
+
+	.categories {
+		h4 {
+			border-top: 1px solid var(--tg-light-secondary);
+			border-bottom: 1px solid var(--tg-light-secondary);
+		}
+		br { display: none; }
+	}
+
+	.tg-filter a.category-link {
+		display: block;
+		padding: 1rem 60px;
+		text-decoration: none;
+	}
+	
+	.category-links {
+		background-color: var(--tg-dark-secondary);
+	}
+
+	.add-to-cart {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		grid-column-gap: 10px;
+		br { display: none; }
+	}
+
+	.add-to-cart input.form-control {
+		background-color: lightgray;
+		border-radius: var(--tg-button-border);
+	}
+	
+	.add-to-cart button {
+		background-color: var(--tg-color-primary) !important;
+		border-radius: var(--tg-button-border);
+	}
+
+	.tapgoods-inventory .price {
+		font-size: 12px;
+	}
+
+	.tapgoods-inventory .item-name {
+		font-size: 12px;
+		text-decoration: none;
+	}
+
+	.accordion-button::after {
+		background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
+	}
+
+	.accordion-button:not(.collapsed)::after {
+		background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
+	}
+
+	.item figure a {
+	    min-height: 150px;
+	}
+
+	.inventory-single {
+		max-width: 1280px;
+
+		.inventory-single-content {
+			background: white;
+		}
+
+		.name {
+			font-weight: bold;
+			font-size: 16px;
+		}
+
+		.thumbnail-btn {
+			border: none;
+			background: transparent;
+			padding: 0;
+		}
+
+		.summary.col {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.pricing {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			grid-column-gap: 15px;
+			line-height: 30px;
+			grid-auto-rows: 30px;
+
+			span {
+				font-size: 14px;
+			}
+		}
+		
+		.pricing span:nth-child(odd) {
+			text-align: right;
+		}
+
+		.details {
+			border-top: 1px solid #8080803d;
+			border-bottom: 1px solid #8080803d;
+		}
+
+		.quantity-select {
+			grid-column: span 2;
+			position: relative;
+			display: grid;
+			grid-template-columns: 1fr 2fr;
+			grid-column-gap: 10px;
+			align-items: end;
+
+			.qty-input {
+				height: 30px;
+				background: lightgray;
+				border-radius: var(--tg-button-border);
+			}
+
+			.btn {
+				height: 30px;
+				background-color: var(--tg-color-primary);
+				color: var(--tg-light-font);
+				border-radius: var(--tg-button-border);
+				line-height: 30px;
+				font-weight: 700;
+				font-size: 11px;
+				padding: 0;
+			}
+		}
+
+		span.carousel-control-next-icon,
+		span.carousel-control-prev-icon {
+			background-color: #909090;
+			border-radius: 100%;
+			box-sizing: border-box;
+			background-size: 60%;
+			background-position: center center;
+		}
+
+		#tg-dimensions p {
+			font-size: 12px;
+		}
+		
+		.label {
+			color: var(--tg-color-primary);
+			font-weight: bold;
+		}
+
+		.date-range {
+			.dates-selector {
+				display: grid;
+				padding-bottom: 20px;
+				border-bottom: 1px solid #e5e8e9;
+				grid-template-columns: 1fr 1fr;
+				grid-column-gap: 20px;
+			}
+
+			p {
+				position: relative;
+				height: 18px;
+				color: #278ada;
+				color: var(--tg-color-primary );
+				text-align: center;
+				font-size: 12px;
+				&:before,
+				&:after {
+					content: " ";
+					position: absolute;
+					top: 50%;
+					height: 1px;
+					width: 25%;
+					background-color: #e5e8e9;
+				}
+				&:before {
+					left: 0;
+				}
+				&:after {
+					right: 0;
+				}
+			}
+			label {
+				color: var(--tg-color-primary);
+				grid-column: span 2;
+			}
+
+			.date-input-wrapper {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				grid-column-gap: 10px;
+			}
+
+			.dates-selector .form-control {
+				background-color: lightgray;
+				border-radius: var(--tg-button-border);
+			}
+
+		}
+	
+	}
+
+
+
+}

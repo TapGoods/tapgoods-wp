@@ -1,0 +1,88 @@
+{
+    "tapgoods-cart": {
+        "name": "Cart",
+        "description": "Displays the TapGoods Cart Button",
+        "atts": {
+            "foo": {
+                "att": "Foo",
+                "desc": "Describes Foo Att",
+                "default": "bar",
+                "type": "input"                
+            }
+        }
+    },
+    "tapgoods-inventory": {
+        "name": "Inventory",
+        "description": "Displays the TapGoods Shop with Inventory, Filters, and Search",
+        "atts": {
+            "show_search": {
+                "att": "Show Search",
+                "desc": "Displays a search input above the product grid, defaults to true",
+                "default": true,
+                "type": "toggle"
+            },
+            "show_filters": {
+                "att": "Show Filters",
+                "desc": "Displays the filter sidebar next to the product grid",
+                "default": true,
+                "type": "toggle"
+            }
+        }
+    },
+    "tapgoods-sign-in": {
+        "name": "Sign In",
+        "description": "Displays the Sign-In button",
+        "atts": {}
+    },
+    "tapgoods-sign-up": {
+        "name": "Sign Up",
+        "description": "Displays the Sign-Up button",
+        "atts": {}
+    },
+    "tapgoods-search": {
+        "name": "Search",
+        "description": "Displays the Inventory Search input",
+        "atts": {}
+    },
+    "tapgoods-location-select": {
+        "name": "Location Select",
+        "description": "Displays location select",
+        "atts": {
+            "display_name": {
+                "default": false
+            }
+        }
+    },
+    "tapgoods-inventory-grid": {
+        "name": "Inventory Grid",
+        "description": "Displays the inventory grid",
+        "atts": {
+            "per_page_default": {
+                "default": 12
+            },
+            "show_pagination": {
+                "default": true
+            }
+        }
+    },
+    "tapgoods-filter": {
+        "name": "Inventory Filter",
+        "description": "Displays the inventory filters sidebar",
+        "atts": {}
+    },
+    "tapgoods-inventory-pagination": {
+        "name": "Pagination",
+        "description": "Displays the page nav",
+        "atts": {}
+    },
+    "tapgoods-image-carousel": {
+        "name": "Image Carousel",
+        "description": "Displays slideshow of product images",
+        "atts": {}
+    },
+    "tapgoods-dimensions": {
+        "name": "Product Dimensions",
+        "description": "Displays rows of product dimensions",
+        "atts": {}
+    }
+}
