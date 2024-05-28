@@ -39,8 +39,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 		$args['body']          = $query;
 		$args['cache_enabled'] = false;
 
-		$request = $this->request( $url, $args );
-
+		$request  = $this->request( $url, $args );
 		$response = $request->get_response();
 
 		if ( array_key_exists( 'errors', $response ) ) {
