@@ -108,12 +108,11 @@ class Tapgoods_Admin {
 
 		$success = update_option( 'tg_key', $api_key );
 
-		// TEST API KEY, if success, save, if fail, return error
+
 		$client = Tapgoods_Connection::get_instance();
 
-		// setting the second param to true will cause this to fail (for testing).
-
 		try {
+			// setting the second param to true will cause this to fail (for testing).
 			$response = $client->test_connection( $submitted_api_key );
 		} catch ( error $e ) {
 			self::connection_failed();
@@ -238,9 +237,9 @@ class Tapgoods_Admin {
 		$icon       = '';
 		add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $function, $icon, 65 );
 
-		add_submenu_page( $this->plugin_name, $page_title, 'Connection', $capability, $this->plugin_name, $function, 1 );
-		add_submenu_page( $this->plugin_name, $page_title, 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
-		add_submenu_page( $this->plugin_name, $page_title, 'Shortcodes', $capability, $this->plugin_name . '#shortcodes', $function, 3 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Connection Settings', 'Connection', $capability, $this->plugin_name, $function, 1 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Styling Settings', 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Shortcodes', 'Shortcodes', $capability, $this->plugin_name . '#shortcodes', $function, 3 );
 	}
 
 
