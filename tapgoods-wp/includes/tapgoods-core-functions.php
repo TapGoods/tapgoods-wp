@@ -411,6 +411,7 @@ function tg_location_styles( $location_id = false ) {
 		return false;
 	}
 
+	ob_start();
 	foreach ( $location_settings as $location ) : ?>
 		<?php
 			$sf_settings = $location['storefrontSetting'];
@@ -421,8 +422,6 @@ function tg_location_styles( $location_id = false ) {
 			$light_secondary = $sf_settings['lightSecondaryColor'];
 			$dark_font       = $sf_settings['darkFontColor'];
 			$dark_secondary  = $sf_settings['darkSecondaryColor'];
-
-			ob_start();
 		?>
 	.location-<?php echo esc_html( $location['id'] ); ?> {
 		--tg-color-primary: <?php echo esc_html( $primary_color ); ?>;
@@ -438,7 +437,6 @@ function tg_location_styles( $location_id = false ) {
 	}
 	<?php endforeach; ?>
 	<?php
-
 	return ob_get_clean();
 
 }
@@ -546,11 +544,11 @@ function tg_get_cart_url( $wp_location_id ) {
 	return $cart_url;
 }
 
-function tg_get_sign_in_url() {
+function tg_get_sign_in_url( $wp_location_id ) {
 	return get_term_meta( $wp_location_id, 'tg_login_url', true );
 }
 
-function tg_get_sign_up_url() {
+function tg_get_sign_up_url( $wp_location_id ) {
 	return get_term_meta( $wp_location_id, 'tg_login_url', true );
 }
 
