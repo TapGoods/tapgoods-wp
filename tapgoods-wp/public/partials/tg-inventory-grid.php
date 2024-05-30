@@ -24,6 +24,14 @@ if ( false !== $tg_search ) {
 $categories = get_query_var( 'tg_category', false );
 $tg_tags    = get_query_var( 'tg_tags', false );
 
+if ( ! empty( $atts['category'] ) ) {
+	$categories = explode( ',', $atts['category'] );
+}
+
+if ( ! empty( $atts['tags'] ) ) {
+	$tg_tags = explode( ',', $atts['tags'] );
+}
+
 $tax_args = array();
 if ( false !== $categories ) {
 	$tax_args[] = array(
@@ -49,7 +57,7 @@ if ( count( $tax_args ) === 1 ) {
 
 if ( count( $tax_args ) > 1 ) {
 	$args['tax_query'] = array(
-		'relation' => 'AND',
+		'relation' => 'OR',
 		$tax_args,
 	);
 }
