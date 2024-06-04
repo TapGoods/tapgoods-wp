@@ -28,7 +28,9 @@ ob_start();
 	<?php endif; ?>
 	<div class="container shop">
 		<div class="row align-items-start">
+				<?php if ( false !== $atts['show_filters'] ) : ?>
 				[tapgoods-filter]
+				<?php endif; ?>
 			<section class="<?php echo esc_attr( apply_filters( 'tg_inventory_grid_class', $tg_inventory_grid_class ) ); ?>">
 				<?php do_action( 'tg_before_inventory_grid' ); ?>		
 				[tapgoods-inventory-grid <?php echo $category; ?> <?php echo $tags; ?>]
