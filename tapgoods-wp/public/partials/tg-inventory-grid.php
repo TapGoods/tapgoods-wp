@@ -132,10 +132,12 @@ $tg_pages = $query->max_num_pages;
 				<a class="d-block item-name mb-2" href="<?php the_permalink(); ?>">
 					<strong><?php the_title(); ?></strong>
 				</a>
+				<?php if ( ! empty( $add_cart_url )) : ?>
 				<div class="add-to-cart item-<?php the_ID(); ?>">
 					<input class="qty-input form-control round" type="text" placeholder="Qty">
 					<button data-target="<?php echo esc_url( $add_cart_url ); ?>" class="add-cart btn btn-primary">Add</button>
 				</div>
+				<?php endif; ?>
 			</div>
 		</div>
 	<?php endwhile; ?>

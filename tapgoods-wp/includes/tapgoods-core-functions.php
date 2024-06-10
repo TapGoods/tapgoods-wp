@@ -560,6 +560,11 @@ function tg_get_add_to_cart_url( $wp_location_id ) {
 function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
 
 	$location = get_the_terms( $product_id, 'tg_location' );
+
+	if ( ! is_array( $location ) ) {
+		return false;
+	}
+
 	$location = current( $location );
 
 	$base_url = tg_get_add_to_cart_url( $location->term_id );
