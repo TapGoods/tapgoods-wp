@@ -11217,7 +11217,8 @@ a > .tapgoods code {
 .tapgoods.tapgoods-inventory .date-input-wrapper br {
   display: none;
 }
-.tapgoods.tapgoods-inventory .dates-selector .form-control {
+.tapgoods.tapgoods-inventory .dates-selector .form-control,
+.tapgoods.tapgoods-inventory .dates-selector input[type=date].form-control {
   border-radius: var(--tg-button-border);
   background-color: white;
   font-size: 12px;
@@ -11395,7 +11396,8 @@ a > .tapgoods code {
   grid-template-columns: 1fr 1fr;
   grid-column-gap: 10px;
 }
-.tapgoods .inventory-single .date-range .dates-selector .form-control {
+.tapgoods .inventory-single .date-range .dates-selector .form-control,
+.tapgoods .inventory-single .date-range .dates-selector input[type=date].form-control {
   background-color: lightgray;
   border-radius: var(--tg-button-border);
 }

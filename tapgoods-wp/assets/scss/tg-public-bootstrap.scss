@@ -221,7 +221,8 @@
 			br { display: none; }
 		}
 
-		.dates-selector .form-control {
+		.dates-selector .form-control,
+		.dates-selector input[type="date"].form-control {
 			border-radius: var(--tg-button-border);
 			background-color: white;
 			font-size: 12px;
@@ -432,7 +433,8 @@
 				grid-column-gap: 10px;
 			}
 
-			.dates-selector .form-control {
+			.dates-selector .form-control,
+			.dates-selector input[type="date"].form-control {
 				background-color: lightgray;
 				border-radius: var(--tg-button-border);
 			}
