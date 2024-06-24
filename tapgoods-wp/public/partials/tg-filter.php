@@ -14,13 +14,13 @@ $today       = wp_date( $date_format );
 <div id="tg-dates-selector" class="dates-selector px-4">
 	<div class="date-input-wrapper order-start">
 		<label><?php _e( 'Order Start', 'tapgoods' ); //phpcs:ignore ?></label>
-		<input type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
-		<input name="eventStartTime" type="time" value="<?php echo esc_attr( tg_get_start_time() ); ?>" class="time-input form-control">
+		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
+		<input id="eventStartTime" name="eventStartTime" type="time" value="<?php echo esc_attr( tg_get_start_time() ); ?>" class="time-input form-control">
 	</div>
 	<div class="date-input-wrapper order-end">
 		<label><?php _e( 'Order End', 'tapgoods' ); //phpcs:ignore ?></label>
-		<input type="date" name="eventEndDate" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
-		<input name="eventEndTime" type="time" value="<?php echo esc_attr( tg_get_end_time() ); ?>" class="time-input form-control">
+		<input id="eventEndDate" type="date" name="eventEndDate" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
+		<input id="eventEndTime" name="eventEndTime" type="time" value="<?php echo esc_attr( tg_get_end_time() ); ?>" class="time-input form-control">
 	</div>
 </div>
 <?php do_action( 'tg_after_date_filter' ); ?>

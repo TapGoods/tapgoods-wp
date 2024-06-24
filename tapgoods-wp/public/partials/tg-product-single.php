@@ -31,7 +31,7 @@ $cart_url = tg_get_product_add_to_cart_url( $post->ID, array( 'redirectUrl' => $
 ?>
 <div class="tapgoods">
 	<?php do_action( 'tg_before_inventory_single_container' ); ?>
-	<div class="inventory-single container-fluid">
+	<div id="tg-single" class="inventory-single container-fluid">
 		<?php do_action( 'tg_before_inventory_single_search' ); ?>
 		[tapgoods-search]
 		<?php do_action( 'tg_after_inventory_single_search' ); ?>

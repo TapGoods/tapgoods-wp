@@ -22,7 +22,7 @@ do_action( 'tg_before_inventory', $atts );
 ob_start();
 
 ?>
-<div class="tapgoods tapgoods-inventory container-fluid">
+<div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
 	<?php if ( false !== $show_search ) : ?>
 		<?php do_action( 'tg_before_inventory_search' ); ?>
 		<?php echo do_shortcode( '[tapgoods-search]' ) ?>

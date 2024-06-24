@@ -69,7 +69,7 @@ $tg_pages = $query->max_num_pages;
 
 // tg_write_log( $query );
 ?>
-<div class="tapgoods-inventory row row-cols-md-3 gx-3 gy-5 row-cols-sm-1">
+<div id="tg-grid" class="tapgoods-inventory row row-cols-md-3 gx-3 gy-5 row-cols-sm-1">
 <?php if ( $query->have_posts() ) : ?>
 	<?php while ( $query->have_posts() ) : ?>
 		<?php $query->the_post(); ?>
