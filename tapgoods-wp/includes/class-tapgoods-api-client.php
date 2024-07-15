@@ -119,6 +119,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 				'theme',
 				'shopAllowAutobook',
 				'buttonStyle',
+				'domains{id,name,domainableType}',
 			)
 		);
 
