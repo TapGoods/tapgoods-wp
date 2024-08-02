@@ -347,10 +347,6 @@ function tg_get_prices( $id = false ) {
 			unset( $prices[ $i ] );
 		}
 	}
-	if ( 455 === $id ) {
-		// Tapgoods_Helpers::tgdd( $prices );
-	}
-
 	return $prices;
 }
 
@@ -358,6 +354,9 @@ function tg_get_single_display_price( $id ) {
 	$prices = tg_get_prices( $id );
 	if ( is_array( $prices ) ) {
 		$price = reset( $prices );
+		if ( false == $price ) {
+			return 'Pricing Unavailable';
+		}
 		$price_string = '$' . current( $price ) . ' / ' . array_key_first( $price );
 		return $price_string;
 	}
