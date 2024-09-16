@@ -52,6 +52,10 @@ Instructions: https://www.hostinger.com/tutorials/how-to-edit-hosts-file
 
 #### 4. Start the WordPress server
 
+Create a localdev.env file with the data you find in example.env
+
+#### 5. Start the WordPress server
+
 ```bash
 docker compose up
 ```
