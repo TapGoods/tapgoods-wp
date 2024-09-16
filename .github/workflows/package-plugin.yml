@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-  workflow_dispatch:  
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build plugin assets and zip
+      - name: Build and Zip plugin
         run: |
           npm run build
           npm run zip-plugin
 
-      - name: Upload plugin zip as artifact
-        uses: actions/upload-artifact@v2
+      - name: Upload Plugin ZIP
+        uses: actions/upload-artifact@v3
         with:
-          name: tapgoods-wp.zip
+          name: plugin-zip
           path: ./dist/tapgoods-wp.zip
