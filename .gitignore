@@ -35,6 +35,7 @@ xdebug/*
 .idea
 cache
 /node_modules
+/dist/*
 tapgoods-wp/vendor
 
 # Dev Configs

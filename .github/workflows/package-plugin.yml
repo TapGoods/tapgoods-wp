@@ -1,0 +1,34 @@
+name: Package WordPress Plugin
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build plugin assets and zip
+        run: |
+          npm run build
+          npm run zip-plugin
+
+      - name: Upload plugin zip as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: tapgoods-wp.zip
+          path: ./dist/tapgoods-wp.zip
