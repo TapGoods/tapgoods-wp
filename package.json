@@ -7,7 +7,7 @@
     "sass": "^1.70.0"
   },
   "scripts": {
-    "clean": "rimraf releases && mkdir releases",  // make releases folder
+    "clean": "rimraf releases && mkdir releases", 
     "build-sass": "sass ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css",
     "build": "npm run clean && npm run build-sass",
     "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*'"
