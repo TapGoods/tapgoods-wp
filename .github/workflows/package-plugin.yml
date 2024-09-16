@@ -3,7 +3,7 @@ name: Package WordPress Plugin
 on:
   push:
     branches:
-      - master
+      - master 
   workflow_dispatch: 
 
 jobs:
@@ -22,16 +22,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Create dist directory
-        run: mkdir -p dist  
-
       - name: Build and Zip plugin
         run: |
           npm run build
           npm run zip-plugin
 
-      - name: Upload Plugin ZIP
-        uses: actions/upload-artifact@v4 
-        with:
-          name: plugin-zip
-          path: ./dist/tapgoods-wp.zip
+      - name: Commit and push the dist folder
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add dist
+          git commit -m "Add generated plugin zip to dist folder"
+          git push origin master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
