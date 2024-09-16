@@ -50,7 +50,7 @@ Instructions: https://www.hostinger.com/tutorials/how-to-edit-hosts-file
 127.0.0.1 wordpress.local
 ```
 
-#### 4. Start the WordPress server
+#### 4. Configure localdev.env file
 
 Create a localdev.env file with the data you find in example.env
 
