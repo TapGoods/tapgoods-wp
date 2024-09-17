@@ -17,7 +17,7 @@ services:
       WORDPRESS_DB_NAME: exampledb
     volumes:
       - wordpress:/var/www/html
-      - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+      - app-tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
     extra_hosts:
       - wordpress.local:host-gateway
     env_file:
@@ -53,8 +53,8 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - ./dev/conf/nginx.conf:/etc/nginx/nginx.conf
-      - ./dev/certs:/etc/nginx/certs
+      - app-nginx:/etc/nginx
+      - app-dev-certs:/etc/nginx/certs
     depends_on:
       - wordpress
 
@@ -69,7 +69,7 @@ services:
       WORDPRESS_DB_NAME: exampledb
     volumes:
       - wordpress:/var/www/html
-      - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+      - app-tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
     depends_on:
       - db
       - wordpress
@@ -81,7 +81,7 @@ services:
       restart: 'no'
       volumes:
         - wordpress:/var/www/html:rw,cache
-        - ./tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
+        - app-tapgoods-wp:/var/www/html/wp-content/plugins/tapgoods-wp
       depends_on:
         - wordpress
 
@@ -99,3 +99,21 @@ volumes:
   wordpress:
   db:
   nginx-config:
+  app-tapgoods-wp:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/tapgoods-wp
+      o: bind
+  app-nginx:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/dev/conf
+      o: bind
+  app-dev-certs:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/dev/certs
+      o: bind            
