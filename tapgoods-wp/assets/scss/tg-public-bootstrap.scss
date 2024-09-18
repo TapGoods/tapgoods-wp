@@ -193,8 +193,8 @@
 
 	&.tapgoods-inventory {
 		img {
-			max-height: 100%;
-			max-width: 100%;
+			height: 100%;
+			width: 100%;
 		}
 		
 		figure {
@@ -235,6 +235,7 @@
 		.tg-filter {
 			background-color: var(--tg-color-primary);
 			color: var(--tg-light-font);
+			min-width: 300px;
 		}
 	
 		.tg-filter h4 {

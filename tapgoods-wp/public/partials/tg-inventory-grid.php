@@ -61,7 +61,7 @@ $tg_pages = $query->max_num_pages;
 
 // tg_write_log( $query );
 ?>
-<div class="tapgoods tapgoods-inventory row row-cols-md-3 gx-3 gy-5 row-cols-sm-1">
+<div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-1 row-cols-sm-1">
 <?php if ( $query->have_posts() ) : ?>
 	<?php while ( $query->have_posts() ) : ?>
 		<?php $query->the_post(); ?>
@@ -91,7 +91,7 @@ $tg_pages = $query->max_num_pages;
 		<div id="tg-item-<?php echo esc_attr( $tg_id ); ?>" class="tapgoods-inventory col item" data-tgId="<?php echo esc_attr( $tg_id ); ?>">
 			<div class="item-wrap">
 				<figure>
-					<a class="d-block" style="text-align: center;" href="<?php the_permalink(); ?>">
+					<a class="d-block" href="<?php the_permalink(); ?>">
 						<?php if ( ! empty( $pictures ) ) : ?>
 							<?php
 							echo wp_kses(
