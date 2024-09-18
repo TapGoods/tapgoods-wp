@@ -27,6 +27,7 @@ nbproject
 *.sublime-workspace
 xdebug/*
 !xdebug/.gitkeep
+.vscode
 
 # Folders to ignore
 /node_modules
