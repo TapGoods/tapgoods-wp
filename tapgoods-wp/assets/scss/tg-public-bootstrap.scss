@@ -118,14 +118,44 @@
 		}
 	}
 
-	.tg-search-container {
+	#tg-search-container {
 		position: relative;
+
+		.suggestion-box {
+			position: absolute;
+			background: white;width: 100%;
+			transition: max-height 0.5s;
+			overflow-y: auto;
+			max-height: 0px;
+			z-index: 999;
+			border-radius: 2px;
+			box-shadow: 1px 2px 5px rgba(0, 0, 0, .15);
+		}
+	
+		.suggestion-box:has(li) {
+			max-height: 200px;
+		}
+		
+		#suggestion-list {
+			list-style: none;
+			display: block;
+			padding-left: 0;
+			margin-bottom: 0;
+			height: auto;
+		}
+	
+		.suggestion-list .result-item .result-link {
+			display: block;
+			border-bottom: 1px solid rgba(0,0,0,.2);
+			text-decoration: none;
+		}
 	}
 	
 	#tg-search.form-control {
 		border: 2px solid;
 		border-radius: 2px;
 		border-color: var(--tg-color-primary);
+		position: relative;
 	}
 
 	#tg-search-form {
@@ -148,36 +178,8 @@
 			display: none;
 		}
 	}
-	
-	.suggestion-box {
-		position: absolute;
-		background: white;width: 100%;
-		transition: max-height 0.5s;
-		overflow-y: auto;
-		max-height: 0px;
-		z-index: 999;
-		border-radius: 2px;
-		box-shadow: 1px 2px 5px rgba(0, 0, 0, .15);
-	}
 
-	.suggestion-box:has(li) {
-		max-height: 200px;
-	}
-	
-	#suggestion-list {
-		list-style: none;
-		display: block;
-		padding-left: 0;
-		margin-bottom: 0;
-		height: auto;
-	}
-
-	.suggestion-list .result-item .result-link {
-		display: block;
-		border-bottom: 1px solid rgba(0,0,0,.2);
-		text-decoration: none;
-	}
-	&.location-select {
+	&#tg-location {
 		background: #fff;
 		border-radius: 2px;
 		.wrapper {
@@ -191,7 +193,7 @@
 		}
 	}
 
-	&.tapgoods-inventory {
+	&#tg-grid {
 		img {
 			height: 100%;
 			width: 100%;
@@ -210,7 +212,9 @@
 		.item figure a {
 			min-height: 150px;
 		}
+	}
 
+	&#tg-shop {
 		.date-input-wrapper {
 			display: grid;
 			grid-gap: 10px 5px;
@@ -221,7 +225,12 @@
 			br { display: none; }
 		}
 
-		.dates-selector .form-control {
+		.dates-selector .form-control,
+		.dates-selector input[type="date"].form-control,
+		#eventStartDate,
+		#eventStartTime,
+		#eventEndDate,
+		#eventEndTime {
 			border-radius: var(--tg-button-border);
 			background-color: white;
 			font-size: 12px;
@@ -244,65 +253,65 @@
 			line-height: 40px;
 			padding-left: 20px;
 		}
-	}
 
-	.categories {
-		h4 {
-			border-top: 1px solid var(--tg-light-secondary);
-			border-bottom: 1px solid var(--tg-light-secondary);
+		.categories {
+			h4 {
+				border-top: 1px solid var(--tg-light-secondary);
+				border-bottom: 1px solid var(--tg-light-secondary);
+			}
+			br { display: none; }
 		}
-		br { display: none; }
-	}
-
-	.tg-filter a.category-link {
-		display: block;
-		padding: 1rem 60px;
-		text-decoration: none;
-	}
 	
-	.category-links {
-		background-color: var(--tg-dark-secondary);
-	}
-
-	.add-to-cart {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		grid-column-gap: 10px;
-		br { display: none; }
-	}
-
-	.add-to-cart input.form-control {
-		background-color: lightgray;
-		border-radius: var(--tg-button-border);
-	}
+		.tg-filter a.category-link {
+			display: block;
+			padding: 1rem 60px;
+			text-decoration: none;
+		}
+		
+		.category-links {
+			background-color: var(--tg-dark-secondary);
+		}
 	
-	.add-to-cart button {
-		background-color: var(--tg-color-primary) !important;
-		border-radius: var(--tg-button-border);
+		.accordion-button::after {
+			background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
+		}
+	
+		.accordion-button:not(.collapsed)::after {
+			background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
+		}
+
+		.add-to-cart {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			grid-column-gap: 10px;
+			br { display: none; }
+		}
+	
+		.add-to-cart input.form-control {
+			background-color: lightgray;
+			border-radius: var(--tg-button-border);
+		}
+		
+		.add-to-cart button {
+			background-color: var(--tg-color-primary) !important;
+			border-radius: var(--tg-button-border);
+		}
+	
+		.tapgoods-inventory .price {
+			font-size: 12px;
+		}
+	
+		.tapgoods-inventory .item-name {
+			font-size: 12px;
+			text-decoration: none;
+		}
+	
+		.item figure a {
+			min-height: 150px;
+		}
 	}
 
-	.tapgoods-inventory .price {
-		font-size: 12px;
-	}
-
-	.tapgoods-inventory .item-name {
-		font-size: 12px;
-		text-decoration: none;
-	}
-
-	.accordion-button::after {
-		background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
-	}
-
-	.accordion-button:not(.collapsed)::after {
-		background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
-	}
-
-	.item figure a {
-	    min-height: 150px;
-	}
-
-	.inventory-single {
+	#tg-single {
 		max-width: 1280px;
 
 		.inventory-single-content {
@@ -433,15 +442,41 @@
 				grid-column-gap: 10px;
 			}
 
-			.dates-selector .form-control {
+			.dates-selector .form-control,
+			.dates-selector input[type="date"].form-control {
 				background-color: lightgray;
 				border-radius: var(--tg-button-border);
 			}
+		}
 
+		.add-to-cart {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			grid-column-gap: 10px;
+			br { display: none; }
 		}
 	
+		.add-to-cart input.form-control {
+			background-color: lightgray;
+			border-radius: var(--tg-button-border);
+		}
+		
+		.add-to-cart button {
+			background-color: var(--tg-color-primary) !important;
+			border-radius: var(--tg-button-border);
+		}
+	
+		.tapgoods-inventory .price {
+			font-size: 12px;
+		}
+	
+		.tapgoods-inventory .item-name {
+			font-size: 12px;
+			text-decoration: none;
+		}
+	
+		.item figure a {
+			min-height: 150px;
+		}
 	}
-
-
-
 }

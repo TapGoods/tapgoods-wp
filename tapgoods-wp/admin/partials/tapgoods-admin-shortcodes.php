@@ -15,7 +15,6 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 		<form>
 			<div class="input-group mb3">
 				<input type="text" id="<?php echo $shortcode; ?>-input" class="from-control" disabled value="[<?php echo $shortcode; ?>]">
-				<button type="button" class="btn btn-outline-secondary"><span class="dashicons dashicons-admin-generic"></span></button>
 				<button type="button" id="copy-<?php echo $shortcode; ?>" onClick="copyText(this)" data-target="<?php echo $shortcode; ?>-input" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-title="Copy to clipboard" class="btn btn-outline-secondary"><span class="dashicons dashicons-admin-page"></span></button>
 			</div>
 		</form>

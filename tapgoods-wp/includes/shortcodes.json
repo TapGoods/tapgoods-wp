@@ -26,6 +26,18 @@
                 "desc": "Displays the filter sidebar next to the product grid",
                 "default": true,
                 "type": "toggle"
+            },
+            "category": {
+                "att": "Filter Category",
+                "desc": "Limit inventory display to user defined category",
+                "default": null,
+                "type": "select_tg_category"
+            },
+            "tags": {
+                "att": "Filter Tags",
+                "desc": "Limit inventory display to user defined tags",
+                "default": null,
+                "type": "select_tg_tags"
             }
         }
     },
@@ -62,6 +74,18 @@
             },
             "show_pagination": {
                 "default": true
+            },
+            "category": {
+                "att": "Filter Category",
+                "desc": "Limit inventory display to user defined category",
+                "default": null,
+                "type": "select_tg_category"
+            },
+            "tags": {
+                "att": "Filter Tags",
+                "desc": "Limit inventory display to user defined tags",
+                "default": null,
+                "type": "select_tg_tags"
             }
         }
     },

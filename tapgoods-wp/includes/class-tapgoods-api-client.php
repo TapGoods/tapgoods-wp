@@ -119,6 +119,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 				'theme',
 				'shopAllowAutobook',
 				'buttonStyle',
+				'domains{id,name,domainableType}',
 			)
 		);
 
@@ -386,6 +387,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 				'description',
 				'discountEligible',
 				'discountPercent',
+				'flatPrices { amount, name }',
 				'gaDescription',
 				'gaKeywords',
 				'halfDayPrice',

@@ -322,6 +322,7 @@ class Tapgoods_Connection {
 
 				if ( false !== $term ) {
 					$this->update_location_term_meta( $term['term_id'], $location_details );
+					update_term_meta( $term['term_id'], 'tg_hash', $this->hash );
 				}
 
 				$location_info[ $lid ] = $location_details;
@@ -377,10 +378,10 @@ class Tapgoods_Connection {
 			return false;
 		}
 
-		$current = 1;
 		$count   = 0;
 		foreach ( $location_ids as $lid ) {
 
+			$current = 1;
 			// We have to use the rest endpoint for now b/c the GQL endpoint doesn't respect popularity sort_order
 			// the first request is just to get the 'meta' object to determine number of pages
 			$response = $client->get_inventories_from_graph( $lid );

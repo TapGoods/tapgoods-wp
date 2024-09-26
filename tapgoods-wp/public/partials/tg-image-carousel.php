@@ -7,8 +7,10 @@ $images = apply_filters(
 ?>
 <section class="images col mb-4">
 <?php if ( ! empty( $images ) ) : ?>
+	<?php if ( count($images) > 1 ) : ?>
 	<div id="tg-carousel" class="carousel slide mb-3">
 		<div class="carousel-inner">
+	<?php endif; ?>
 		<?php $img_coutner = 0; ?>
 		<?php foreach ( $images as $image ) : ?>
 			<?php $img_tag = Tapgoods_Public::get_img_tag( $image['imgixUrl'], 500, 280, 'd-block w-100 h-auto', '' ); ?>
@@ -17,6 +19,7 @@ $images = apply_filters(
 			</div>
 			<?php ++$img_coutner; ?>
 		<?php endforeach; ?>
+	<?php if ( count($images) > 1 ) : ?>
 		</div>
 		<button class="carousel-control-prev" type="button" data-bs-target="#tg-carousel" data-bs-slide="prev">
 			<span class="carousel-control-prev-icon" aria-hidden="true"></span>
@@ -27,6 +30,7 @@ $images = apply_filters(
 			<span class="visually-hidden">Next</span>
 		</button>				
 	</div>
+	<?php endif; ?>
 	<?php if ( count( $images ) > 1 ) : ?> 
 		<?php $img_coutner = 0; ?>
 	<div class="thumbs">

@@ -24,6 +24,14 @@ if ( false !== $tg_search ) {
 $categories = get_query_var( 'tg_category', false );
 $tg_tags    = get_query_var( 'tg_tags', false );
 
+if ( ! empty( $atts['category'] ) ) {
+	$categories = explode( ',', $atts['category'] );
+}
+
+if ( ! empty( $atts['tags'] ) ) {
+	$tg_tags = explode( ',', $atts['tags'] );
+}
+
 $tax_args = array();
 if ( false !== $categories ) {
 	$tax_args[] = array(
@@ -49,7 +57,7 @@ if ( count( $tax_args ) === 1 ) {
 
 if ( count( $tax_args ) > 1 ) {
 	$args['tax_query'] = array(
-		'relation' => 'AND',
+		'relation' => 'OR',
 		$tax_args,
 	);
 }
@@ -61,6 +69,7 @@ $tg_pages = $query->max_num_pages;
 
 // tg_write_log( $query );
 ?>
+
 <div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-1 row-cols-sm-1">
 <?php if ( $query->have_posts() ) : ?>
 	<?php while ( $query->have_posts() ) : ?>
@@ -124,10 +133,12 @@ $tg_pages = $query->max_num_pages;
 				<a class="d-block item-name mb-2" href="<?php the_permalink(); ?>">
 					<strong><?php the_title(); ?></strong>
 				</a>
+				<?php if ( ! empty( $add_cart_url )) : ?>
 				<div class="add-to-cart item-<?php the_ID(); ?>">
 					<input class="qty-input form-control round" type="text" placeholder="Qty">
 					<button data-target="<?php echo esc_url( $add_cart_url ); ?>" class="add-cart btn btn-primary">Add</button>
 				</div>
+				<?php endif; ?>
 			</div>
 		</div>
 	<?php endwhile; ?>
