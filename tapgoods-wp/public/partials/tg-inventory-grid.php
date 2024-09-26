@@ -69,7 +69,8 @@ $tg_pages = $query->max_num_pages;
 
 // tg_write_log( $query );
 ?>
-<div id="tg-grid" class="tapgoods-inventory row row-cols-md-3 gx-3 gy-5 row-cols-sm-1">
+
+<div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-1 row-cols-sm-1">
 <?php if ( $query->have_posts() ) : ?>
 	<?php while ( $query->have_posts() ) : ?>
 		<?php $query->the_post(); ?>
@@ -96,7 +97,7 @@ $tg_pages = $query->max_num_pages;
 			$img_tag = Tapgoods_Public::get_img_tag( $pictures[0]['imgixUrl'], '254', '150' );
 		}
 		?>
-		<div id="tg-item-<?php echo esc_attr( $tg_id ); ?>" class="col item" data-tgId="<?php echo esc_attr( $tg_id ); ?>">
+		<div id="tg-item-<?php echo esc_attr( $tg_id ); ?>" class="tapgoods-inventory col item" data-tgId="<?php echo esc_attr( $tg_id ); ?>">
 			<div class="item-wrap">
 				<figure>
 					<a class="d-block" href="<?php the_permalink(); ?>">
@@ -145,31 +146,54 @@ $tg_pages = $query->max_num_pages;
 	<?php if ( $tg_pages > 1 ) : ?>
 	<div class="<?php esc_attr( apply_filters( 'tg_inventory_pagination_class', $tg_inventory_pagination_class ) ); ?>">
 		<?php do_action( 'tg_before_inventory_pagination' ); ?>
+	
+	
+	
+	
 		<nav aria-label="Page navigation">
 			<ul class="pagination justify-content-center align-items-center">
-				<li class="page-item disabled">
-					<a class="page-link"><span class="dashicons dashicons-controls-skipback"></span></a>
+				<!-- First Page -->
+				<li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
+					<a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? '?paged=1' : '#'; ?>">
+						<span class="dashicons dashicons-controls-skipback"></span>
+					</a>
 				</li>
-				<li class="page-item disabled">
-					<a class="page-link"><span class="dashicons dashicons-controls-back"></span></a>
+				<!-- Previous Page -->
+				<li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
+					<a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? '?paged=' . ($query->query['paged'] - 1) : '#'; ?>">
+						<span class="dashicons dashicons-controls-back"></span>
+					</a>
 				</li>
+				<!-- Current Page -->
 				<li class="page-item current-page">
-					<a class="page-link"><?php echo esc_html( $query->query['paged'] ); ?></a>
+					<a class="page-link"><?php echo esc_html($query->query['paged']); ?></a>
 				</li>
+				<!-- Of -->
 				<li class="page-item disabled">
 					<a>of</a>
 				</li>
+				<!-- Total Pages -->
 				<li class="page-item disabled">
-					<a class="page-link"><?php echo esc_html( $tg_pages ); ?></a>
+					<a class="page-link"><?php echo esc_html($tg_pages); ?></a>
 				</li>
-				<li class="page-item disabled">
-					<a href="<?php echo '?paged=' . ++$tg_page; ?>" class="page-link"><span class="dashicons dashicons-controls-forward"></span></a>
+				<!-- Next Page -->
+				<li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
+					<a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? '?paged=' . ($query->query['paged'] + 1) : '#'; ?>">
+						<span class="dashicons dashicons-controls-forward"></span>
+					</a>
 				</li>
-				<li class="page-item disabled">
-					<a class="page-link"><span class="dashicons dashicons-controls-skipforward"></span></a>
+				<!-- Last Page -->
+				<li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
+					<a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? '?paged=' . $tg_pages : '#'; ?>">
+						<span class="dashicons dashicons-controls-skipforward"></span>
+					</a>
 				</li>
 			</ul>
 		</nav>
+
+
+
+
 		<?php do_action( 'tg_after_inventory_pagination' ); ?>
 	</div>
 	<?php endif; ?>

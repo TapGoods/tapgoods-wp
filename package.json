@@ -2,7 +2,14 @@
   "devDependencies": {
     "@wordpress/env": "^9.2.0",
     "@wordpress/scripts": "^27.1.0",
+    "archiver": "^7.0.1",
     "bootstrap": "^5.3.2",
     "sass": "^1.70.0"
+  },
+  "scripts": {
+    "clean": "rimraf releases && mkdir releases", 
+    "build-sass": "sass ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css",
+    "build": "npm run clean && npm run build-sass",
+    "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*'"
   }
 }

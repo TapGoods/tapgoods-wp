@@ -27,6 +27,7 @@ nbproject
 *.sublime-workspace
 xdebug/*
 !xdebug/.gitkeep
+.vscode
 
 # Folders to ignore
 /node_modules
@@ -35,6 +36,7 @@ xdebug/*
 .idea
 cache
 /node_modules
+/dist/*
 tapgoods-wp/vendor
 
 # Dev Configs
