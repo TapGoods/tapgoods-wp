@@ -38,11 +38,11 @@ $today       = wp_date( $date_format );
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">
-				<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+				<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
 				<?php _e( apply_filters( 'tg_categories_header_text', 'Categories' ), 'tapgoods' ); //phpcs:ignore ?>
 				</button>
 			</h2>
-			<div id="collapseOne" class="<?php echo esc_attr( apply_filters( 'tg_category_accordion_collapse_class', 'accordion-collapse collapse category-links show' ) ); ?>">
+			<div id="collapseOne" class="<?php echo esc_attr( apply_filters( 'tg_category_accordion_collapse_class', 'accordion-collapse collapse category-links' ) ); ?>">
 				<?php foreach ( $categories as $category ) : ?>
 					<?php do_action( 'tg_before_category_link' ); ?>
 					<a class="category-link" href="<?php echo esc_url( get_term_link( $category, 'tg_category' ) ); ?>">
