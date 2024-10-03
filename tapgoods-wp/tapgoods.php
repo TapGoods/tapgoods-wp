@@ -1,86 +1,62 @@
-<?php
+name: Package WordPress Plugin
 
-/*
- * Plugin Name:       TapGoods WordPress
- * Plugin URI:        https://github.com/TapGoods/tapgoods_wp-plugin
- * Description:       WordPress integration for TapGoods
- * Version:           0.1.0
- * Requires at least: 5.2
- * Requires PHP:      7.2
- * Author:            TapGoods
- * Author URI:        https://www.tapgoods.com/pro/
- * License:           MIT
- * Text Domain:       tapgoods-wp
- * Domain Path:       /languages
- *
- *
- * MIT License
- *
- * Copyright (c) 2024 TapGoods
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the next paragraph) shall be included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- */
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
-// define( 'TAPGOODS_KEY', 'YOUR API KEY' );
-// define( 'TAPGOODS_DEV', true );
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-// exit if accessed directly
-if ( ! defined( 'WPINC' ) ) {
-	die;
-}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-define( 'TAPGOODSWP_VERSION', '0.1.0' );
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-/**
- * Path to the plugin root directory.
- */
-define( 'TAPGOODS_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
-/**
- * Url to the plugin root directory.
- */
-define( 'TAPGOODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+      - name: Install dependencies
+        run: npm install
 
-$uploads = wp_upload_dir();
-define( 'TAPGOODS_UPLOADS', trailingslashit( $uploads['basedir'] . '/tapgoods' ) );
+      - name: Bump version in tapgoods-wp/tapgoods.php
+        run: |
+          # Find current version
+          current_version=$(grep -oP 'Version:\s*\K[\d.]+' tapgoods-wp/tapgoods.php)
+          echo "Current version: $current_version"
 
-// TODO: register activate hook
-function tapgoods_activate() {
+          # Increment version by 0.0.1
+          new_version=$(echo $current_version | awk -F. -v OFS=. '{$NF = $NF + 1 ; print}')
+          echo "New version: $new_version"
 
-	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-activator.php';
-	Tapgoods_Activator::activate();
-}
+          # Replace version in tapgoods-wp/tapgoods.php
+          sed -i "s/Version:           $current_version/Version:           $new_version/" tapgoods-wp/tapgoods.php
 
-function tapgoods_deactivate() {
+          # Commit the version change
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add tapgoods-wp/tapgoods.php
+          git commit -m "Bump version to $new_version"
+          git push origin master
 
-	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-deactivator.php';
-	Tapgoods_Deactivator::deactivate();
-}
+      - name: Build and Zip plugin
+        run: |
+          npm run build
+          npm run zip-plugin
 
-register_activation_hook( __FILE__, 'tapgoods_activate' );
-register_deactivation_hook( __FILE__, 'tapgoods_deactivate' );
-
-function init_tapgoods_wp() {
-
-	require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-wp.php';
-	$tapgoods = Tapgoods::get_instance();
-	$tapgoods->init();
-}
-
-add_action( 'plugins_loaded', 'init_tapgoods_wp' );
-
-if ( ! function_exists( 'getenv_docker' ) ) {
-	function getenv_docker( $env, $default ) {
-		if ( $fileEnv = getenv( $env . '_FILE' ) ) {
-			return rtrim( file_get_contents( $fileEnv ), "\r\n" );
-		} elseif ( ( $val = getenv( $env ) ) !== false ) {
-			return $val;
-		} else {
-			return $default;
-		}
-	}
-}
+      - name: Commit and push the releases folder
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add releases || true
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add generated plugin zip to releases folder"
+            git push origin master
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
