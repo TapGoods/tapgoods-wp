@@ -17,7 +17,7 @@ This project is using docker-compose to run a WordPress locally with mkcert for 
 
 #### 2. Install Certificates
 
-Generate and install SSL certificates. This is a one-time process.
+ Generate and install SSL certificates. This is a one-time process.
 
 Visit https://github.com/FiloSottile/mkcert?tab=readme-ov-file#installation and install it on your machine.
 
