@@ -768,7 +768,7 @@ class Tapgoods_Connection {
 
 
     public function sync_from_api() {
-        // Iniciar la sincronización manualmente, sin cron, con un enfoque basado en pasos
+        // Start manual synchronization without cron, using a step-based approach
         error_log('Starting manual inventory sync');
         $result = $this->sync_inventory_in_batches(false);
         return array(
@@ -778,24 +778,24 @@ class Tapgoods_Connection {
     }
 
     public function sync_inventory_in_batches($manual_trigger = false) {
-        $batch_size = 50; // Ajustar el tamaño del lote
+        $batch_size = 50; // Adjust the batch size
         $progress = get_option('tg_last_sync_progress', array('location_id' => null, 'current_page' => 1));
         $client = $this->get_connection();
 
-        // Verificar si hay un bloqueo de sincronización activo
+        // Check if there is an active sync lock
         if (get_transient('tg_sync_lock')) {
             error_log('Sync is locked, another process is running.');
             return array('success' => false, 'message' => 'Sync is currently in progress by another process.');
         }
 
-        // Establecer un bloqueo de sincronización
-        set_transient('tg_sync_lock', true, 300); // Bloqueo válido por 5 minutos
+        // Set a sync lock
+        set_transient('tg_sync_lock', true, 300); // Lock valid for 5 minutes
 
         $location_ids = $client->get_location_ids();
         if (false === $location_ids) {
             tg_write_log('Failed to retrieve location IDs');
             error_log('Failed to retrieve location IDs');
-            delete_transient('tg_sync_lock'); // Eliminar el bloqueo
+            delete_transient('tg_sync_lock'); // Remove the lock
             return array('success' => false, 'message' => 'Failed to retrieve location IDs');
         }
 
@@ -810,14 +810,14 @@ class Tapgoods_Connection {
 
             $current_page = ($progress['location_id'] === $lid) ? $progress['current_page'] : 1;
 
-            // Registrar estado de sincronización
+            // Log sync status
             error_log('Starting sync for location ID: ' . $lid . ', page: ' . $current_page);
 
             $response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
             if (false === $response) {
                 tg_write_log('Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
                 error_log('Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
-                delete_transient('tg_sync_lock'); // Eliminar el bloqueo
+                delete_transient('tg_sync_lock'); // Remove the lock
                 return array('success' => false, 'message' => 'Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
             }
 
@@ -829,15 +829,15 @@ class Tapgoods_Connection {
             $inventory = $response['collection'];
             foreach ($inventory as $item) {
                 try {
-                    // Usar transiente para bloquear el proceso de creación del ítem
+                    // Use transient to block item creation process
                     $lock_key = 'tg_item_lock_' . $item['id'];
                     if (get_transient($lock_key)) {
                         error_log('Skipping item with tg_id ' . $item['id'] . ' because it is already being processed.');
                         continue;
                     }
-                    set_transient($lock_key, true, 300); // Bloqueo válido por 5 minutos
+                    set_transient($lock_key, true, 300); // Block valid for 5 minutes
 
-                    // Verificar si el ítem ya existe antes de actualizarlo o crearlo
+                    // Check if item already exists before updating or creating it
                     $existing_item = $this->get_existing_inventory_item_by_tg_id($item['id']);
                     if ($existing_item) {
                         error_log('Item exists: updating item with tg_id ' . $item['id']);
@@ -850,33 +850,33 @@ class Tapgoods_Connection {
                     $total_synced++;
                     error_log('Successfully synced item: ' . $item['id']);
 
-                    // Eliminar el bloqueo del ítem
+                    // Remove item lock
                     delete_transient($lock_key);
                 } catch (Exception $e) {
                     tg_write_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
                     error_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
-                    delete_transient($lock_key); // Asegurarse de eliminar el bloqueo en caso de error
+                    delete_transient($lock_key); // Make sure to remove the lock in case of error
                 }
             }
 
-            // Guardar el progreso cada 50 ítems
+            // Save progress every 50 items
             update_option('tg_last_sync_progress', array('location_id' => $lid, 'current_page' => $current_page + 1));
             error_log('Progress saved: location ID ' . $lid . ', page ' . $current_page);
 
-            // Romper después de cada lote de 50
-            delete_transient('tg_sync_lock'); // Eliminar el bloqueo temporalmente
+            // Break after every batch of 50
+            delete_transient('tg_sync_lock'); // Temporarily remove the lock
             return array('success' => true, 'message' => 'Synced ' . $total_synced . ' items so far. Continuing...', 'continue' => true);
         }
 
-        // Si se completa la sincronización, eliminar el progreso
+        // If synchronization is complete, remove the progress
         delete_option('tg_last_sync_progress');
-        delete_transient('tg_sync_lock'); // Eliminar el bloqueo
+        delete_transient('tg_sync_lock'); // Delete the lock
         error_log('Total inventory items synced: ' . $total_synced);
 
         return array('success' => true, 'message' => 'Total inventory items synced: ' . $total_synced, 'continue' => false);
     }
 
-    // Método para obtener un ítem de inventario existente por tg_id
+    // Method to get an existing inventory item by tg_id
     public function get_existing_inventory_item_by_tg_id($tg_id) {
         $args = array(
             'post_type' => 'tg_inventory',
@@ -900,7 +900,7 @@ class Tapgoods_Connection {
         }
     }
 
-    // Método para insertar un nuevo ítem de inventario
+    // Method to insert a new inventory item
     public function tg_insert_inventory($product, $tg_order) {
         $slug = str_replace('_', '-', $product['slug']);
         $meta = array();
@@ -918,7 +918,7 @@ class Tapgoods_Connection {
         }
         $meta['tg_id'] = $product['id'];
 
-        // Intentar insertar y evitar duplicados mediante 'post_title' y 'tg_id'
+        // Attempt to insert and avoid duplicates using 'post_title' and 'tg_id'
         $post_arr = array(
             'post_type' => 'tg_inventory',
             'post_title' => $product['name'],
@@ -932,7 +932,7 @@ class Tapgoods_Connection {
             $post_arr['post_content'] = $product['description'];
         }
 
-        // Verificar si un post con el mismo título y tg_id ya existe
+        // Check if a post with the same title and tg_id already exists
         $existing_post = $this->get_existing_inventory_item_by_tg_id($product['id']);
         if ($existing_post) {
             error_log('Skipping creation: Item with tg_id ' . $product['id'] . ' already exists.');
@@ -948,7 +948,7 @@ class Tapgoods_Connection {
         return $insert;
     }
 
-    // Endpoint para forzar la ejecución manual de la sincronización
+    // Endpoint to manually trigger synchronization
     public function manual_sync_trigger() {
         if (current_user_can('manage_options')) {
             $result = $this->sync_inventory_in_batches(true);
@@ -959,13 +959,13 @@ class Tapgoods_Connection {
     }
 }
 
-// Crear un endpoint para ejecutar manualmente la sincronización sin usar cron
+// Create an endpoint to manually execute synchronization without using cron
 add_action('wp_ajax_tapgoods_manual_sync', [Tapgoods_Connection::get_instance(), 'manual_sync_trigger']);
 add_action('wp_ajax_nopriv_tapgoods_manual_sync', function() {
     wp_send_json(array('success' => false, 'message' => 'Unauthorized request.'));
 });
 
-// JavaScript para llamar al endpoint de sincronización de manera continua y actualizar el botón
+// JavaScript to call the sync endpoint continuously and update the button
 add_action('admin_footer', function() {
     if (current_user_can('manage_options')) {
         ?>
@@ -987,7 +987,7 @@ add_action('admin_footer', function() {
                             if (response.success && response.continue) {
                                 setTimeout(function() {
                                     $('#tg_api_sync').click();
-                                }, 1000); // Esperar 1 segundo antes de continuar con la próxima solicitud
+                                }, 1000); // Wait 1 second before continuing with the next request
                             } else {
                                 console.log('Sync completed or stopped: ' + response.message);
                                 $('#tg_api_sync').prop('disabled', false).text('SYNC');
@@ -1001,7 +1001,7 @@ add_action('admin_footer', function() {
                     });
                 }
 
-                // Iniciar la sincronización al hacer clic en el botón
+                // Start synchronization when the button is clicked
                 $('#tg_api_sync').on('click', function() {
                     syncInventory();
                 });
