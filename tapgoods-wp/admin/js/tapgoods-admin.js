@@ -60,22 +60,24 @@
             type: 'post',
             data: data,
             success: function( response ) {
-                // setTimeout( function(){
-                    console.log(response);
-                    if ( response.success ) {
-                        connectButton.prop('disabled', true).text('CONNECTED');
-                        const newVal = connectInput.val();
-                        connectInput.attr('data-original', newVal).attr('value', newVal );
-                        syncButton.show();
-                    } else {
-                        connectButton.removeAttr('disabled').text('CONNECT');
-                        syncButton.hide();
-                    }
+                console.log(response);
+                if ( response.success ) {
+                    connectButton.prop('disabled', true).text('CONNECTED');
+                    const newVal = connectInput.val();
+                    connectInput.attr('data-original', newVal).attr('value', newVal );
+                    syncButton.show();
+                } else {
+                    connectButton.removeAttr('disabled').text('CONNECT');
+                    syncButton.hide();
+                }
+                if (el) {
                     show_notice( response.data, el );    
-                // }, 1000 );   
+                }   
             },
             error: function( response ){
-                show_notice( response.data, el );
+                if (el) {
+                    show_notice( response.data, el );
+                }
                 syncButton.hide();
                 console.log( response );
             }
@@ -95,35 +97,37 @@
             type: 'get',
             success: function(response) {
                 console.log(response);
-                // setTimeout( function(){
-                    syncBtn.removeAttr('disabled').text('SYNC');
+                syncBtn.removeAttr('disabled').text('SYNC');
+                if (statusEl) {
                     show_notice( response.data, statusEl );
-
-                // }, 2000 );
+                }
             },
             error: function( response ){
-                show_notice( response.data, statusEl );
+                if (statusEl) {
+                    show_notice( response.data, statusEl );
+                }
+                console.log( response );
             },
         });
     }
 
     function show_notice( notice, el )
     {
+        if (!notice || !el) {
+            console.log('Notice or target element is undefined.');
+            return;
+        }
+        
         console.log(el);
         const template = document.createElement('div');
         template.innerHTML = notice;
-        if( template.firstChild.classList.contains('is-dismissible') ) {
+        if( template.firstChild && template.firstChild.classList.contains('is-dismissible') ) {
             template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tg_dissmiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
         }
-        // el.insertAdjacentElement( 'afterbegin', template.firstChild );
         el.innerHTML = notice;
         $(el).removeAttr('hidden');
     }
 })(jQuery,window,document)
-
-
-
-
 
 function tg_dissmiss_notice( notice )
 {
