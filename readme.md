@@ -60,6 +60,13 @@ Create a localdev.env file with the data you find in example.env
 docker compose up
 ```
 
+##### Get access to the wordpress docker shell
+
+```bash
+docker compose exec wordpress /bin/bash
+```
+
+
 ## Access the WordPress site
 
 Visit https://wordpress.local in your browser.
@@ -77,6 +84,13 @@ To use WP-CLI, run the following command:
 ```bash
 docker compose run --rm wpcli [command]
 ```
+
+example to set a password
+```bash
+docker compose run --rm wpcli user list
+docker compose run --rm wpcli user update 1 --user_pass=password
+```
+
 
 ### Compiling SASS files
 
