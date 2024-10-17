@@ -49,3 +49,6 @@ composer.lock
 
 # Dev utilities
 dev.php
+
+#ignore
+/releases/*

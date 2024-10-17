@@ -10,7 +10,8 @@ This project is using docker-compose to run a WordPress locally with mkcert for 
 - Docker
 - git
 - mkcert (for SSL)
-- sass 
+- sass
+- node
 
 ### Installation
 #### 1. Clone this repo into a folder on your machine and cd into your new folder
@@ -26,7 +27,7 @@ After installing mkcert, run the following commands to generate and install the 
 ```bash
 mkcert -install
 cd dev/certs
-mkcert wordpress.local
+mkcert -key-file /ws/certs/wordpress.local-key.pem -cert-file /ws/certs/wordpress.local.pem wordpress.local
 ```
 
 ##### Note for WSL users:
@@ -54,6 +55,10 @@ Instructions: https://www.hostinger.com/tutorials/how-to-edit-hosts-file
 
 Create a localdev.env file with the data you find in example.env
 
+```bash
+cp example.env localdev.env
+```
+
 #### 5. Start the WordPress server
 
 ```bash
@@ -75,7 +80,10 @@ On your first visit you will need to confirm the install and setup an admin user
 
 Once you're in the admin navigate to plugins and activate the TapGoods Plugin.
 
-In the future we will automate this setup step.
+or run to activate it
+```bash
+docker compose run --rm wpcli plugin activate tapgoods-wp
+```
 
 ## WP-CLI
 
