@@ -138,7 +138,9 @@ class Tapgoods_Admin {
 		$args = array(
 			'type' => 'error',
 		);
-		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect, make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
+		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
+
+		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect,, ' . $env1 . ' make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
 		wp_send_json_error( $notice );
 		die();
 	}

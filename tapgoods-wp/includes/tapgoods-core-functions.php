@@ -616,3 +616,37 @@ function tg_get_end_time() {
 function tg_get_user_agent() {
 	return isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 }
+
+
+
+
+
+// Function to enqueue a script that disables editing in the Gutenberg editor
+function tapgoods_disable_gutenberg_editing() {
+    global $post;
+    
+    // Check if the post type is 'tg_inventory' and if we are on the edit screen
+    if ( isset( $post->post_type ) && $post->post_type === 'tg_inventory' && is_admin() && get_current_screen()->is_block_editor() ) {
+        wp_enqueue_script(
+            'disable-gutenberg-editing',
+            plugin_dir_url( __FILE__ ) . '../public/js/disable-gutenberg-editing.js', // Correct URL
+            array( 'wp-blocks', 'wp-dom' ),
+            false,
+            true
+        );
+    }
+}
+add_action( 'admin_enqueue_scripts', 'tapgoods_disable_gutenberg_editing' );
+
+// Function to remove the 'Quick Edit' option from the list view
+function remove_quick_edit( $actions, $post ) {
+    // Check if the post type is 'tg_inventory'
+    if ( $post->post_type == 'tg_inventory' ) {
+        // Remove the 'Quick Edit' option
+        unset( $actions['inline hide-if-no-js'] );
+    }
+    return $actions;
+}
+add_filter( 'post_row_actions', 'remove_quick_edit', 10, 2 );
+
+

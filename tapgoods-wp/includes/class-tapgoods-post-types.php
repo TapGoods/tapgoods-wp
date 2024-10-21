@@ -326,6 +326,8 @@ class Tapgoods_Post_Types {
 		// add_rewrite_rule( '^shop/([^/]*)?$', 'index.php?inventory=$matches[1]&tg_category=$matches[1]', 'top' );
 	}
 
+	
+	
 	public static function tg_filter_post_type_link( $link, $post ) {
 		if ( 'tg_inventory' === $post->post_type ) {
 			// Try Yoast Primary Category First
@@ -573,5 +575,19 @@ class Tapgoods_Post_Types {
 		}
 	}
 }
+
+// Function to modify the number of 'tg_inventory' items displayed per page in the admin list view
+// The number of items per page can be controlled via a URL parameter 'items_per_page', defaulting to 20 if not set.
+
+function modify_tg_inventory_items_per_page( $per_page, $post_type ) {
+    if ( 'tg_inventory' === $post_type ) {
+        // Check if a parameter is passed via URL, otherwise use 20 as the default value.
+        $per_page = isset( $_GET['items_per_page'] ) ? (int) $_GET['items_per_page'] : 20;
+    }
+    return $per_page;
+}
+add_filter( 'edit_posts_per_page', 'modify_tg_inventory_items_per_page', 10, 2 );
+
+
 
 Tapgoods_Post_Types::init();
