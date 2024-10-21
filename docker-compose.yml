@@ -117,3 +117,7 @@ volumes:
       type: none
       device: ${PWD}/dev/certs
       o: bind            
+
+
+# remove volumes
+# docker compose down && docker volume rm tapgoods-wp_app-tapgoods-wp && docker volume rm tapgoods-wp_app-nginx && docker volume rm tapgoods-wp_app-dev-certs
