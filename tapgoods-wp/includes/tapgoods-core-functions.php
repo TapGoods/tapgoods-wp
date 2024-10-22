@@ -650,3 +650,51 @@ function remove_quick_edit( $actions, $post ) {
 add_filter( 'post_row_actions', 'remove_quick_edit', 10, 2 );
 
 
+// Function to clean up duplicate items
+function tg_clean_duplicate_items() {
+    // Check if the 'clean_duplicates' parameter is in the URL
+    if (isset($_GET['clean_duplicates']) && $_GET['clean_duplicates'] === 'true') {
+        global $wpdb;
+
+        // Add a script to display the start status in the browser console
+        add_action('admin_footer', function() {
+            echo "<script>console.log('Duplicate items cleanup started...');</script>";
+        });
+
+        // Query to find the IDs of duplicate posts based on 'post_title' and 'tg_id'
+        $query = "
+            SELECT MIN(p1.ID) as keep_id, p2.ID as delete_id
+            FROM {$wpdb->posts} p1
+            INNER JOIN {$wpdb->posts} p2 ON p1.post_title = p2.post_title 
+            AND p1.ID < p2.ID
+            INNER JOIN {$wpdb->postmeta} pm1 ON pm1.post_id = p1.ID AND pm1.meta_key = 'tg_id'
+            INNER JOIN {$wpdb->postmeta} pm2 ON pm2.post_id = p2.ID AND pm1.meta_value = pm2.meta_value
+            WHERE p1.post_type = 'tg_inventory' 
+            AND p2.post_type = 'tg_inventory'
+            AND p1.post_status = 'publish'
+            GROUP BY p2.ID
+        ";
+
+        // Execute the query to find duplicate posts
+        $duplicates = $wpdb->get_results($query);
+
+        // Counter for deleted posts
+        $deleted_count = 0;
+
+        // Delete the duplicate posts
+        foreach ($duplicates as $dup) {
+            // Permanently delete the duplicate post
+            wp_delete_post($dup->delete_id, true);
+            $deleted_count++;
+        }
+
+        // Add a script to display the completion status in the browser console
+        add_action('admin_footer', function() use ($deleted_count) {
+            echo "<script>console.log('Duplicate items cleanup completed. Total deleted: {$deleted_count}');</script>";
+        });
+    }
+}
+
+// Hook to clean duplicates when the admin page loads
+add_action('admin_init', 'tg_clean_duplicate_items');
+
