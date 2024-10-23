@@ -18,7 +18,7 @@ $tg_env       = getenv_docker( 'tg_env', 'tapgoods.com' );
 
 ?>
 <h2>Styling</h2>
-<p>This will override the styling in your <a href="https://business.<?php echo $tg_env; //phpcs:ignore ?>/admin/storefront/wordpress" target="_blank" class="link">TapGoods Storefront Settings</a>.</p>
+<p>This will override the styling in your <a href="https://business.<?php echo $tg_env; //phpcs:ignore ?>/admin/storefront/styling" target="_blank" class="link">TapGoods Storefront Settings</a>.</p>
 <h3>TapGoods Styles</h3>
 <textarea placeholder="" id="tg-css" spellcheck="false"><?php echo esc_textarea( $tapgoods_css ); ?></textarea>
 
