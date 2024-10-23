@@ -157,119 +157,169 @@ class Tapgoods_Connection {
 		do_action( 'tg_stop_api_sync', $sync_info );
 		update_option( 'tg_last_sync_info', $sync_info );
 	}
-
 	public function last_sync_message() {
-
-		$api_connected = get_option( 'tg_api_connected', false );
-
-		if ( ! $api_connected ) {
+		$api_connected = get_option('tg_api_connected', false);
+	
+		if (!$api_connected) {
 			return 'The last sync failed, please check your API Key and try again';
 		}
-
-		$time      = current_time( 'timestamp' ); // phpcs:ignore
-		$sync_info = get_option( 'tg_last_sync_info' );
-
-		$time_ago     = $time - $sync_info['last_sync_end'];
-		$time_ago_str = tg_seconds_to_string( $time_ago );
-		$duration_str = tg_seconds_to_string( $sync_info['last_sync_duration'] );
-
-		if ( ! $sync_info ) {
-			return false;
+	
+		// Check if the synchronization is in progress
+		if (get_transient('tg_sync_lock')) {
+			return 'Sync in progress. Please wait...';
 		}
-
+	
+		// Get the last synchronization information
+		$sync_info = get_option('tg_last_sync_info');
+	
+		// Verify that $sync_info is not false and contains the required keys
+		if (!$sync_info || !isset($sync_info['last_sync_end']) || !isset($sync_info['last_sync_duration'])) {
+			return 'No sync information available';
+		}
+	
+		// Calculate elapsed time and duration
+		$time = current_time('timestamp'); // phpcs:ignore
+		$time_ago = $time - $sync_info['last_sync_end'];
+		$time_ago_str = tg_seconds_to_string($time_ago);
+		$duration_str = tg_seconds_to_string($sync_info['last_sync_duration']);
+	
+		// Build the last synchronization message
 		$message = 'The last sync finished ' . $time_ago_str . " ago and took {$duration_str} seconds to run";
+	
 		return $message;
 	}
-
 	
-	
-
-
-
-
-
-
-
-	public function sync_location_settings() {
-
+	public function sync_inventory_in_batches($manual_trigger = false) {
+		$batch_size = 50;
+		$progress = get_option('tg_last_sync_progress', array('location_id' => null, 'current_page' => 1));
 		$client = $this->get_connection();
-
-		$location_ids = get_option( 'tg_locationIds', false );
-		$business_id  = get_option( 'tg_businessId', false );
-
-		// we should already be connected and have this info, but if we don't then try to validate the key and grab the ids one more time
-		if ( empty( $location_ids ) || empty( $business_id ) ) {
-
-			$business = $this->get_business();
-			if ( false === $business ) {
-				return false;
+	
+		// Force the removal of the previous lock
+		delete_transient('tg_sync_lock');
+	
+		if (get_transient('tg_sync_lock')) {
+			$this->console_log('Sync is locked, another process is running.');
+			return array('success' => false, 'message' => 'Sync is currently in progress by another process.');
+		}
+	
+		// Set the lock to prevent multiple executions
+		set_transient('tg_sync_lock', true, 900);
+		$this->console_log('Sync lock set for 15 minutes.');
+	
+		$location_ids = $client->get_location_ids();
+		if (false === $location_ids) {
+			error_log('Failed to retrieve location IDs');
+			$this->console_log('Failed to retrieve location IDs.');
+			delete_transient('tg_sync_lock');
+			return array('success' => false, 'message' => 'Failed to retrieve location IDs');
+		}
+	
+		$total_items = 0;
+		$start_time = current_time('timestamp'); // Log the start of the synchronization
+	
+		// Get all existing tg_ids in WordPress before synchronization
+		$existing_items = $this->get_all_existing_inventory_ids();
+		$synced_items = [];
+	
+		foreach ($location_ids as $lid) {
+			$current_page = 1;
+			$continue_fetching = true;
+	
+			while ($continue_fetching) {
+				$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
+				if (false === $response || empty($response['collection'])) {
+					$this->console_log('No more items to fetch for location ID: ' . $lid);
+					$continue_fetching = false;
+					continue;
+				}
+	
+				$inventory = $response['collection'];
+				$total_items += count($inventory);
+				$this->console_log('Fetched ' . count($inventory) . ' items from location ID: ' . $lid . ', page: ' . $current_page);
+	
+				foreach ($inventory as $item) {
+					$this->sync_inventory_item($item);
+					$synced_items[] = $item['id']; // Save the IDs of synchronized items
+				}
+	
+				if (count($inventory) < $batch_size) {
+					$continue_fetching = false;
+				} else {
+					$current_page++;
+					update_option('tg_last_sync_progress', array('location_id' => $lid, 'current_page' => $current_page));
+					$this->console_log('Progress saved for location ID: ' . $lid . ', page: ' . $current_page);
+				}
 			}
-			$location_ids = get_option( 'tg_locationIds', false );
-			$business_id  = get_option( 'tg_businessId', false );
 		}
-
-		// if this fails, something else is wrong
-		if ( false === $location_ids || false === $business_id ) {
-			return false;
+	
+		// Remove items that are no longer in the endpoint
+		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+	
+		// Call the function to remove duplicates
+		$this->remove_duplicate_items();
+	
+		// Save synchronization information
+		$this->update_sync_info($start_time);
+	
+		// Update the final message in the database
+		update_option('tg_last_sync_info', array(
+			'last_sync_end' => current_time('timestamp'),
+			'last_sync_duration' => current_time('timestamp') - $start_time
+		));
+	
+		// Release the lock
+		delete_transient('tg_sync_lock');
+		delete_option('tg_last_sync_progress');
+	
+		$this->console_log('Sync process completed.');
+		return array('success' => true);
+	}
+	
+	
+	public function get_all_existing_inventory_ids() {
+		global $wpdb;
+	
+		$query = "
+			SELECT post_id, meta_value as tg_id 
+			FROM {$wpdb->postmeta}
+			WHERE meta_key = 'tg_id'
+		";
+	
+		$results = $wpdb->get_results($query, ARRAY_A);
+	
+		$existing_items = [];
+		foreach ($results as $result) {
+			$existing_items[$result['tg_id']] = $result['post_id'];
 		}
-
-		// We only check for the transient during sync because we want fresh information and update the long-lived option value
-		$location_transient = $client->transient_name( 'location_info' );
-
-		$location_info = get_transient( $location_transient );
-		$location_info = false;
-
-		if ( false === $location_info || '' === $location_info || null === $location_info ) {
-
-			$location_info = array();
-			$extra_config  = array(
-				'cache_enabled' => false,
-				'bid'           => $business_id,
-			);
-			$client->set_config( $extra_config );
-
-			foreach ( $location_ids as $lid ) {
-
-				$location_details = $client->get_location_details_from_graph( $lid );
-
-				if ( false === $location_details ) {
-					return false;
-				}
-
-				$location_details['slug'] = sanitize_title( $location_details['physicalAddress']['city'] . '-' . $location_details['physicalAddress']['locale'] );
-				$location_details['display_locale'] = ucwords( $location_details['physicalAddress']['city'] ) . ', ' . strtoupper( $location_details['physicalAddress']['locale'] );
-
-				$sf_shop_settings = (array) $location_details['storefrontShopSettings'];
-				$settings_count   = count( $sf_shop_settings );
-
-				if ( $settings_count > 1 ) {
-					usort(
-						$sf_shop_settings,
-						function ( $a, $b ) {
-							return $a['id'] < $b['id'] ? 1 : -1;
-						}
-					);
-				}
-				$location_details['storefrontShopSettings'] = current( $sf_shop_settings );
-
-				$term = $this->tg_insert_or_update_term( $location_details, 'tg_location' );
-
-				if ( false !== $term ) {
-					$this->update_location_term_meta( $term['term_id'], $location_details );
-					update_term_meta( $term['term_id'], 'tg_hash', $this->hash );
-				}
-
-				$location_info[ $lid ] = $location_details;
-				update_option( 'tg_location_' . $lid, $location_details );
-			}
-
-			set_transient( $location_transient, $location_info, 300 );
-			update_option( 'tg_location_settings', $location_info );
-		}
-
-		return $location_info;
+	
+		return $existing_items;
 	}
 
+	public function remove_missing_items_from_wordpress($existing_items, $synced_items) {
+		$items_to_remove = array_diff(array_keys($existing_items), $synced_items);
+	
+		foreach ($items_to_remove as $tg_id) {
+			$post_id = $existing_items[$tg_id];
+			wp_delete_post($post_id, true);
+			$this->console_log('Removed missing item with tg_id: ' . $tg_id . ', post ID: ' . $post_id);
+		}
+	}
+	
+	
+	public function update_sync_info($start_time) {
+		$end_time = current_time('timestamp');
+		$sync_duration = $end_time - $start_time;
+	
+		// Save the synchronization information
+		$sync_info = array(
+			'last_sync_end' => $end_time,
+			'last_sync_duration' => $sync_duration
+		);
+	
+		update_option('tg_last_sync_info', $sync_info);
+	}
+
+	
 	public function get_location_info() {
 
 		$client = $this->get_connection();
@@ -756,17 +806,6 @@ class Tapgoods_Connection {
 	}
 
 
-
-
-
-
-
-
-
-
-
-
-
     public function sync_from_api() {
         // Start manual synchronization without cron, using a step-based approach
         error_log('Starting manual inventory sync');
@@ -777,188 +816,188 @@ class Tapgoods_Connection {
         );
     }
 
-    public function sync_inventory_in_batches($manual_trigger = false) {
-        $batch_size = 50; // Adjust the batch size
-        $progress = get_option('tg_last_sync_progress', array('location_id' => null, 'current_page' => 1));
-        $client = $this->get_connection();
+		public function sync_inventory_item($item) {
+		try {
+			$existing_item_by_id = $this->get_existing_inventory_item_by_tg_id($item['id']);
+			if ($existing_item_by_id) {
+				$this->console_log('Updating item with tg_id: ' . $item['id'] . ' (' . $item['name'] . ')');
+				$this->update_inventory_item($existing_item_by_id->ID, $item);
+			} else {
+				$this->console_log('Inserting new item: ' . $item['name']);
+				$this->tg_insert_inventory($item);
+			}
+		} catch (Exception $e) {
+			$this->console_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
+		}
+	}
+	
+	
+	// Function to remove duplicates after synchronization
+	public function remove_duplicate_items() {
+		global $wpdb;
+	
+		$duplicates_query = "
+			SELECT meta_value AS tg_id, COUNT(*) as count, MIN(post_id) as keep_id
+			FROM {$wpdb->postmeta}
+			WHERE meta_key = 'tg_id'
+			GROUP BY meta_value
+			HAVING count > 1
+		";
+	
+		$duplicates = $wpdb->get_results($duplicates_query);
+	
+		foreach ($duplicates as $duplicate) {
+			// Get duplicate post IDs (excluding the one we want to keep)
+			$duplicate_ids_query = "
+				SELECT post_id
+				FROM {$wpdb->postmeta}
+				WHERE meta_key = 'tg_id' AND meta_value = %s AND post_id != %d
+			";
+			$duplicate_ids = $wpdb->get_col($wpdb->prepare($duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id));
+	
+			// Delete the duplicate posts
+			foreach ($duplicate_ids as $post_id) {
+				wp_delete_post($post_id, true);
+				$this->console_log('Removed duplicate item with post ID: ' . $post_id);
+			}
+		}
+	
+		$this->console_log('Duplicate removal process completed.');
+	}
+	
+	
+	
+	public function get_existing_inventory_item_by_title($title) {
+		$args = array(
+			'post_type' => 'tg_inventory',
+			'title'     => $title,
+			'posts_per_page' => 1,
+		);
+		$query = new WP_Query($args);
+		
+		if ($query->have_posts()) {
+			$this->console_log('Found existing item with title: ' . $title);
+			return $query->posts[0];
+		} else {
+			$this->console_log('No existing item found with title: ' . $title);
+			return false;
+		}
+	}
+	
+	public function update_inventory_item($post_id, $item) {
+		$post_arr = array(
+			'ID' => $post_id,
+			'post_title' => $item['name'],
+			'meta_input' => $this->prepare_meta_input($item)
+		);
+		wp_update_post($post_arr);
+	}
+	
+	public function get_existing_inventory_item_by_tg_id($tg_id) {
+		$args = array(
+			'post_type' => 'tg_inventory',
+			'meta_query' => array(
+				array(
+					'key' => 'tg_id',
+					'value' => $tg_id,
+					'compare' => '='
+				)
+			),
+			'posts_per_page' => 1
+		);
+		$query = new WP_Query($args);
+		if ($query->have_posts()) {
+			$this->console_log('Found existing item with tg_id: ' . $tg_id);
+			return $query->posts[0];
+		} else {
+			$this->console_log('No existing item found with tg_id: ' . $tg_id);
+			return false;
+		}
+	}
+	
+	public function tg_insert_inventory($product) {
+		global $wpdb;
+	
+		// Direct verification in the database to prevent duplicates
+		$existing_item_id = $wpdb->get_var($wpdb->prepare(
+			"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'tg_id' AND meta_value = %s LIMIT 1",
+			$product['id']
+		));
+	
+		if ($existing_item_id) {
+			$this->console_log('Skipping creation: Item with tg_id ' . $product['id'] . ' already exists.');
+			return $existing_item_id; // If it already exists, return the ID of the existing item
+		}
+	
+		// Prepare the slug and metadata
+		$slug = str_replace('_', '-', $product['slug']);
+		$meta = $this->prepare_meta_input($product);
+		$post_arr = array(
+			'post_type' => 'tg_inventory',
+			'post_title' => $product['name'],
+			'post_name' => wp_unique_post_slug($slug, 0, 'publish', 'tg_inventory', 0),
+			'meta_input' => $meta,
+			'post_status' => 'publish',
+		);
+	
+		if (1 === get_option('tg_description_as_content')) {
+			$post_arr['post_content'] = $product['description'];
+		}
+	
+		// Attempt to insert the item using `wp_insert_post`
+		$insert = wp_insert_post($post_arr, true);
+		
+		// Check for errors during the insertion
+		if (is_wp_error($insert)) {
+			$this->console_log('Error inserting item: ' . $product['id'] . ' - ' . $insert->get_error_message());
+			return false;
+		}
+	
+		// Save the 'tg_id' as metadata
+		update_post_meta($insert, 'tg_id', $product['id']);
+	
+		$this->console_log('Inserted new item with tg_id: ' . $product['id']);
+		return $insert;
+	}
+	
+	
+	public function prepare_meta_input($product) {
+		$meta = array();
+		$exclude = array('businessInfo', 'location', 'suppliers', 'slug');
+		foreach ($product as $k => $v) {
+			if (in_array($k, $exclude, true)) {
+				continue;
+			}
+			if (null === $v) {
+				continue;
+			}
+			$key = 'tg_' . $k;
+			$meta[$key] = $v;
+		}
+		$meta['tg_id'] = $product['id'];
+		return $meta;
+	}
+	
+	public function console_log($message) {
+		add_action('admin_footer', function() use ($message) {
+			echo "<script>console.log('{$message}');</script>";
+		});
+	}
+	
+	public function manual_sync_trigger() {
+		if (current_user_can('manage_options')) {
+			$result = $this->sync_inventory_in_batches(true);
+			wp_send_json($result);
+		} else {
+			wp_send_json(array('success' => false, 'message' => 'You do not have permission to access this endpoint.'));
+		}
+	}
+	
 
-        // Check if there is an active sync lock
-        if (get_transient('tg_sync_lock')) {
-            error_log('Sync is locked, another process is running.');
-            return array('success' => false, 'message' => 'Sync is currently in progress by another process.');
-        }
-
-        // Set a sync lock
-        set_transient('tg_sync_lock', true, 300); // Lock valid for 5 minutes
-
-        $location_ids = $client->get_location_ids();
-        if (false === $location_ids) {
-            tg_write_log('Failed to retrieve location IDs');
-            error_log('Failed to retrieve location IDs');
-            delete_transient('tg_sync_lock'); // Remove the lock
-            return array('success' => false, 'message' => 'Failed to retrieve location IDs');
-        }
-
-        $total_synced = 0;
-        $start_syncing = false;
-
-        foreach ($location_ids as $lid) {
-            if (!$start_syncing && $progress['location_id'] !== null && $progress['location_id'] !== $lid) {
-                continue;
-            }
-            $start_syncing = true;
-
-            $current_page = ($progress['location_id'] === $lid) ? $progress['current_page'] : 1;
-
-            // Log sync status
-            error_log('Starting sync for location ID: ' . $lid . ', page: ' . $current_page);
-
-            $response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
-            if (false === $response) {
-                tg_write_log('Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
-                error_log('Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
-                delete_transient('tg_sync_lock'); // Remove the lock
-                return array('success' => false, 'message' => 'Failed to retrieve inventory for location ID: ' . $lid . ' on page ' . $current_page);
-            }
-
-            if (empty($response['collection'])) {
-                error_log('No inventory items found for location ID: ' . $lid . ' on page ' . $current_page);
-                continue;
-            }
-
-            $inventory = $response['collection'];
-            foreach ($inventory as $item) {
-                try {
-                    // Use transient to block item creation process
-                    $lock_key = 'tg_item_lock_' . $item['id'];
-                    if (get_transient($lock_key)) {
-                        error_log('Skipping item with tg_id ' . $item['id'] . ' because it is already being processed.');
-                        continue;
-                    }
-                    set_transient($lock_key, true, 300); // Block valid for 5 minutes
-
-                    // Check if item already exists before updating or creating it
-                    $existing_item = $this->get_existing_inventory_item_by_tg_id($item['id']);
-                    if ($existing_item) {
-                        error_log('Item exists: updating item with tg_id ' . $item['id']);
-                        $this->tg_update_inventory($item, $total_synced, $existing_item->ID);
-                    } else {
-                        error_log('Item does not exist: creating new item with tg_id ' . $item['id']);
-                        $this->tg_insert_inventory($item, $total_synced);
-                    }
-
-                    $total_synced++;
-                    error_log('Successfully synced item: ' . $item['id']);
-
-                    // Remove item lock
-                    delete_transient($lock_key);
-                } catch (Exception $e) {
-                    tg_write_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
-                    error_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
-                    delete_transient($lock_key); // Make sure to remove the lock in case of error
-                }
-            }
-
-            // Save progress every 50 items
-            update_option('tg_last_sync_progress', array('location_id' => $lid, 'current_page' => $current_page + 1));
-            error_log('Progress saved: location ID ' . $lid . ', page ' . $current_page);
-
-            // Break after every batch of 50
-            delete_transient('tg_sync_lock'); // Temporarily remove the lock
-            return array('success' => true, 'message' => 'Synced ' . $total_synced . ' items so far. Continuing...', 'continue' => true);
-        }
-
-        // If synchronization is complete, remove the progress
-        delete_option('tg_last_sync_progress');
-        delete_transient('tg_sync_lock'); // Delete the lock
-        error_log('Total inventory items synced: ' . $total_synced);
-
-        return array('success' => true, 'message' => 'Total inventory items synced: ' . $total_synced, 'continue' => false);
-    }
-
-    // Method to get an existing inventory item by tg_id
-    public function get_existing_inventory_item_by_tg_id($tg_id) {
-        $args = array(
-            'post_type' => 'tg_inventory',
-            'meta_query' => array(
-                array(
-                    'key' => 'tg_id',
-                    'value' => $tg_id,
-                    'compare' => '='
-                )
-            ),
-            'posts_per_page' => 1
-        );
-        $query = new WP_Query($args);
-
-        if ($query->have_posts()) {
-            error_log('Found existing item with tg_id: ' . $tg_id);
-            return $query->posts[0];
-        } else {
-            error_log('No existing item found with tg_id: ' . $tg_id);
-            return false;
-        }
-    }
-
-    // Method to insert a new inventory item
-    public function tg_insert_inventory($product, $tg_order) {
-        $slug = str_replace('_', '-', $product['slug']);
-        $meta = array();
-        $exclude = array('businessInfo', 'location', 'suppliers', 'slug');
-
-        foreach ($product as $k => $v) {
-            if (in_array($k, $exclude, true)) {
-                continue;
-            }
-            if (null === $v) {
-                continue;
-            }
-            $key = 'tg_' . $k;
-            $meta[$key] = $v;
-        }
-        $meta['tg_id'] = $product['id'];
-
-        // Attempt to insert and avoid duplicates using 'post_title' and 'tg_id'
-        $post_arr = array(
-            'post_type' => 'tg_inventory',
-            'post_title' => $product['name'],
-            'post_name' => $slug,
-            'menu_order' => $tg_order,
-            'meta_input' => $meta,
-            'post_status' => 'publish',
-        );
-
-        if (1 === get_option('tg_description_as_content')) {
-            $post_arr['post_content'] = $product['description'];
-        }
-
-        // Check if a post with the same title and tg_id already exists
-        $existing_post = $this->get_existing_inventory_item_by_tg_id($product['id']);
-        if ($existing_post) {
-            error_log('Skipping creation: Item with tg_id ' . $product['id'] . ' already exists.');
-            return $existing_post->ID;
-        }
-
-        $insert = wp_insert_post($post_arr, true);
-        if (is_wp_error($insert)) {
-            error_log('Error inserting item: ' . $product['id'] . ' - ' . $insert->get_error_message());
-        } else {
-            error_log('Inserted new item with tg_id: ' . $product['id']);
-        }
-        return $insert;
-    }
-
-    // Endpoint to manually trigger synchronization
-    public function manual_sync_trigger() {
-        if (current_user_can('manage_options')) {
-            $result = $this->sync_inventory_in_batches(true);
-            wp_send_json($result);
-        } else {
-            wp_send_json(array('success' => false, 'message' => 'You do not have permission to access this endpoint.'));
-        }
-    }
 }
-
+	// Add action for synchronization via AJAX
+	add_action('wp_ajax_tg_api_sync', array(Tapgoods_Connection::get_instance(), 'manual_sync_trigger'));
+	
 // Create an endpoint to manually execute synchronization without using cron
 add_action('wp_ajax_tapgoods_manual_sync', [Tapgoods_Connection::get_instance(), 'manual_sync_trigger']);
 add_action('wp_ajax_nopriv_tapgoods_manual_sync', function() {
