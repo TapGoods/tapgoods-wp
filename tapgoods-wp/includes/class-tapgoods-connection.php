@@ -272,7 +272,7 @@ class Tapgoods_Connection {
 		delete_option('tg_last_sync_progress');
 	
 		$this->console_log('Sync process completed.');
-		return array('success' => true);
+		return array('success' => true, 'message' => '');
 	}
 	
 	
