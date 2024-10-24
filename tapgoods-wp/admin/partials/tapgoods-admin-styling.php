@@ -28,7 +28,7 @@ $tg_env       = getenv_docker( 'tg_env', 'tapgoods.com' );
 
 do_action( 'tg_save_custom_css', $input_submit );
 
-$custom_css = Tapgoods_Filesystem::get_file( TAPGOODS_UPLOADS . 'custom.css' );
+$custom_css = Tapgoods_Filesystem::get_file( TAPGOODS_PLUGIN_PATH . '/public/css/tapgoods-custom.css' );
 
 ?>
 <form name="tapgoods_styling" method="post" action="">

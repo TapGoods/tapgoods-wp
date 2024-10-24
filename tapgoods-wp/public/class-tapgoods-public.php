@@ -15,8 +15,19 @@ class Tapgoods_Public {
 
 	public function enqueue_styles() {
 
-		wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array(), $this->version, 'all' );
-		wp_enqueue_style( TAPGOODS_UPLOADS . 'custom.css', array(), $this->version, 'all' );
+		add_action( 'wp_enqueue_scripts', function() {
+			wp_enqueue_style( 'custom-css', TAPGOODS_UPLOADS . 'custom.css', array(), $this->version, 'all' );
+		}, 15 );
+
+		add_action( 'wp_enqueue_scripts', function() {
+			wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array( 'custom-css' ), $this->version, 'all' );
+		}, 30 );
+
+		add_action( 'wp_enqueue_scripts', function() {
+			wp_enqueue_style( $this->plugin_name . '-custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+		}, 50 );
+
+
 
 		$sf_styles = tg_location_styles();
 		wp_add_inline_style( $this->plugin_name . '-public-css', $sf_styles );

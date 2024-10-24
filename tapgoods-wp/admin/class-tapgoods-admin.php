@@ -210,11 +210,15 @@ class Tapgoods_Admin {
 
 		if ( isset( $_REQUEST[ $nonce_name ] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST[ $nonce_name ] ) ), $action ) ) {
 
-			$custom_css = ( isset( $_REQUEST['tg-custom-css'] ) ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['tg-custom-css'] ) ) : false;
-			$success    = ( $custom_css ) ? Tapgoods_Filesystem::put_file( $input_submit, $custom_css, TAPGOODS_UPLOADS . 'custom.css', $action, $nonce_name ) : false;
-
+			// Allow saving the file even if the content is empty
+			$custom_css = ( isset( $_REQUEST['tg-custom-css'] ) ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['tg-custom-css'] ) ) : '';
+		
+			// Now we save even if the content is empty
+			$success = Tapgoods_Filesystem::put_file( $input_submit, $custom_css, TAPGOODS_PLUGIN_PATH . '/public/css/tapgoods-custom.css' , $action, $nonce_name );
+		
 			return $success;
 		}
+		
 	}
 
 	public function taxonomy_intercept() {
