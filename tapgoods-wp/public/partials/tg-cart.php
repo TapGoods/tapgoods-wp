@@ -6,6 +6,7 @@
 global $post;
 
 $location = tg_get_wp_location_id();
+error_log('Location ID: ' . print_r($location, true));
 $url = tg_get_cart_url( $location );
 
 ?>

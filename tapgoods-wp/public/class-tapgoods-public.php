@@ -16,7 +16,7 @@ class Tapgoods_Public {
 	public function enqueue_styles() {
 
 		add_action( 'wp_enqueue_scripts', function() {
-			wp_enqueue_style( 'custom-css', TAPGOODS_UPLOADS . 'custom.css', array(), $this->version, 'all' );
+			wp_enqueue_style( 'custom-css',  'custom.css', array(), $this->version, 'all' );
 		}, 15 );
 
 		add_action( 'wp_enqueue_scripts', function() {
@@ -39,24 +39,25 @@ class Tapgoods_Public {
 		require TAPGOODS_PLUGIN_PATH . 'public/css/tapgoods-sf-styles.php';
 	}
 
-	public function enqueue_scripts() {
-
+	public function enqueue_scripts() { 
 		$location = tg_get_wp_location_id();
-		$cart_url = tg_get_cart_url( $location );
-
-		wp_enqueue_script( $this->plugin_name . '-public', plugin_dir_url( __FILE__ ) . 'js/tapgoods-public.js', array( 'jquery' ), $this->version, false );
-		wp_enqueue_script( 'tg-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', array(), '5.3.3', false );
+		$cart_url = tg_get_cart_url($location);
+	
+		wp_enqueue_script($this->plugin_name . '-public', plugin_dir_url(__FILE__) . 'js/tapgoods-public.js', array('jquery'), $this->version, false);
+		wp_enqueue_script('tg-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', array(), '5.3.3', false);
 		wp_localize_script(
 			$this->plugin_name . '-public',
 			'tg_ajax',
 			array(
-				'ajaxurl'    => admin_url( 'admin-ajax.php' ),
+				'ajaxurl'    => admin_url('admin-ajax.php'),
 				'locationId' => $location,
 				'cart_url'   => $cart_url,
-				'domain'     => wp_parse_url( get_site_url(), PHP_URL_HOST ),
+				'domain'     => wp_parse_url(get_site_url(), PHP_URL_HOST),
 			)
 		);
 	}
+	
+	
 
 	public static function tg_locate_template( $template = '' ) {
 
@@ -285,4 +286,6 @@ class Tapgoods_Public {
 
 		return array_merge( $classes, $tg_classes );
 	}
+
 }
+

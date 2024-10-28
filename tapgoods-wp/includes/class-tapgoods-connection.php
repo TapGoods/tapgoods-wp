@@ -255,6 +255,23 @@ class Tapgoods_Connection {
 		// Remove items that are no longer in the endpoint
 		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
 	
+
+		// Assigns a default location_id if one does not already exist
+		if (!get_option('tg_default_location')) {
+			// Get the list of locations from tg_locationIds
+			$locations = maybe_unserialize(get_option('tg_locationIds'));
+
+			// Verify that the list of locations is defined and not empty
+			if (is_array($locations) && !empty($locations)) {
+				// Select the first ID in the list as default
+				$default_location_id = reset($locations);
+
+				// Save the first location_id as default value
+				update_option('tg_default_location', $default_location_id);
+			}
+		}
+
+
 		// Call the function to remove duplicates
 		$this->remove_duplicate_items();
 	

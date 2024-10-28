@@ -67,6 +67,10 @@ $enable_advanced = get_option( 'tg_enable_advanced', false );
 		<div class="tab-pane fade bg-white p-4" id="shortcodes" role="tabpanel" aria-labelledby="nav-shortcodes-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-shortcodes.php'; ?>
 		</div>
+		<div class="tab-pane fade bg-white p-4" id="options" role="tabpanel" aria-labelledby="nav-options-tab" tabindex="0">
+			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-options.php'; ?>
+		</div>
+
 		<?php if ( $enable_advanced ) : ?>
 		<div class="tab-pane fade bg-white p-4" id="advanced" role="tabpanel" aria-labelledby="nav-advanced-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-advanced.php'; ?>

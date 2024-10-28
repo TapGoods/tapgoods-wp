@@ -475,28 +475,12 @@ function tg_get_tg_location_id( $post_id = false ) {
 	return false;
 }
 
-function tg_get_wp_location_id( $post_id = false ) {
+//function tg_get_wp_location_id( $post_id = false ) {
+function tg_get_wp_location_id() {
+    $default_location = get_option('tg_default_location');
+    error_log("Default Location: " . print_r($default_location, true)); // Add for debugging
+    return $default_location ?: null;
 
-	if ( false === $post_id ) {
-		$args = array(
-			'taxonomy'   => 'tg_location',
-			'hide_empty' => false,
-			'number'     => 1,
-			'fields'     => 'ids',
-		);
-
-		$locations = get_terms( $args );
-	}
-
-	if ( false !== $post_id ) {
-		$locations = get_the_terms( $post_id, 'tg_location' );
-	}
-
-	if ( count( $locations ) > 0 ) {
-		return current( $locations );
-	}
-
-	return false;
 }
 
 function tg_locate_template( $template = '' ) {
@@ -522,66 +506,109 @@ function tg_locate_template( $template = '' ) {
 	return $template_path;
 }
 
-function tg_get_sf_url( $wp_location_id ) {
-	return get_term_meta( $wp_location_id, 'tg_sf_url', true );
+function tg_get_sf_url($wp_location_id) {
+    $location_data = get_option('tg_location_' . $wp_location_id);
+    return isset($location_data['sf_url']) ? $location_data['sf_url'] : '#';
 }
+
 
 function tg_get_sf_domain( $wp_location_id ) {
 	return get_term_meta( $wp_location_id, 'tg_subdomain', true );
 }
 
-function tg_get_cart_url( $wp_location_id ) {
-	$url = get_term_meta( $wp_location_id, 'tg_cart_url', true );
-	$event_start = tg_get_start_date() . 'T' . tg_get_start_time();
-	$event_end = tg_get_end_date() . 'T' . tg_get_end_time();
-	$params = array(
-		'eventStart' => $event_start,
-		'eventEnd'   => $event_end,
-	);
+function tg_get_cart_url($wp_location_id) {
+    // Get location data from tg_location_{ID} option
+    $location_data = get_option('tg_location_' . $wp_location_id);
 
-	$cart_url = add_query_arg( $params, $url );
-	return $cart_url;
+    if (empty($location_data) || !isset($location_data['cart_url'])) {
+        error_log("tg_cart_url not found for location_id: " . $wp_location_id);
+        return '#'; // Fallback value if no URL
+    }
+
+    // Constructing the URL with the event parameters
+    $url = $location_data['cart_url'];
+    $event_start = tg_get_start_date() . 'T' . tg_get_start_time();
+    $event_end = tg_get_end_date() . 'T' . tg_get_end_time();
+    $params = array(
+        'eventStart' => $event_start,
+        'eventEnd'   => $event_end,
+    );
+
+    return add_query_arg($params, $url);
 }
 
-function tg_get_sign_in_url( $wp_location_id ) {
-	return get_term_meta( $wp_location_id, 'tg_login_url', true );
+
+function tg_get_sign_in_url($wp_location_id) {
+    $location_data = get_option('tg_location_' . $wp_location_id);
+    return isset($location_data['login_url']) ? $location_data['login_url'] : '#';
 }
 
-function tg_get_sign_up_url( $wp_location_id ) {
-	return get_term_meta( $wp_location_id, 'tg_login_url', true );
+function tg_get_sign_up_url($wp_location_id) {
+    $location_data = get_option('tg_location_' . $wp_location_id);
+    return isset($location_data['signup_url']) ? $location_data['signup_url'] : '#';
 }
 
-function tg_get_add_to_cart_url( $wp_location_id ) {
-	$url = get_term_meta( $wp_location_id, 'tg_add_to_cart', true );
-	return $url;
+
+function tg_get_add_to_cart_url($wp_location_id) {
+    $location_data = get_option('tg_location_' . $wp_location_id);
+    $url = isset($location_data['add_to_cart']) ? $location_data['add_to_cart'] : '#';
+    
+    // Log to verify the URL value
+    error_log("Add to Cart URL: " . $url);
+    
+    return $url;
 }
+
 
 function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
+    // Obtiene la ubicación específica del producto
+    $location = get_the_terms( $product_id, 'tg_location' );
 
-	$location = get_the_terms( $product_id, 'tg_location' );
+    // Si no se encuentra la ubicación específica, usa la ubicación predeterminada
+    if ( ! is_array( $location ) || empty( $location ) ) {
+        $default_location_id = get_option('tg_default_location');
+        if ( !$default_location_id ) {
+            error_log("Ubicación no encontrada para product_id: $product_id y no hay ubicación predeterminada.");
+            return '#';
+        }
+        $base_url = tg_get_add_to_cart_url( $default_location_id );
+        $cart_url = tg_get_cart_url( $default_location_id ); // URL del carrito
+    } else {
+        $location = current( $location );
+        $base_url = tg_get_add_to_cart_url( $location->term_id );
+        $cart_url = tg_get_cart_url( $location->term_id ); // URL del carrito
+    }
 
-	if ( ! is_array( $location ) ) {
-		return false;
-	}
+    // Verifica que `base_url` y `cart_url` sean válidos
+    if ( $base_url === '#' || !$cart_url ) {
+        error_log("Add to Cart URL o Cart URL no encontrado para location_id: " . ( $location->term_id ?? 'Predeterminado' ));
+        return '#';
+    }
 
-	$location = current( $location );
+    // Obtén el `itemId` y el `itemType` del producto
+    $tg_id = get_post_meta( $product_id, 'tg_id', true );
+    $type  = get_post_meta( $product_id, 'tg_productType', true );
 
-	$base_url = tg_get_add_to_cart_url( $location->term_id );
+    // Combina los parámetros adicionales, utilizando `$cart_url` directamente en `redirectUrl`
+    $params = array_merge(
+        array(
+            'itemId'      => $tg_id,
+            'itemType'    => $type,
+            'quantity'    => 1,
+            'redirectUrl' => $cart_url  // Asigna directamente el `cart_url`
+        ),
+        $params
+    );
 
-	$tg_id = get_post_meta( $product_id, 'tg_id', true );
-	$type  = get_post_meta( $product_id, 'tg_productType', true );
+    // Asegúrate de que `redirectUrl` esté correctamente asignado como `cart_url`
+    $params['redirectUrl'] = $cart_url;
 
-	$params = array_merge(
-		array(
-			'itemId'   => $tg_id,
-			'itemType' => $type,
-			'quantity' => 1,
-		),
-		$params
-	);
+    // Agrega los parámetros a la URL base
+    $url = add_query_arg( $params, $base_url );
 
-	$url = add_query_arg( $params, $base_url );
-	return $url;
+    error_log("URL final de Add to Cart: " . $url); // Log para verificar
+
+    return $url;
 }
 
 function tg_date_format() {
@@ -598,16 +625,43 @@ function tg_get_page_id( $page ) {
 }
 
 function tg_get_start_date() {
-	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+    // Get the start date of the cookie, if it exists
+    $start_date = isset($_COOKIE['tg-eventStart']) ? sanitize_text_field($_COOKIE['tg-eventStart']) : '';
+
+    // If the cookie date is invalid or older than today, set the start date to today
+    $today = wp_date('Y-m-d');
+    if (empty($start_date) || wp_date('Y-m-d', strtotime($start_date)) < $today) {
+        $start_date = $today;
+    }
+
+    return $start_date;
 }
+
 
 function tg_get_start_time() {
 	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 10:00 AM' ) );
 }
 
+// function tg_get_end_date() {
+// 	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+// }
+
 function tg_get_end_date() {
-	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+    // Get the start date
+    $start_date = tg_get_start_date();
+
+    // Get the cookie expiration date, if any
+    $end_date = isset($_COOKIE['tg-eventEnd']) ? sanitize_text_field($_COOKIE['tg-eventEnd']) : '';
+
+    // If the cookie date is invalid or older than three days after the start date, set to three days after the start
+    $min_end_date = wp_date('Y-m-d', strtotime($start_date . ' +3 days'));
+    if (empty($end_date) || wp_date('Y-m-d', strtotime($end_date)) < $min_end_date) {
+        $end_date = $min_end_date;
+    }
+
+    return $end_date;
 }
+
 
 function tg_get_end_time() {
 	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 15:00' ) );
@@ -698,3 +752,22 @@ function tg_clean_duplicate_items() {
 // Hook to clean duplicates when the admin page loads
 add_action('admin_init', 'tg_clean_duplicate_items');
 
+
+add_action('pre_get_posts', function($query) {
+    if (!is_admin() && $query->is_main_query() && $query->is_search && isset($_GET['post_type']) && $_GET['post_type'] === 'tg_inventory') {
+        
+        // Make sure `tg_location_id` is in the request
+        if (!empty($_GET['tg_location_id'])) {
+            $location_id = sanitize_text_field($_GET['tg_location_id']);
+            
+            // Add a meta_query relation to filter by `location_id`
+            $query->set('meta_query', array(
+                array(
+                    'key'     => 'tg_locationId',
+                    'value'   => $location_id,
+                    'compare' => '=',
+                ),
+            ));
+        }
+    }
+});

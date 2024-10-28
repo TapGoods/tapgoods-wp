@@ -588,6 +588,58 @@ function modify_tg_inventory_items_per_page( $per_page, $post_type ) {
 }
 add_filter( 'edit_posts_per_page', 'modify_tg_inventory_items_per_page', 10, 2 );
 
+// Add 'Location' column to admin table for 'tg_inventory' before 'Date' column
+add_filter('manage_tg_inventory_posts_columns', 'add_location_column_to_inventory');
+function add_location_column_to_inventory($columns) {
+    $new_columns = [];
+
+    // Rearrange columns and insert 'Location' before 'Date'
+    foreach ($columns as $key => $value) {
+        if ($key === 'date') {
+            $new_columns['location'] = __('Location', 'tapgoods');
+        }
+        $new_columns[$key] = $value;
+    }
+
+    return $new_columns;
+}
+
+
+// Fill the 'Location' column with the ID and name of the specific location of the item
+add_action('manage_tg_inventory_posts_custom_column', 'fill_location_column_in_inventory', 10, 2);
+function fill_location_column_in_inventory($column, $post_id) {
+    if ($column === 'location') {
+        // Get the ID of the location associated with the current item
+        $location_id = get_post_meta($post_id, 'tg_locationId', true);
+
+        // If location_id is empty, assign a default ID (eg. 0)
+        if (empty($location_id)) {
+            $location_id = 0; // Default ID
+        }
+
+        // Debugging log
+        error_log("Post ID: {$post_id}, Location ID retrieved: " . print_r($location_id, true));
+
+        // Get location details from 'tg_location_ID'
+        $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
+
+        // Log para verificar datos de la ubicación
+        error_log("Location Data for ID {$location_id}: " . print_r($location_data, true));
+
+        // Verify that the information has been obtained correctly
+        if (!empty($location_data)) {
+            $location_name = isset($location_data['fullName']) ? $location_data['fullName'] : "Location {$location_id}";
+            echo esc_html("{$location_id} - {$location_name}");
+        } else {
+            echo __('Location details not found', 'tapgoods');
+        }
+    }
+}
+
+
+
+
+
 
 
 Tapgoods_Post_Types::init();

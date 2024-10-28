@@ -84,3 +84,18 @@ if ( ! function_exists( 'getenv_docker' ) ) {
 		}
 	}
 }
+
+// AJAX function to set default location
+function tapgoods_set_default_location() {
+    if (!isset($_POST['location_id']) || !is_numeric($_POST['location_id'])) {
+        wp_send_json_error();
+    }
+
+    $location_id = intval($_POST['location_id']);
+    update_option('tg_default_location', $location_id); // Save location as default in WP options
+    wp_send_json_success();
+}
+
+// Adds AJAX actions for authenticated and unauthenticated users
+add_action('wp_ajax_set_default_location', 'tapgoods_set_default_location');
+add_action('wp_ajax_nopriv_set_default_location', 'tapgoods_set_default_location');
