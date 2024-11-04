@@ -561,55 +561,56 @@ function tg_get_add_to_cart_url($wp_location_id) {
 
 
 function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
-    // Obtiene la ubicación específica del producto
+    // Gets the specific location of the product
     $location = get_the_terms( $product_id, 'tg_location' );
 
-    // Si no se encuentra la ubicación específica, usa la ubicación predeterminada
+    // If the specific location is not found, use the default location
     if ( ! is_array( $location ) || empty( $location ) ) {
         $default_location_id = get_option('tg_default_location');
         if ( !$default_location_id ) {
-            error_log("Ubicación no encontrada para product_id: $product_id y no hay ubicación predeterminada.");
+            error_log("Location not found for product_id: $product_id and no default location set.");
             return '#';
         }
         $base_url = tg_get_add_to_cart_url( $default_location_id );
-        $cart_url = tg_get_cart_url( $default_location_id ); // URL del carrito
+        $cart_url = tg_get_cart_url( $default_location_id ); // Cart URL
     } else {
         $location = current( $location );
         $base_url = tg_get_add_to_cart_url( $location->term_id );
-        $cart_url = tg_get_cart_url( $location->term_id ); // URL del carrito
+        $cart_url = tg_get_cart_url( $location->term_id ); // Cart URL
     }
 
-    // Verifica que `base_url` y `cart_url` sean válidos
+    // Verify that `base_url` and `cart_url` are valid
     if ( $base_url === '#' || !$cart_url ) {
-        error_log("Add to Cart URL o Cart URL no encontrado para location_id: " . ( $location->term_id ?? 'Predeterminado' ));
+        error_log("Add to Cart URL or Cart URL not found for location_id: " . ( $location->term_id ?? 'Default' ));
         return '#';
     }
 
-    // Obtén el `itemId` y el `itemType` del producto
+    // Get the `itemId` and `itemType` of the product
     $tg_id = get_post_meta( $product_id, 'tg_id', true );
     $type  = get_post_meta( $product_id, 'tg_productType', true );
 
-    // Combina los parámetros adicionales, utilizando `$cart_url` directamente en `redirectUrl`
+    // Combine additional parameters, using `$cart_url` directly in `redirectUrl`
     $params = array_merge(
         array(
             'itemId'      => $tg_id,
             'itemType'    => $type,
             'quantity'    => 1,
-            'redirectUrl' => $cart_url  // Asigna directamente el `cart_url`
+            'redirectUrl' => $cart_url  // Directly assigns `cart_url`
         ),
         $params
     );
 
-    // Asegúrate de que `redirectUrl` esté correctamente asignado como `cart_url`
+    // Ensure that `redirectUrl` is correctly set as `cart_url`
     $params['redirectUrl'] = $cart_url;
 
-    // Agrega los parámetros a la URL base
+    // Add parameters to the base URL
     $url = add_query_arg( $params, $base_url );
 
-    error_log("URL final de Add to Cart: " . $url); // Log para verificar
+    error_log("Final Add to Cart URL: " . $url); // Log for verification
 
     return $url;
 }
+
 
 function tg_date_format() {
 	return 'Y-m-d';

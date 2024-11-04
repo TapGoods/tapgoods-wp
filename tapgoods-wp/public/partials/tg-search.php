@@ -18,7 +18,7 @@ do_action('tg_before_search_form');
         <input type="hidden" name="post_type" value="tg_inventory">
         <input id="tg-search" class="form-control form-control-lg" name="s" type="text" placeholder="Search" aria-label=".form-control-lg example">
         <?php do_action('tg_after_search_form'); ?>
-        <select id="tg-per-page" name="per-page" class="number-select">
+        <select id="tg-per-page" name="per-page" class="number-select" hidden>
             <?php foreach ($posts_per_page_options as $option) : ?>
                 <?php $selected = ($option === $tg_per_page) ? ' selected' : ''; ?>
                 <option value="<?php echo esc_attr($option); ?>"<?php echo esc_attr($selected); ?>><?php echo esc_html($option); ?></option>
