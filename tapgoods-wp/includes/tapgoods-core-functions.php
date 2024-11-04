@@ -431,32 +431,34 @@ function tg_location_styles() {
     tg_write_log("Primary Color: $primary_color, Button Style: $button_style");
 
     // Generate CSS using :root for global variables
-    ob_start(); ?>
-    
+	ob_start(); // Start output buffering
+    ?>
     :root {
-        --tg-color-primary: <?php echo esc_html( $primary_color ); ?>;
-        --tg-light-font: <?php echo esc_html( $light_font ); ?>;
-        --tg-dark-font: <?php echo esc_html( $dark_font ); ?>;
-        --tg-light-secondary: <?php echo esc_html( $light_secondary ); ?>;
-        --tg-dark-secondary: <?php echo esc_html( $dark_secondary ); ?>;
-        <?php if ( 'rounded' === $button_style ) : ?>
+        --tg-color-primary: <?php echo esc_html($primary_color); ?>;
+        --tg-light-font: <?php echo esc_html($light_font); ?>;
+        --tg-dark-font: <?php echo esc_html($dark_font); ?>;
+        --tg-light-secondary: <?php echo esc_html($light_secondary); ?>;
+        --tg-dark-secondary: <?php echo esc_html($dark_secondary); ?>;
+        <?php if ('rounded' === $button_style) : ?>
             --tg-button-border: 18px;
         <?php else : ?>
             --tg-button-border: 2px;
         <?php endif; ?>
     }
-
     <?php
-    $generated_css = ob_get_clean();
-    tg_write_log("TG styles: Generated CSS for location ID $location_id: " . $generated_css);
-    return $generated_css;
+    return ob_get_clean(); // Return the generated CSS instead of printing it
 }
 
-// Insertar el CSS generado en el HTML
-echo '<style>';
-echo tg_location_styles(); // Llamar a la función sin pasar un ID fijo
-echo '</style>';
 
+add_action('wp_head', 'tg_output_location_styles');
+
+function tg_output_location_styles() {
+    if (!defined('DOING_AJAX') || !DOING_AJAX) {
+        echo '<style>';
+        echo tg_location_styles();
+        echo '</style>';
+    }
+}
 
 
 
