@@ -154,7 +154,7 @@ class Tapgoods_Post_Types {
 					'rest_base'             => 'tg_tag',
 					'rest_controller_class' => 'WP_REST_Terms_Controller',
 					'capabilities'          => array(
-						'delete_terms' => false,
+						'delete_terms' => true,
 						'add_terms'    => false,
 					),
 				)
