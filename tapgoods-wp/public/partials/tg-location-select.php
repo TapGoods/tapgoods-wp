@@ -35,7 +35,6 @@ error_log("Current default location: " . $current_location);
                 </option>
             <?php endforeach; ?>
         </select>
-        <button id="tg-set-location" class="btn btn-primary">Set as Default Location</button>
     </div>
 </div>
 
@@ -45,9 +44,8 @@ var tg_ajax = {
 };
 
 jQuery(document).ready(function($) {
-    $('#tg-set-location').on('click', function(e) {
-        e.preventDefault();
-        var selectedLocation = $('#tg-location-select').val();
+    $('#tg-location-select').on('change', function() {
+        var selectedLocation = $(this).val();
         
         if (selectedLocation) {
             console.log("Attempting to set location:", selectedLocation); // Client-side log
