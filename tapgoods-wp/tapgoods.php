@@ -4,7 +4,7 @@
  * Plugin Name:       TapGoods WordPress
  * Plugin URI:        https://github.com/TapGoods/tapgoods_wp-plugin
  * Description:       WordPress integration for TapGoods
- * Version:           0.1.14
+ * Version:           0.1.15
  * Requires at least: 5.2
  * Requires PHP:      7.2
  * Author:            TapGoods
