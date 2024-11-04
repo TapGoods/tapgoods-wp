@@ -399,46 +399,69 @@ function tg_get_locations() {
 	return $locations;
 }
 
-function tg_location_styles( $location_id = false ) {
+function tg_location_styles() {
+    // Obtener el location_id dinámicamente, por ejemplo, desde una cookie o configuración
+    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field($_COOKIE['tg_location_id']) : get_option('tg_default_location');
 
-	$styles = '';
+    // Registrar un log si no se encontró el location_id
+    if ( !$location_id ) {
+        tg_write_log('No location_id found. Skipping style generation.');
+        return '';
+    }
 
-	$location_settings = get_option( 'tg_location_settings', false );
+    // Obtener las configuraciones de ubicación desde la base de datos
+    $location_settings = get_option( 'tg_location_settings', false );
 
-	if ( false === $location_settings || ! is_array( $location_settings ) ) {
-		tg_write_log( 'TG styles: no location settings' );
-		return false;
-	}
+    if ( false === $location_settings || ! isset( $location_settings[$location_id] ) ) {
+        tg_write_log( "TG styles: no location settings found for location ID $location_id" );
+        return '';
+    }
 
-	ob_start();
-	foreach ( $location_settings as $location ) : ?>
-		<?php
-			$sf_settings = $location['storefrontSetting'];
+    // Obtener configuraciones de storefront para el location_id especificado
+    $sf_settings = $location_settings[$location_id];
+    $button_style    = $sf_settings['buttonStyle'] ?? 'default';
+    $primary_color   = $sf_settings['primaryColor'] ?? '#527390';
+    $light_font      = $sf_settings['lightFontColor'] ?? '#000000';
+    $light_secondary = $sf_settings['lightSecondaryColor'] ?? '#E5E8E9';
+    $dark_font       = $sf_settings['darkFontColor'] ?? '#ffffff';
+    $dark_secondary  = $sf_settings['darkSecondaryColor'] ?? '#9c9c9c';
 
-			$button_style    = $sf_settings['buttonStyle'];
-			$primary_color   = $sf_settings['primaryColor'];
-			$light_font      = $sf_settings['lightFontColor'];
-			$light_secondary = $sf_settings['lightSecondaryColor'];
-			$dark_font       = $sf_settings['darkFontColor'];
-			$dark_secondary  = $sf_settings['darkSecondaryColor'];
-		?>
-	.location-<?php echo esc_html( $location['id'] ); ?> {
-		--tg-color-primary: <?php echo esc_html( $primary_color ); ?>;
-		--tg-light-font: <?php echo esc_html( $light_font ); ?>;
-		--tg-dark-font: <?php echo esc_html( $dark_font ); ?>;
-		--tg-light-secondary: <?php echo esc_html( $light_secondary ); ?>;
-		--tg-dark-secondary: <?php echo esc_html( $dark_secondary ); ?>;
-		<?php if ( 'rounded' === $button_style ) : ?>
-		--tg-button-border: 18px;
-		<?php else : ?>
-		--tg-button-border: 2px;
-		<?php endif; ?>
-	}
-	<?php endforeach; ?>
-	<?php
-	return ob_get_clean();
+    // Log the retrieved settings for debugging
+    tg_write_log("Generating styles for Location ID: $location_id");
+    tg_write_log("Primary Color: $primary_color, Button Style: $button_style");
 
+    // Generate CSS using :root for global variables
+    ob_start(); ?>
+    
+    :root {
+        --tg-color-primary: <?php echo esc_html( $primary_color ); ?>;
+        --tg-light-font: <?php echo esc_html( $light_font ); ?>;
+        --tg-dark-font: <?php echo esc_html( $dark_font ); ?>;
+        --tg-light-secondary: <?php echo esc_html( $light_secondary ); ?>;
+        --tg-dark-secondary: <?php echo esc_html( $dark_secondary ); ?>;
+        <?php if ( 'rounded' === $button_style ) : ?>
+            --tg-button-border: 18px;
+        <?php else : ?>
+            --tg-button-border: 2px;
+        <?php endif; ?>
+    }
+
+    <?php
+    $generated_css = ob_get_clean();
+    tg_write_log("TG styles: Generated CSS for location ID $location_id: " . $generated_css);
+    return $generated_css;
 }
+
+// Insertar el CSS generado en el HTML
+echo '<style>';
+echo tg_location_styles(); // Llamar a la función sin pasar un ID fijo
+echo '</style>';
+
+
+
+
+
+
 
 function tg_get_categories() {
 	$terms = get_terms(

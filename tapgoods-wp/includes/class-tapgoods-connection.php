@@ -371,51 +371,51 @@ class Tapgoods_Connection {
 			return false;
 		}
 		
-		$location_transient = $client->transient_name('location_info');
+		
+		$location_transient = $client->transient_name('location_info_' . $location_id);
 		$location_info = get_transient($location_transient);
 		$this->console_log('location_info from transient: ' . print_r($location_info, true));
 		
-		// If there is no location_info in the transient, get it from the API
-		if (false === $location_info || empty($location_info)) {
-			$this->console_log('No location_info found in transient. Trying to get it from the API.');
-			$location_info = array();
-		
-			foreach ($location_ids as $lid) {
-				$this->console_log('Fetching location details for location_id: ' . $lid);
-				$location_details = $client->get_location_details_from_graph($lid);
-				$this->console_log('Result of get_location_details_from_graph for location_id ' . $lid . ': ' . print_r($location_details, true));
-		
-				if (false === $location_details) {
-					$this->console_log('Error fetching location details for location_id: ' . $lid);
-					return false;
-				}
-		
-				// Insert or Update Location Term in WordPress
-				$term = $this->tg_insert_or_update_term($location_details, 'tg_location');
-				$this->console_log('Result of tg_insert_or_update_term for location_id ' . $lid . ': ' . print_r($term, true));
-		
-				if (false !== $term) {
-					$this->update_location_term_meta($term['term_id'], $location_details);
-					update_term_meta($term['term_id'], 'tg_hash', $this->hash);
-					$this->console_log('Meta updated for term ID: ' . $term['term_id']);
-				}
-		
-				$location_info[$lid] = $location_details;
-				update_option('tg_location_' . $lid, $location_details);
-				$this->console_log('Location details saved in option tg_location_' . $lid);
-			}
-		
-			set_transient($location_transient, $location_info, 300);
-			update_option('tg_location_settings', $location_info);
-			$this->console_log('location_info saved in transient and option tg_location_settings');
-		}
-		
-		$this->console_log('Ending function sync_location_settings with location_info: ' . print_r($location_info, true));
-		return $location_info;
-	}
-	
+		$location_transient = $client->transient_name('location_info_' . $location_id);
+$location_info = get_transient($location_transient);
+$this->console_log('location_info from transient: ' . print_r($location_info, true));
 
-	
+// If there is no location_info in the transient, get it from the API
+if (false === $location_info || empty($location_info)) {
+    $this->console_log('No location_info found in transient. Trying to get it from the API.');
+    $location_info = array();
+
+    $this->console_log('Fetching location details for location_id: ' . $location_id);
+    $location_details = $client->get_location_details_from_graph($location_id);
+    $this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
+
+    if (false === $location_details) {
+        $this->console_log('Error fetching location details for location_id: ' . $location_id);
+        return false;
+    }
+
+    // Check if storefrontSetting exists and retrieve it
+    if (isset($location_details['storefrontSetting'])) {
+        $storefront_settings = $location_details['storefrontSetting'];
+        $this->console_log('Storefront settings found: ' . print_r($storefront_settings, true));
+    } else {
+        $this->console_log('Storefront settings not found for location_id: ' . $location_id);
+        return false;
+    }
+
+    // Save storefrontSetting in location_info for quick retrieval
+    $location_info[$location_id] = $storefront_settings;
+    update_option('tg_location_' . $location_id, $storefront_settings);
+    $this->console_log('Storefront settings saved in option tg_location_' . $location_id);
+
+    // Cache the data in transient and option
+    set_transient($location_transient, $location_info, 300);
+    update_option('tg_location_settings', $location_info);
+    $this->console_log('Storefront settings saved in transient and option tg_location_settings');
+}
+
+
+	}
 	
 	
 	
