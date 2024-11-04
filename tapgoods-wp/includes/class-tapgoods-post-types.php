@@ -100,10 +100,10 @@ class Tapgoods_Post_Types {
 					'show_in_rest'          => true,
 					'rest_base'             => 'tg_category',
 					'rest_controller_class' => 'WP_REST_Terms_Controller',
-					// 'capabilities'          => array(
-					// 	'delete_terms' => 1,
-					// 	'assign_terms' => 1,
-					// ),
+					 'capabilities'          => array(
+						'manage_terms' => 'manage_categories',
+						'edit_terms'   => 'do_not_allow' // Prevent editing
+					 ),
 				)
 			)
 		);
@@ -154,6 +154,8 @@ class Tapgoods_Post_Types {
 					'rest_base'             => 'tg_tag',
 					'rest_controller_class' => 'WP_REST_Terms_Controller',
 					'capabilities'          => array(
+						'manage_terms' => 'manage_categories',
+						'edit_terms'   => 'do_not_allow', // Prevent editing
 						'delete_terms' => true,
 						'add_terms'    => false,
 					),
@@ -198,6 +200,10 @@ class Tapgoods_Post_Types {
 						'items_list'                 => __( 'Locations list', 'tapgoods' ),
 						'items_list_navigation'      => __( 'Locations list navigation', 'tapgoods' ),
 					),
+					'capabilities'          => array(
+						'manage_terms' => 'manage_categories',
+						'edit_terms'   => 'do_not_allow' // Prevent editing
+					 ),
 				)
 			)
 		);
