@@ -80,27 +80,29 @@ jQuery(document).ready(function($) {
 add_action('wp_ajax_set_default_location', 'tg_set_default_location');
 add_action('wp_ajax_nopriv_set_default_location', 'tg_set_default_location');
 
-function tg_set_default_location() {
-    error_log("AJAX action 'set_default_location' triggered."); // Log AJAX call
+if (!function_exists('tg_set_default_location')) {
+    function tg_set_default_location() {
+        error_log("AJAX action 'set_default_location' triggered."); // Log AJAX call
 
-    // Check if 'location_id' is provided
-    if (isset($_POST['location_id'])) {
-        $location_id = sanitize_text_field($_POST['location_id']);
-        error_log("Received location_id: $location_id");
+        // Check if 'location_id' is provided
+        if (isset($_POST['location_id'])) {
+            $location_id = sanitize_text_field($_POST['location_id']);
+            error_log("Received location_id: $location_id");
 
-        // Update default location in 'tg_default_location'
-        if (update_option('tg_default_location', $location_id)) {
-            error_log("Default location updated successfully.");
-            wp_send_json_success();
+            // Update default location in 'tg_default_location'
+            if (update_option('tg_default_location', $location_id)) {
+                error_log("Default location updated successfully.");
+                wp_send_json_success();
+            } else {
+                error_log("Failed to update default location.");
+                wp_send_json_error('Failed to update default location.');
+            }
         } else {
-            error_log("Failed to update default location.");
-            wp_send_json_error('Failed to update default location.');
+            error_log("No location_id provided in AJAX request.");
+            wp_send_json_error('Location ID not provided.');
         }
-    } else {
-        error_log("No location_id provided in AJAX request.");
-        wp_send_json_error('Location ID not provided.');
-    }
 
-    wp_die(); // Stop execution to avoid extra output
+        wp_die(); // Stop execution to avoid extra output
+    }
 }
 ?>
