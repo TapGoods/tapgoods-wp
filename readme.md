@@ -99,6 +99,17 @@ docker compose run --rm wpcli user list
 docker compose run --rm wpcli user update 1 --user_pass=password
 ```
 
+example to enable debug
+```bash
+docker compose run --rm wpcli config set --raw WP_DEBUG true
+docker compose run --rm wpcli config set --raw WP_DEBUG_LOG true
+docker compose run --rm wpcli config list WP_DEBUG
+```
+
+example to copy a file out of the container to the host
+```bash
+docker cp wordpress:/var/www/html/wp-content/debug.log debug.log
+```
 
 ### Compiling SASS files
 
