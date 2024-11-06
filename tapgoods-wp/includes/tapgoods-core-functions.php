@@ -399,46 +399,71 @@ function tg_get_locations() {
 	return $locations;
 }
 
-function tg_location_styles( $location_id = false ) {
+function tg_location_styles() {
+    // Obtener el location_id dinámicamente, por ejemplo, desde una cookie o configuración
+    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field($_COOKIE['tg_location_id']) : get_option('tg_default_location');
 
-	$styles = '';
+    // Registrar un log si no se encontró el location_id
+    if ( !$location_id ) {
+        tg_write_log('No location_id found. Skipping style generation.');
+        return '';
+    }
 
-	$location_settings = get_option( 'tg_location_settings', false );
+    // Obtener las configuraciones de ubicación desde la base de datos
+    $location_settings = get_option( 'tg_location_settings', false );
 
-	if ( false === $location_settings || ! is_array( $location_settings ) ) {
-		tg_write_log( 'TG styles: no location settings' );
-		return false;
-	}
+    if ( false === $location_settings || ! isset( $location_settings[$location_id] ) ) {
+        tg_write_log( "TG styles: no location settings found for location ID $location_id" );
+        return '';
+    }
 
-	ob_start();
-	foreach ( $location_settings as $location ) : ?>
-		<?php
-			$sf_settings = $location['storefrontSetting'];
+    // Obtener configuraciones de storefront para el location_id especificado
+    $sf_settings = $location_settings[$location_id];
+    $button_style    = $sf_settings['buttonStyle'] ?? 'default';
+    $primary_color   = $sf_settings['primaryColor'] ?? '#527390';
+    $light_font      = $sf_settings['lightFontColor'] ?? '#000000';
+    $light_secondary = $sf_settings['lightSecondaryColor'] ?? '#E5E8E9';
+    $dark_font       = $sf_settings['darkFontColor'] ?? '#ffffff';
+    $dark_secondary  = $sf_settings['darkSecondaryColor'] ?? '#9c9c9c';
 
-			$button_style    = $sf_settings['buttonStyle'];
-			$primary_color   = $sf_settings['primaryColor'];
-			$light_font      = $sf_settings['lightFontColor'];
-			$light_secondary = $sf_settings['lightSecondaryColor'];
-			$dark_font       = $sf_settings['darkFontColor'];
-			$dark_secondary  = $sf_settings['darkSecondaryColor'];
-		?>
-	.location-<?php echo esc_html( $location['id'] ); ?> {
-		--tg-color-primary: <?php echo esc_html( $primary_color ); ?>;
-		--tg-light-font: <?php echo esc_html( $light_font ); ?>;
-		--tg-dark-font: <?php echo esc_html( $dark_font ); ?>;
-		--tg-light-secondary: <?php echo esc_html( $light_secondary ); ?>;
-		--tg-dark-secondary: <?php echo esc_html( $dark_secondary ); ?>;
-		<?php if ( 'rounded' === $button_style ) : ?>
-		--tg-button-border: 18px;
-		<?php else : ?>
-		--tg-button-border: 2px;
-		<?php endif; ?>
-	}
-	<?php endforeach; ?>
-	<?php
-	return ob_get_clean();
+    // Log the retrieved settings for debugging
+    tg_write_log("Generating styles for Location ID: $location_id");
+    tg_write_log("Primary Color: $primary_color, Button Style: $button_style");
 
+    // Generate CSS using :root for global variables
+	ob_start(); // Start output buffering
+    ?>
+    :root {
+        --tg-color-primary: <?php echo esc_html($primary_color); ?>;
+        --tg-light-font: <?php echo esc_html($light_font); ?>;
+        --tg-dark-font: <?php echo esc_html($dark_font); ?>;
+        --tg-light-secondary: <?php echo esc_html($light_secondary); ?>;
+        --tg-dark-secondary: <?php echo esc_html($dark_secondary); ?>;
+        <?php if ('rounded' === $button_style) : ?>
+            --tg-button-border: 18px;
+        <?php else : ?>
+            --tg-button-border: 2px;
+        <?php endif; ?>
+    }
+    <?php
+    return ob_get_clean(); // Return the generated CSS instead of printing it
 }
+
+
+add_action('wp_head', 'tg_output_location_styles');
+
+function tg_output_location_styles() {
+    if (!defined('DOING_AJAX') || !DOING_AJAX) {
+        echo '<style>';
+        echo tg_location_styles();
+        echo '</style>';
+    }
+}
+
+
+
+
+
 
 function tg_get_categories() {
 	$terms = get_terms(
@@ -561,55 +586,56 @@ function tg_get_add_to_cart_url($wp_location_id) {
 
 
 function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
-    // Obtiene la ubicación específica del producto
+    // Gets the specific location of the product
     $location = get_the_terms( $product_id, 'tg_location' );
 
-    // Si no se encuentra la ubicación específica, usa la ubicación predeterminada
+    // If the specific location is not found, use the default location
     if ( ! is_array( $location ) || empty( $location ) ) {
         $default_location_id = get_option('tg_default_location');
         if ( !$default_location_id ) {
-            error_log("Ubicación no encontrada para product_id: $product_id y no hay ubicación predeterminada.");
+            error_log("Location not found for product_id: $product_id and no default location set.");
             return '#';
         }
         $base_url = tg_get_add_to_cart_url( $default_location_id );
-        $cart_url = tg_get_cart_url( $default_location_id ); // URL del carrito
+        $cart_url = tg_get_cart_url( $default_location_id ); // Cart URL
     } else {
         $location = current( $location );
         $base_url = tg_get_add_to_cart_url( $location->term_id );
-        $cart_url = tg_get_cart_url( $location->term_id ); // URL del carrito
+        $cart_url = tg_get_cart_url( $location->term_id ); // Cart URL
     }
 
-    // Verifica que `base_url` y `cart_url` sean válidos
+    // Verify that `base_url` and `cart_url` are valid
     if ( $base_url === '#' || !$cart_url ) {
-        error_log("Add to Cart URL o Cart URL no encontrado para location_id: " . ( $location->term_id ?? 'Predeterminado' ));
+        error_log("Add to Cart URL or Cart URL not found for location_id: " . ( $location->term_id ?? 'Default' ));
         return '#';
     }
 
-    // Obtén el `itemId` y el `itemType` del producto
+    // Get the `itemId` and `itemType` of the product
     $tg_id = get_post_meta( $product_id, 'tg_id', true );
     $type  = get_post_meta( $product_id, 'tg_productType', true );
 
-    // Combina los parámetros adicionales, utilizando `$cart_url` directamente en `redirectUrl`
+    // Combine additional parameters, using `$cart_url` directly in `redirectUrl`
     $params = array_merge(
         array(
             'itemId'      => $tg_id,
             'itemType'    => $type,
             'quantity'    => 1,
-            'redirectUrl' => $cart_url  // Asigna directamente el `cart_url`
+            'redirectUrl' => $cart_url  // Directly assigns `cart_url`
         ),
         $params
     );
 
-    // Asegúrate de que `redirectUrl` esté correctamente asignado como `cart_url`
+    // Ensure that `redirectUrl` is correctly set as `cart_url`
     $params['redirectUrl'] = $cart_url;
 
-    // Agrega los parámetros a la URL base
+    // Add parameters to the base URL
     $url = add_query_arg( $params, $base_url );
 
-    error_log("URL final de Add to Cart: " . $url); // Log para verificar
+    error_log("Final Add to Cart URL: " . $url); // Log for verification
 
     return $url;
 }
+
 
 function tg_date_format() {
 	return 'Y-m-d';

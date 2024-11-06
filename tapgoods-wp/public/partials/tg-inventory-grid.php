@@ -154,50 +154,55 @@ $tg_pages = $query->max_num_pages;
     <?php endwhile; ?>
     <?php do_action('tg_inventory_after_grid'); ?>
     <?php if ($tg_pages > 1) : ?>
-    <div class="<?php esc_attr(apply_filters('tg_inventory_pagination_class', $tg_inventory_pagination_class)); ?>">
+    <?php
+    $is_plain_permalink = get_option('permalink_structure') == ''; // Check if permalink is Plain
+    $base_url = $is_plain_permalink ? add_query_arg(null, null) : ''; // Current URL base if Plain
+    ?>
+    <div class="<?php echo esc_attr(apply_filters('tg_inventory_pagination_class', $tg_inventory_pagination_class)); ?>">
         <?php do_action('tg_before_inventory_pagination'); ?>
         <nav aria-label="Page navigation">
-			<ul class="pagination justify-content-center align-items-center">
-				<!-- First Page -->
-				<li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
-					<a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? '?paged=1' : '#'; ?>">
-						<span class="dashicons dashicons-controls-skipback"></span>
-					</a>
-				</li>
-				<!-- Previous Page -->
-				<li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
-					<a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? '?paged=' . ($query->query['paged'] - 1) : '#'; ?>">
-						<span class="dashicons dashicons-controls-back"></span>
-					</a>
-				</li>
-				<!-- Current Page -->
-				<li class="page-item current-page">
-					<a class="page-link"><?php echo esc_html($query->query['paged']); ?></a>
-				</li>
-				<li class="page-item disabled">
-					<a>of</a>
-				</li>
-				<!-- Total Pages -->
-				<li class="page-item disabled">
-					<a class="page-link"><?php echo esc_html($tg_pages); ?></a>
-				</li>
-				<!-- Next Page -->
-				<li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
-					<a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? '?paged=' . ($query->query['paged'] + 1) : '#'; ?>">
-						<span class="dashicons dashicons-controls-forward"></span>
-					</a>
-				</li>
-				<!-- Last Page -->
-				<li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
-					<a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? '?paged=' . $tg_pages : '#'; ?>">
-						<span class="dashicons dashicons-controls-skipforward"></span>
-					</a>
-				</li>
-			</ul>
-		</nav>
+            <ul class="pagination justify-content-center align-items-center">
+                <!-- First Page -->
+                <li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? ($is_plain_permalink ? $base_url . '&paged=1' : '?paged=1') : '#'; ?>">
+                        <span class="dashicons dashicons-controls-skipback"></span>
+                    </a>
+                </li>
+                <!-- Previous Page -->
+                <li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? ($is_plain_permalink ? $base_url . '&paged=' . ($query->query['paged'] - 1) : '?paged=' . ($query->query['paged'] - 1)) : '#'; ?>">
+                        <span class="dashicons dashicons-controls-back"></span>
+                    </a>
+                </li>
+                <!-- Current Page -->
+                <li class="page-item current-page">
+                    <a class="page-link"><?php echo esc_html($query->query['paged']); ?></a>
+                </li>
+                <li class="page-item disabled">
+                    <a>of</a>
+                </li>
+                <!-- Total Pages -->
+                <li class="page-item disabled">
+                    <a class="page-link"><?php echo esc_html($tg_pages); ?></a>
+                </li>
+                <!-- Next Page -->
+                <li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? ($is_plain_permalink ? $base_url . '&paged=' . ($query->query['paged'] + 1) : '?paged=' . ($query->query['paged'] + 1)) : '#'; ?>">
+                        <span class="dashicons dashicons-controls-forward"></span>
+                    </a>
+                </li>
+                <!-- Last Page -->
+                <li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? ($is_plain_permalink ? $base_url . '&paged=' . $tg_pages : '?paged=' . $tg_pages) : '#'; ?>">
+                        <span class="dashicons dashicons-controls-skipforward"></span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
         <?php do_action('tg_after_inventory_pagination'); ?>
     </div>
-    <?php endif; ?>
+<?php endif; ?>
+
 <?php endif; ?>
 <?php wp_reset_postdata(); ?>
 </div>

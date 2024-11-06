@@ -38,11 +38,11 @@ $today       = wp_date( $date_format );
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">
-				<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+				<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
 				<?php _e( apply_filters( 'tg_categories_header_text', 'Categories' ), 'tapgoods' ); //phpcs:ignore ?>
 				</button>
 			</h2>
-			<div id="collapseOne" class="<?php echo esc_attr( apply_filters( 'tg_category_accordion_collapse_class', 'accordion-collapse collapse category-links' ) ); ?>">
+			<div id="collapseOne" class="accordion-collapse collapse category-links">
 				<?php foreach ( $categories as $category ) : ?>
 					<?php do_action( 'tg_before_category_link' ); ?>
 					<a class="category-link" href="<?php echo esc_url( get_term_link( $category, 'tg_category' ) ); ?>">
@@ -58,3 +58,26 @@ $today       = wp_date( $date_format );
 </div>
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var accordionCollapse = document.getElementById("collapseOne");
+        var accordionButton = document.querySelector(".accordion-button");
+
+        function toggleAccordion() {
+            if (window.innerWidth >= 1000) {
+                accordionCollapse.classList.add("show");
+                accordionButton.classList.remove("collapsed");
+                accordionButton.setAttribute("aria-expanded", "true");
+            } else {
+                accordionCollapse.classList.remove("show");
+                accordionButton.classList.add("collapsed");
+                accordionButton.setAttribute("aria-expanded", "false");
+            }
+        }
+
+        // Run function on page load and on window resize
+        toggleAccordion();
+        window.addEventListener("resize", toggleAccordion);
+    });
+</script>
