@@ -89,23 +89,25 @@
 
         if ($('#tg_cart').length > 0) {
             const cartBtn = $('#tg_cart');
-            const url = tg_ajax.cart_url;
-            const cartCookie = (tgGetCookie('tg_has_items'));
-
-            if ('1' === cartCookie) {
-                cartBtn.addClass('has-items');
-            }
-
+            
             cartBtn.on('click', function(e) {
-                console.log('cart click');
+                console.log('Cart button clicked');
                 e.preventDefault();
+                
+                const url = $(this).data('target'); // Obtener la URL desde el data-target en el momento del clic
+                console.log('Cart URL on click:', url);
+    
                 if (url && url !== '#') {
                     window.open(url, '_self');
                 } else {
                     console.error('Cart URL is invalid:', url);
                 }
             });
+        } else {
+            console.error('#tg_cart button not found in DOM');
         }
+        
+        
 
         if ($('input.qty-input').length > 0) {
             $('input.qty-input').keyup(
@@ -142,7 +144,7 @@
 
         if ($('button.add-cart').length > 0) {
             $('button.add-cart').on('click', function(e) {
-                e.preventDefault();
+             //   e.preventDefault();
                 const url = e.target.dataset.target;
                 if (url && url !== '#') {
                     window.open(url, '_self');
@@ -169,16 +171,16 @@
                 let eventStart = tgGetCookie('tg-eventStart');
                 let eventEnd = tgGetCookie('tg-eventEnd');
                 let url = $('#tg_cart').data('target');
-
+        
                 if (!url || url === '#') {
                     console.error('Cart URL is invalid:', url);
                     return;
                 }
-
+        
                 try {
                     let urlObj = new URL(url, window.location.origin);
                     let params = new URLSearchParams(urlObj.search);
-
+        
                     // Date format validation
                     const datePattern = /^\d{4}-\d{2}-\d{2}$/;
                     if (datePattern.test(eventStart.split('T')[0]) && datePattern.test(eventEnd.split('T')[0])) {
@@ -187,7 +189,7 @@
                     } else {
                         console.warn('Invalid date format for eventStart or eventEnd');
                     }
-
+        
                     urlObj.search = params.toString();
                     $('#tg_cart').attr('data-target', urlObj.toString());
                 } catch (error) {
@@ -195,6 +197,7 @@
                 }
             }
         }
+        
 
         function tapgoods_search(event) {
             // event.preventDefault();

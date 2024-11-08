@@ -301,8 +301,14 @@ function tg_term_template_redirect() {
 	global $wp;
 	$wp->parse_request();
 	$current_url = trim( home_url( $wp->request ), '/' );
-	$redirect    = get_term_link( $wp_query->queried_object->term_id );
-	$surl        = trim( $redirect, '/' );
+
+	// Get the term link and check for errors
+	$redirect = get_term_link( $wp_query->queried_object->term_id );
+	if ( is_wp_error( $redirect ) ) {
+		return; // Stop execution if there is an error
+	}
+
+	$surl = trim( $redirect, '/' );
 
 	// If the current url isn't the permalink redirect to the permalink
 	if ( $current_url !== $surl ) {
@@ -310,6 +316,7 @@ function tg_term_template_redirect() {
 		exit;
 	}
 }
+
 
 function tg_get_prices( $id = false ) {
 	if ( false === $id ) {
@@ -614,19 +621,16 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
     $tg_id = get_post_meta( $product_id, 'tg_id', true );
     $type  = get_post_meta( $product_id, 'tg_productType', true );
 
-    // Combine additional parameters, using `$cart_url` directly in `redirectUrl`
+    // Combine additional parameters without overriding `redirectUrl`
     $params = array_merge(
         array(
-            'itemId'      => $tg_id,
-            'itemType'    => $type,
-            'quantity'    => 1,
-            'redirectUrl' => $cart_url  // Directly assigns `cart_url`
+            'itemId'   => $tg_id,
+            'itemType' => $type,
+            'quantity' => 1,
+            // 'redirectUrl' => $cart_url  // Commented out to allow external setting
         ),
         $params
     );
-
-    // Ensure that `redirectUrl` is correctly set as `cart_url`
-    $params['redirectUrl'] = $cart_url;
 
     // Add parameters to the base URL
     $url = add_query_arg( $params, $base_url );
@@ -635,6 +639,7 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
 
     return $url;
 }
+
 
 
 function tg_date_format() {
@@ -795,5 +800,12 @@ add_action('pre_get_posts', function($query) {
                 ),
             ));
         }
+    }
+});
+
+add_action('template_redirect', function () {
+    if (isset($_GET['thankyou'])) {
+        include TAPGOODS_PLUGIN_PATH . '/public/partials/tg-thankyou.php';
+        exit;
     }
 });
