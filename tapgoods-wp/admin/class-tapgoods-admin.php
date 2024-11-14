@@ -7,7 +7,7 @@
  *
  * @package    Tapgoods
  * @subpackage Tapgoods/admin
- * @author     Jeremy Benson <jeremy.benson@tapgoods.com>
+ * @author     Aaron Valiente <aaron.valiente@tapgoods.com> and Jeremy Benson <jeremy.benson@tapgoods.com>
  */
 class Tapgoods_Admin {
 
@@ -96,41 +96,65 @@ class Tapgoods_Admin {
 
 		check_ajax_referer( 'save', '_tgnonce_connection' );
 		// if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
-		// 	die();
+		//     die();
 		// }
-
+	
+		// Delete all the items
+		$posts = get_posts([
+			'post_type'      => 'tg_inventory',
+			'numberposts'    => -1,
+			'post_status'    => 'any',
+		]);
+	
+		foreach ($posts as $post) {
+			wp_delete_post($post->ID, true); // true to delete forever
+		}
+	
+		// Delete all the taxonomies: tg_location, tg_tags, tg_category. 
+		$taxonomies = ['tg_location', 'tg_tags', 'tg_category'];
+		foreach ($taxonomies as $taxonomy) {
+			$terms = get_terms([
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+			]);
+	
+			foreach ($terms as $term) {
+				wp_delete_term($term->term_id, $taxonomy);
+			}
+		}
+	
+		// Connection to the API
 		$api_key = '';
 		if ( isset( $_REQUEST['tapgoods_api_key'] ) ) {
 			$encryption        = new Tapgoods_Encryption();
 			$submitted_api_key = sanitize_text_field( wp_unslash( $_REQUEST['tapgoods_api_key'] ) );
 			$api_key           = $encryption->tg_encrypt( $submitted_api_key );
 		}
-
+	
 		$success = update_option( 'tg_key', $api_key );
-
-
+	
 		$client = Tapgoods_Connection::get_instance();
-
+	
 		try {
 			// setting the second param to true will cause this to fail (for testing).
 			$response = $client->test_connection( $submitted_api_key );
-		} catch ( error $e ) {
+		} catch ( Error $e ) {
 			self::connection_failed();
 		}
-		// $response = true;
-
+	
 		if ( false === $response || is_wp_error( $response ) ) {
 			self::connection_failed();
 		}
-
+	
 		if ( $success ) {
 			update_option( 'tg_api_connected', true );
 			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
 			wp_send_json_success( $notice );
 		}
-
+	
 		die();
 	}
+	
 
 	private static function connection_failed() {
 		tg_write_log( 'test_connection failed' );

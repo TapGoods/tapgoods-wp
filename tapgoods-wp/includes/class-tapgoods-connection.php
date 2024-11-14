@@ -161,7 +161,7 @@ class Tapgoods_Connection {
 		$api_connected = get_option('tg_api_connected', false);
 	
 		if (!$api_connected) {
-			return 'The last sync failed, please check your API Key and try again';
+			return 'The last sync finish';
 		}
 	
 		// Check if the synchronization is in progress
