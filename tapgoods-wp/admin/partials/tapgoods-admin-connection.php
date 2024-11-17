@@ -16,55 +16,55 @@ $location_settings = get_option( 'tg_location_settings' );
 if (isset($_POST['confirm_reset'])) {
     echo "<p style='color: red;'>Reset action triggered. Deleting data...</p>";
 
-    // Delete all 'tg_inventory' posts
-    $posts = get_posts([
-        'post_type'      => 'tg_inventory',
-        'numberposts'    => -1,
-        'post_status'    => 'any',
-    ]);
+    // // Delete all 'tg_inventory' posts
+    // $posts = get_posts([
+    //     'post_type'      => 'tg_inventory',
+    //     'numberposts'    => -1,
+    //     'post_status'    => 'any',
+    // ]);
 
-    foreach ($posts as $post) {
-        wp_delete_post($post->ID, true); // true to delete permanently
-    }
-    echo "<p style='color: red;'>All 'tg_inventory' posts deleted.</p>";
+    // foreach ($posts as $post) {
+    //     wp_delete_post($post->ID, true); // true to delete permanently
+    // }
+    // echo "<p style='color: red;'>All 'tg_inventory' posts deleted.</p>";
 
-    // Delete all terms in the taxonomies: tg_location, tg_tags, tg_category
-    $taxonomies = ['tg_location', 'tg_tags', 'tg_category'];
-    foreach ($taxonomies as $taxonomy) {
-        $terms = get_terms([
-            'taxonomy'   => $taxonomy,
-            'hide_empty' => false,
-        ]);
+    // // Delete all terms in the taxonomies: tg_location, tg_tags, tg_category
+    // $taxonomies = ['tg_location', 'tg_tags', 'tg_category'];
+    // foreach ($taxonomies as $taxonomy) {
+    //     $terms = get_terms([
+    //         'taxonomy'   => $taxonomy,
+    //         'hide_empty' => false,
+    //     ]);
 
-        foreach ($terms as $term) {
-            wp_delete_term($term->term_id, $taxonomy);
-        }
-    }
-    echo "<p style='color: red;'>All taxonomy terms deleted (tg_location, tg_tags, tg_category).</p>";
+    //     foreach ($terms as $term) {
+    //         wp_delete_term($term->term_id, $taxonomy);
+    //     }
+    // }
+    // echo "<p style='color: red;'>All taxonomy terms deleted (tg_location, tg_tags, tg_category).</p>";
 
-    // Retrieve and delete each location based on tg_locationIds
-    $location_ids = get_option('tg_locationIds', []);
-    if (!empty($location_ids) && is_array($location_ids)) {
-        foreach ($location_ids as $location_id) {
-            delete_option("tg_location_{$location_id}");
-        }
-    }
+    // // Retrieve and delete each location based on tg_locationIds
+    // $location_ids = get_option('tg_locationIds', []);
+    // if (!empty($location_ids) && is_array($location_ids)) {
+    //     foreach ($location_ids as $location_id) {
+    //         delete_option("tg_location_{$location_id}");
+    //     }
+    // }
 
-    // Delete tg_locationIds and tg_default_location
-    delete_option('tg_locationIds');
-    delete_option('tg_default_location');
+    // // Delete tg_locationIds and tg_default_location
+    // delete_option('tg_locationIds');
+    // delete_option('tg_default_location');
 
-    // Set tg_api_connected to 0 and delete the API key (tg_key)
-    update_option('tg_api_connected', 0);
-    delete_option('tg_key');
+    // // Set tg_api_connected to 0 and delete the API key (tg_key)
+    // update_option('tg_api_connected', 0);
+    // delete_option('tg_key');
 
-    // Reload the page after deletion and show success message
-    echo "<script>
-            document.addEventListener('DOMContentLoaded', function() {
-                closePopup();
-                location.reload();
-            });
-          </script>";
+    // // Reload the page after deletion and show success message
+    // echo "<script>
+    //         document.addEventListener('DOMContentLoaded', function() {
+    //             closePopup();
+    //             location.reload();
+    //         });
+    //       </script>";
     exit;
 }
 

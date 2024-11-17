@@ -2,7 +2,7 @@
 // Get the locations set in 'tg_locationIds'
 $locations = maybe_unserialize(get_option('tg_locationIds'));
 if (!is_array($locations)) {
-    $locations = []; // Make sure it is an array
+    $locations = []; // Ensure it's an array
 }
 
 // Check if a selection exists and display its details
@@ -16,12 +16,11 @@ if (isset($_POST['set_default_location']) && $selected_location) {
 // Get the current default location
 $default_location = get_option('tg_default_location');
 
-// Get the data for the selected location if it exists
-if ($selected_location) {
-    $location_option = get_option('tg_location_' . $selected_location);
-    $location_data = maybe_unserialize($location_option);
-} else {
-    $location_data = null;
+// Get the data for the selected location only if it exists
+$location_data = null;
+if (!empty($selected_location)) {
+    $selected_location_data = get_option('tg_location_' . $selected_location);
+    $location_data = maybe_unserialize($selected_location_data);
 }
 ?>
 
@@ -35,11 +34,11 @@ if ($selected_location) {
             <?php
             foreach ($locations as $location_id) {
                 // Retrieve the location data for each ID
-                $location_data = get_option("tg_location_{$location_id}");
-                $location_data = maybe_unserialize($location_data);
+                $individual_location_data = get_option("tg_location_{$location_id}");
+                $individual_location_data = maybe_unserialize($individual_location_data);
                 
                 // Get the name of the location, or use a default if not found
-                $location_name = $location_data['fullName'] ?? "Location {$location_id}";
+                $location_name = $individual_location_data['fullName'] ?? "Location {$location_id}";
                 
                 // Display both ID and name in the option
                 echo '<option value="' . esc_attr($location_id) . '"' . selected($selected_location, $location_id, false) . '>' . esc_html("{$location_id} - {$location_name}") . '</option>';
@@ -69,12 +68,6 @@ if ($selected_location) {
                 </li>
             <?php endforeach; ?>
         </ul>
-
-        <!-- Button to set the location as default -->
-        <form method="post" action="">
-            <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
-            <button type="submit" name="set_default_location" class="button button-secondary">Set as Default</button>
-        </form>
         
         <?php if ($default_location == $selected_location): ?>
             <p><em>This is the current default location.</em></p>

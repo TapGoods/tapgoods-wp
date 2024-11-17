@@ -100,28 +100,28 @@ class Tapgoods_Admin {
 		// }
 	
 		// Delete all the items
-		$posts = get_posts([
-			'post_type'      => 'tg_inventory',
-			'numberposts'    => -1,
-			'post_status'    => 'any',
-		]);
+		// $posts = get_posts([
+		// 	'post_type'      => 'tg_inventory',
+		// 	'numberposts'    => -1,
+		// 	'post_status'    => 'any',
+		// ]);
 	
-		foreach ($posts as $post) {
-			wp_delete_post($post->ID, true); // true to delete forever
-		}
+		// foreach ($posts as $post) {
+		// 	wp_delete_post($post->ID, true); // true to delete forever
+		// }
 	
-		// Delete all the taxonomies: tg_location, tg_tags, tg_category. 
-		$taxonomies = ['tg_location', 'tg_tags', 'tg_category'];
-		foreach ($taxonomies as $taxonomy) {
-			$terms = get_terms([
-				'taxonomy'   => $taxonomy,
-				'hide_empty' => false,
-			]);
+		// // Delete all the taxonomies: tg_location, tg_tags, tg_category. 
+		// $taxonomies = ['tg_location', 'tg_tags', 'tg_category'];
+		// foreach ($taxonomies as $taxonomy) {
+		// 	$terms = get_terms([
+		// 		'taxonomy'   => $taxonomy,
+		// 		'hide_empty' => false,
+		// 	]);
 	
-			foreach ($terms as $term) {
-				wp_delete_term($term->term_id, $taxonomy);
-			}
-		}
+		// 	foreach ($terms as $term) {
+		// 		wp_delete_term($term->term_id, $taxonomy);
+		// 	}
+		// }
 	
 		// Connection to the API
 		$api_key = '';

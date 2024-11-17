@@ -172,7 +172,7 @@ class Tapgoods_Post_Types {
 				'tapgoods_taxonomy_args_location',
 				array(
 					'hierarchical'      => false,
-					'show_ui'           => true,
+					'show_ui'           => false,
 					'show_in_nav_menus' => false,
 					'query_var'         => is_admin(),
 					'rewrite'           => false,

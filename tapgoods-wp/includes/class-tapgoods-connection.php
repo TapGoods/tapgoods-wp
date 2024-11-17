@@ -337,85 +337,109 @@ class Tapgoods_Connection {
 	}
 
 	
-	public function sync_location_settings() {
+	public function sync_location_settings($force_update = false) {
 		$this->console_log('Starting function sync_location_settings');
-		
+	
 		$client = $this->get_connection();
 		$location_ids = get_option('tg_locationIds', false);
 		$business_id = get_option('tg_businessId', false);
-		
-		// Register the IDs obtained initially
+	
+		if ($force_update) {
+			$this->console_log('Force update enabled. Clearing cached location_ids and business_id.');
+			delete_option('tg_locationIds');
+			delete_option('tg_businessId');
+			$location_ids = false;
+			$business_id = false;
+		}
+	
 		$this->console_log('Obtained location_ids: ' . print_r($location_ids, true));
 		$this->console_log('Obtained business_id: ' . print_r($business_id, true));
-		
-		// If location_ids or business_id are not obtained, we try to obtain them again
+	
 		if (empty($location_ids) || empty($business_id)) {
 			$this->console_log('location_ids or business_id are empty. Trying to obtain the business.');
 			$business = $this->get_business();
 			$this->console_log('Result of get_business: ' . print_r($business, true));
-		
+	
 			if (false === $business) {
 				$this->console_log('No business found. Exiting the function.');
 				return false;
 			}
-		
+	
 			$location_ids = get_option('tg_locationIds', false);
 			$business_id = get_option('tg_businessId', false);
 			$this->console_log('After get_business, location_ids: ' . print_r($location_ids, true));
 			$this->console_log('After get_business, business_id: ' . print_r($business_id, true));
 		}
-		
-		// Final validation of location_ids and business_id
+	
 		if (false === $location_ids || false === $business_id) {
 			$this->console_log('location_ids or business_id are invalid.');
 			return false;
 		}
-		
-		
-		$location_transient = $client->transient_name('location_info_' . $location_id);
-		$location_info = get_transient($location_transient);
-		$this->console_log('location_info from transient: ' . print_r($location_info, true));
-		
-		$location_transient = $client->transient_name('location_info_' . $location_id);
-$location_info = get_transient($location_transient);
-$this->console_log('location_info from transient: ' . print_r($location_info, true));
-
-// If there is no location_info in the transient, get it from the API
-if (false === $location_info || empty($location_info)) {
-    $this->console_log('No location_info found in transient. Trying to get it from the API.');
-    $location_info = array();
-
-    $this->console_log('Fetching location details for location_id: ' . $location_id);
-    $location_details = $client->get_location_details_from_graph($location_id);
-    $this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
-
-    if (false === $location_details) {
-        $this->console_log('Error fetching location details for location_id: ' . $location_id);
-        return false;
-    }
-
-    // Check if storefrontSetting exists and retrieve it
-    if (isset($location_details['storefrontSetting'])) {
-        $storefront_settings = $location_details['storefrontSetting'];
-        $this->console_log('Storefront settings found: ' . print_r($storefront_settings, true));
-    } else {
-        $this->console_log('Storefront settings not found for location_id: ' . $location_id);
-        return false;
-    }
-
-    // Save storefrontSetting in location_info for quick retrieval
-    $location_info[$location_id] = $storefront_settings;
-    update_option('tg_location_' . $location_id, $storefront_settings);
-    $this->console_log('Storefront settings saved in option tg_location_' . $location_id);
-
-    // Cache the data in transient and option
-    set_transient($location_transient, $location_info, 300);
-    update_option('tg_location_settings', $location_info);
-    $this->console_log('Storefront settings saved in transient and option tg_location_settings');
-}
-
-
+	
+		// Array para almacenar los detalles de las ubicaciones
+		$location_info = [];
+	
+		foreach ($location_ids as $location_id) {
+			$location_transient = $client->transient_name('location_info_' . $location_id);
+	
+			// Si se fuerza la actualización, elimina el transient actual
+			if ($force_update) {
+				$this->console_log('Force update enabled. Clearing transient for location_id: ' . $location_id);
+				delete_transient($location_transient);
+			}
+	
+			// Intenta obtener los detalles del transient
+			$location_details = get_transient($location_transient);
+	
+			// Si no hay datos en el transient, obtén los datos desde el API
+			if (false === $location_details || empty($location_details)) {
+				$this->console_log('No location_info found in transient. Trying to get it from the API for location_id: ' . $location_id);
+				$location_details = $client->get_location_details_from_graph($location_id);
+				$this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
+	
+				if (false === $location_details) {
+					$this->console_log('Error fetching location details for location_id: ' . $location_id);
+					continue;
+				}
+	
+				// Guarda los datos en el transient
+				set_transient($location_transient, $location_details, 300);
+			}
+	
+			// Verifica que los datos obtenidos sean para el ID correcto
+			if (!isset($location_details['id']) || $location_details['id'] != $location_id) {
+				$this->console_log('Mismatch in location_id for location_details. Skipping.');
+				continue;
+			}
+	
+			// Guarda los datos en la opción tg_location_{id}
+			update_option('tg_location_' . $location_id, $location_details);
+			$this->console_log('Saved location details to tg_location_' . $location_id);
+	
+			// Almacena los datos en el array de información general
+			$location_info[$location_id] = $location_details;
+		}
+	
+		// Actualiza la opción tg_location_settings con todos los datos
+		update_option('tg_location_settings', $location_info);
+		$this->console_log('Updated tg_location_settings option.');
+	
+		// Verifica y actualiza el valor por defecto si es necesario
+		$default_location = get_option('tg_default_location', false);
+		if (empty($default_location) || !in_array($default_location, $location_ids)) {
+			$this->console_log('Default location is not set or invalid. Setting to the first location_id.');
+			$new_default_location = reset($location_ids);
+			update_option('tg_default_location', $new_default_location);
+			$this->console_log('Updated tg_default_location to: ' . $new_default_location);
+		}
+	
+		$this->console_log('Completed sync_location_settings function.');
+		return true;
 	}
+	
+	
+	
+	
 	
 	
 	
@@ -438,7 +462,7 @@ if (false === $location_info || empty($location_info)) {
 		}
 
 		// if no options, get new data from the API
-		$location_info = $this->sync_location_settings();
+		$location_info = $this->sync_location_settings(true);
 		return $location_info;
 	}
 
@@ -1002,7 +1026,7 @@ if (false === $location_info || empty($location_info)) {
     public function sync_from_api() {
         // Start manual synchronization without cron, using a step-based approach
         error_log('Starting manual inventory sync');
-		$location_info = $this->sync_location_settings();
+		$location_info = $this->sync_location_settings(true);
 		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
 	
         $result = $this->sync_inventory_in_batches(false);
@@ -1202,8 +1226,8 @@ public function update_inventory_item($post_id, $item) {
 	// }
 	
 	public function manual_sync_trigger() {
-		$this->console_log('Manual sync'); 
-		$location_info = $this->sync_location_settings();
+		$this->console_log('Manual sync:1205'); 
+		$location_info = $this->sync_location_settings(true);
 		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
 	
 		if (current_user_can('manage_options')) {
