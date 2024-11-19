@@ -219,33 +219,39 @@ $tg_pages = $query->max_num_pages;
 
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
     // Retrieve cart data from localStorage
     const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
     const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
 
-    // Function to update buttons and quantity inputs based on cart data for each shortcode instance
+    // Function to update buttons and quantity inputs based on cart data
     function updateCartItems(shortcodeContainer) {
         if (cartData[locationId]) {
             Object.keys(cartData[locationId]).forEach(itemId => {
                 const quantity = cartData[locationId][itemId];
-                console.log(`Updating item ID: ${itemId} for location ID: ${locationId} with quantity ${quantity}`);
 
-                // Find all quantity inputs and buttons for the current item ID within the specific shortcode container
+                // Update all buttons and inputs for this item ID in the current container
                 const quantityInputs = shortcodeContainer.querySelectorAll(`#qty-${itemId}`);
                 const buttons = shortcodeContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`);
 
-                if (quantityInputs.length > 0 && buttons.length > 0) {
-                    quantityInputs.forEach(input => {
-                        input.value = quantity;
-                    });
-
+                // If buttons or inputs exist, update them
+                if (buttons.length > 0) {
                     buttons.forEach(button => {
                         button.style.setProperty("background-color", "green", "important");
                         button.textContent = "Added";
+
+                        // Restore to original state after 10 seconds
+                        setTimeout(() => {
+                            button.style.removeProperty("background-color");
+                            button.textContent = "Add";
+                        }, 10000);
                     });
-                } else {
-                    console.warn(`Element not found or no quantity for item ID: ${itemId}.`);
+                }
+
+                if (quantityInputs.length > 0) {
+                    quantityInputs.forEach(input => {
+                        input.value = quantity;
+                    });
                 }
             });
         }
@@ -259,86 +265,75 @@ document.addEventListener("DOMContentLoaded", function() {
         const itemId = button.getAttribute("data-item-id");
         const quantityInput = button.closest('.tapgoods-inventory').querySelector(`#qty-${itemId}`);
 
-        // Check if quantityInput exists
         if (!quantityInput) {
-            console.warn(`Quantity input not found for item ID: ${itemId}`);
             alert("Quantity input field is missing.");
             return;
         }
 
-        // Verify the quantity input value is not empty
         let quantityValue = quantityInput.value.trim();
-        if (quantityValue === "") {
-            alert("Please enter a quantity.");
-            return;
-        }
-
-        // Parse quantity and ensure it's a valid number
-        let quantity = parseInt(quantityValue, 10);
-        console.log(`Quantity input value: "${quantityValue}", Parsed quantity: ${quantity}`);
-
-        // Verify if quantity is a valid number and greater than zero
-        if (isNaN(quantity) || quantity <= 0) {
-            console.warn(`Invalid quantity: ${quantity} for item ID: ${itemId}`);
+        if (quantityValue === "" || isNaN(parseInt(quantityValue, 10)) || parseInt(quantityValue, 10) <= 0) {
             alert("Please enter a valid quantity.");
             return;
         }
 
-        console.log(`Adding item ID: ${itemId} with quantity: ${quantity} at location ID: ${locationId}`);
+        const quantity = parseInt(quantityValue, 10);
 
-        // Initialize location data if it does not exist in localStorage
+        // Update cart data in localStorage
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
 
-        // Update item quantity under the location in localStorage
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
-        // Confirm localStorage update by logging the current cart data
-        console.log("Updated cart data in localStorage:", JSON.parse(localStorage.getItem("cartData")));
+        // Update button and quantity inputs in the current container
+        const currentContainer = button.closest('.tapgoods-inventory');
+        const quantityInputs = currentContainer.querySelectorAll(`#qty-${itemId}`);
+        const buttons = currentContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`);
 
-        // Change button style and text to "Added" for all instances of this item ID within the specific shortcode container
-        button.closest('.tapgoods-inventory').querySelectorAll(`.add-cart[data-item-id="${itemId}"]`).forEach(btn => {
-            btn.style.setProperty("background-color", "green", "important");
-            btn.textContent = "Added";
-        });
+        if (buttons.length > 0) {
+            buttons.forEach(btn => {
+                btn.style.setProperty("background-color", "green", "important");
+                btn.textContent = "Added";
 
-        button.closest('.tapgoods-inventory').querySelectorAll(`#qty-${itemId}`).forEach(input => {
-            input.value = quantity;
-        });
+                // Restore to original state after 10 seconds
+                setTimeout(() => {
+                    btn.style.removeProperty("background-color");
+                    btn.textContent = "Add";
+                }, 10000);
+            });
+        }
 
-        // Construct the URL with the selected quantity
-        const url = button.getAttribute("data-target");
-        const addToCartUrl = `${url}&quantity=${quantity}`;
+        if (quantityInputs.length > 0) {
+            quantityInputs.forEach(input => {
+                input.value = quantity;
+            });
+        }
 
         // Send request to add item to cart
-        fetch(addToCartUrl, {
-            method: "GET",
-            credentials: "include"
-        })
-        .then(response => {
-            if (response.ok) {
-                alert("Item added to cart!");
-            } else {
-                console.error("Error adding item to cart.");
-            }
-        })
-        .catch(error => console.error("Request error:", error));
+        const url = button.getAttribute("data-target");
+        const addToCartUrl = `${url}&quantity=${quantity}`;
+        fetch(addToCartUrl, { method: "GET", credentials: "include" })
+            .then(response => {
+                if (!response.ok) {
+                    console.error("Error adding item to cart.");
+                }
+            })
+            .catch(error => console.error("Request error:", error));
     }
 
-    // Iterate over each instance of the shortcode container to set up event listeners independently
+    // Iterate over each instance of the shortcode container to set up event listeners and update UI
     document.querySelectorAll(".tapgoods-inventory").forEach(shortcodeContainer => {
-        // Update cart display when the page loads for each shortcode instance
         updateCartItems(shortcodeContainer);
 
-        // Set up event listeners for all add-to-cart buttons within the specific shortcode container
+        // Set up event listeners for all add-to-cart buttons within the current container
         shortcodeContainer.querySelectorAll(".add-cart").forEach(button => {
-            button.removeEventListener("click", handleAddToCart); // Ensure no duplicate listeners
+            button.removeEventListener("click", handleAddToCart);
             button.addEventListener("click", handleAddToCart);
         });
     });
 });
+
 
 
 

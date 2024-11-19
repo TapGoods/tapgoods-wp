@@ -121,6 +121,12 @@ document.addEventListener("DOMContentLoaded", function() {
         quantityInput.value = cartData[locationId][itemId];
         addButton.style.backgroundColor = "green";
         addButton.textContent = "Added";
+
+        // Change text back to "Add" after 10 seconds
+        setTimeout(() => {
+            addButton.style.backgroundColor = ""; // Restore to default color
+            addButton.textContent = "Add";
+        }, 10000);
     }
 
     // Check if the cart icon exists and update based on location data
@@ -157,6 +163,12 @@ document.addEventListener("DOMContentLoaded", function() {
         this.style.backgroundColor = "green";
         this.textContent = "Added";
 
+        // Change text back to "Add" after 10 seconds
+        setTimeout(() => {
+            this.style.backgroundColor = ""; // Restore to default color
+            this.textContent = "Add";
+        }, 10000);
+
         // Send request to add item to cart without redirection
         fetch(url + `&quantity=${quantity}`, {
             method: "GET",
@@ -172,4 +184,5 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(error => console.error("Request error:", error));
     });
 });
+
 </script>
