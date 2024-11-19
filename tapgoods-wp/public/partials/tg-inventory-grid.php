@@ -4,7 +4,9 @@ global $wp;
 $current_url = home_url($wp->request);
 $tg_inventory_pagination_class = 'foo';
 
-$tg_per_page = (isset($_COOKIE['tg-per-page'])) ? sanitize_text_field(wp_unslash($_COOKIE['tg-per-page'])) : get_option('tg_per_page', 12);
+$tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], array(12, 24, 48))
+    ? (int) sanitize_text_field($_GET['tg-per-page'])
+    : (int) get_option('tg_per_page', 12);
 
 $tg_page = (get_query_var('paged')) ? get_query_var('paged') : 1;
 

@@ -16,7 +16,7 @@ if ( false !== $tags ) {
     }
 }
 
-$tg_per_page = ( isset( $_COOKIE['tg-per-page'] ) ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-per-page'] ) ) : get_option( 'tg_per_page', 12 );
+$tg_per_page = ( isset( $_COOKIE['tg-per-page'] ) ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-per-page'] ) ) : get_option( 'tg_per_page', '12' );
 
 $tg_id = get_post_meta( $post->ID, 'tg_id', true );
 $location_id = tg_get_wp_location_id(); // Retrieve the current location ID
@@ -38,7 +38,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode( $current_page );
     <?php do_action( 'tg_before_inventory_single_container' ); ?>
     <div id="tg-single" class="inventory-single container-fluid">
         <?php do_action( 'tg_before_inventory_single_search' ); ?>
-        [tapgoods-search]
+        [tapgoods-search nos="true"]
         <?php do_action( 'tg_after_inventory_single_search' ); ?>
         <section class="inventory-single-content row row-cols-1 row-cols-md-2 p-3">
             <?php do_action( 'tg_before_inventory_single_images' ); ?>
@@ -56,7 +56,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode( $current_page );
                 </div>
                 <div class="quantity-select mb-4">
                     <input type="text" placeholder="Qty" name="quantity" class="form-control qty-input">
-                    <button data-location-id="<?php echo esc_attr($location_id); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" data-target="<?php echo esc_url( $cart_url ); ?>" class="add-cart btn btn-primary">Add Item</button>
+                    <button data-location-id="<?php echo esc_attr($location_id); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" data-target="<?php echo esc_url( $cart_url ); ?>" class="add-cart btn btn-primary" >Add Item</button>
                 </div>
             </section>
             <section class="details col py-4 mt-2">

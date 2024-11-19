@@ -428,9 +428,9 @@ function tg_location_styles() {
     $sf_settings = $location_settings[$location_id];
     $button_style    = $sf_settings['buttonStyle'] ?? 'default';
     $primary_color   = $sf_settings['primaryColor'] ?? '#527390';
-    $light_font      = $sf_settings['lightFontColor'] ?? '#000000';
+    $light_font      = $sf_settings['lightFontColor'] ?? '#ffffff';
     $light_secondary = $sf_settings['lightSecondaryColor'] ?? '#E5E8E9';
-    $dark_font       = $sf_settings['darkFontColor'] ?? '#ffffff';
+    $dark_font       = $sf_settings['darkFontColor'] ?? '#000000';
     $dark_secondary  = $sf_settings['darkSecondaryColor'] ?? '#9c9c9c';
 
     // Log the retrieved settings for debugging

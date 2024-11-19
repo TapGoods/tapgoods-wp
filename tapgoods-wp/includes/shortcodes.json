@@ -54,7 +54,12 @@
     "tapgoods-search": {
         "name": "Search",
         "description": "Displays the Inventory Search input",
-        "atts": {}
+        "atts": {
+            "nos": {
+                "default": false,
+                "type": "toggle"
+            }
+        }
     },
     "tapgoods-location-select": {
         "name": "Location Select",

@@ -63,13 +63,20 @@
                 }, 300));
         }
 
-        if ($('#tg-per-page').length > 0) {
-            $('#tg-per-page').on('change', function(e) {
-                let perPage = e.target.value;
-                document.cookie = "tg-per-page=" + perPage + ";expires=0;domain=" + tg_ajax.domain + ";path=/";
-                window.location.reload();
-            });
-        }
+        document.addEventListener("DOMContentLoaded", function () {
+            const perPageSelect = document.getElementById("tg-per-page");
+        
+            if (perPageSelect) {
+                perPageSelect.addEventListener("change", function (e) {
+                    const perPage = e.target.value;
+                    document.cookie = `tg-per-page=${perPage};path=/;`;
+                    console.log("Updated cookie:", document.cookie);
+                    window.location.reload();
+                });
+            }
+        });
+        
+        
 
         if ($('#tg-dates-selector').length > 0) {
             $('#tg-dates-selector input').on('change', function() {
