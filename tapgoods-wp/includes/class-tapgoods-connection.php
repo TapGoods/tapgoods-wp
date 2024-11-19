@@ -190,39 +190,43 @@ class Tapgoods_Connection {
 	}
 	
 	public function sync_inventory_in_batches($manual_trigger = false) {
+		$current_key = $this->get_key();
+		$stored_key = get_option('tg_last_api_key');
+	
+		// Handle API key change
+		if ($current_key !== $stored_key) {
+			$this->console_log('API Key has changed. Clearing previous data...');
+			$this->tg_delete_data();
+			update_option('tg_last_api_key', $current_key);
+		}
+	
 		$batch_size = 50;
 		$progress = get_option('tg_last_sync_progress', array('location_id' => null, 'current_page' => 1));
 		$client = $this->get_connection();
 	
-		// Force the removal of the previous lock
-		delete_transient('tg_sync_lock');
-	
+		// Prevent concurrent syncs
 		if (get_transient('tg_sync_lock')) {
-			$this->console_log('Sync is locked, another process is running.');
-			return array('success' => false, 'message' => 'Sync is currently in progress by another process.');
+			$this->console_log('Sync is locked. Another process is running.');
+			return array('success' => false, 'message' => '');
 		}
 	
-		// Set the lock to prevent multiple executions
+		// Lock the sync process
 		set_transient('tg_sync_lock', true, 900);
-		$this->console_log('Sync lock set for 15 minutes.');
 	
 		$location_ids = $client->get_location_ids();
 		if (false === $location_ids) {
-			error_log('Failed to retrieve location IDs');
-			$this->console_log('Failed to retrieve location IDs.');
 			delete_transient('tg_sync_lock');
-			return array('success' => false, 'message' => 'Failed to retrieve location IDs');
+			$this->console_log('Failed to retrieve location IDs.');
+			return array('success' => false, 'message' => '');
 		}
 	
 		$total_items = 0;
-		$start_time = current_time('timestamp'); // Log the start of the synchronization
-	
-		// Get all existing tg_ids in WordPress before synchronization
+		$start_time = current_time('timestamp');
 		$existing_items = $this->get_all_existing_inventory_ids();
 		$synced_items = [];
 	
 		foreach ($location_ids as $lid) {
-			$current_page = 1;
+			$current_page = $progress['current_page'];
 			$continue_fetching = true;
 	
 			while ($continue_fetching) {
@@ -235,11 +239,10 @@ class Tapgoods_Connection {
 	
 				$inventory = $response['collection'];
 				$total_items += count($inventory);
-				$this->console_log('Fetched ' . count($inventory) . ' items from location ID: ' . $lid . ', page: ' . $current_page);
 	
 				foreach ($inventory as $item) {
-					$this->sync_inventory_item($item);
-					$synced_items[] = $item['id']; // Save the IDs of synchronized items
+					$this->sync_inventory_item($item, false); // Skip assigning terms initially
+					$synced_items[] = $item['id'];
 				}
 	
 				if (count($inventory) < $batch_size) {
@@ -247,50 +250,65 @@ class Tapgoods_Connection {
 				} else {
 					$current_page++;
 					update_option('tg_last_sync_progress', array('location_id' => $lid, 'current_page' => $current_page));
-					$this->console_log('Progress saved for location ID: ' . $lid . ', page: ' . $current_page);
 				}
 			}
 		}
 	
-		// Remove items that are no longer in the endpoint
-		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+		// Sync categories and tags after items
+		$this->console_log('Syncing categories and tags...');
+		$categories_synced = $this->sync_categories_from_api();
 	
-
-		// Assigns a default location_id if one does not already exist
-		if (!get_option('tg_default_location')) {
-			// Get the list of locations from tg_locationIds
-			$locations = maybe_unserialize(get_option('tg_locationIds'));
-
-			// Verify that the list of locations is defined and not empty
-			if (is_array($locations) && !empty($locations)) {
-				// Select the first ID in the list as default
-				$default_location_id = reset($locations);
-
-				// Save the first location_id as default value
-				update_option('tg_default_location', $default_location_id);
+		if ($categories_synced) {
+			$this->console_log('Assigning categories and tags to items...');
+			foreach ($synced_items as $tg_id) {
+				$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
+				if ($item) {
+					$this->tg_assign_terms($item->ID);
+				}
 			}
+		} else {
+			$this->console_log('Category and tag sync failed.');
 		}
-
-
-		// Call the function to remove duplicates
-		$this->remove_duplicate_items();
 	
-		// Save synchronization information
+		// Cleanup after sync
+		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+		$this->remove_unused_terms('tg_category');
+		$this->remove_unused_terms('tg_tags');
+		$this->remove_duplicate_items();
 		$this->update_sync_info($start_time);
 	
-		// Update the final message in the database
-		update_option('tg_last_sync_info', array(
-			'last_sync_end' => current_time('timestamp'),
-			'last_sync_duration' => current_time('timestamp') - $start_time
-		));
-	
-		// Release the lock
+		// Unlock the process
 		delete_transient('tg_sync_lock');
 		delete_option('tg_last_sync_progress');
 	
-		$this->console_log('Sync process completed.');
 		return array('success' => true, 'message' => '');
 	}
+	
+	
+	/**
+	 * Confirm that terms exist for a given taxonomy.
+	 *
+	 * @param string $taxonomy The taxonomy to confirm.
+	 * @return bool True if terms exist, false otherwise.
+	 */
+	public function confirm_terms_ready($taxonomy) {
+		$terms = get_terms(array(
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+		));
+	
+		if (empty($terms) || is_wp_error($terms)) {
+			$this->console_log("No terms found for taxonomy: $taxonomy.");
+			return false;
+		}
+	
+		return true;
+	}
+	
+	
+	
+	
+	
 	
 	
 	public function get_all_existing_inventory_ids() {
@@ -570,18 +588,17 @@ class Tapgoods_Connection {
 	
 	
 
-	public function tg_update_inventory( $product, $tg_order ) {
+	public function tg_update_inventory($product, $tg_order) {
 		$args = array(
-			'post_type'      => 'tg_inventory',
+			'post_type' => 'tg_inventory',
 			'posts_per_page' => 1,
-			'meta_key'       => 'tg_token',
-			'meta_value'     => $product['token'],
+			'meta_key' => 'tg_token',
+			'meta_value' => $product['token'],
 		);
 	
 		$query = new WP_Query($args);
 		$post_id = false;
 	
-		// If the post exists
 		if (count($query->posts) > 0) {
 			$post_id = $query->posts[0]->ID;
 			$this->console_log('Found existing post with tg_token: ' . $product['token'] . ' (Post ID: ' . $post_id . ')');
@@ -589,21 +606,19 @@ class Tapgoods_Connection {
 			$this->console_log('No post found for tg_token: ' . $product['token'] . '. Inserting new post.');
 		}
 	
-		// Preparing the metadata and the post
 		$slug = str_replace('_', '-', $product['slug']);
 		$meta = $this->prepare_meta_input($product);
 		$meta['tg_hash'] = $this->hash;
 	
 		$post_arr = array(
-			'post_type'   => 'tg_inventory',
-			'post_title'  => $product['name'],
-			'post_name'   => $slug,
-			'menu_order'  => $tg_order,
-			'meta_input'  => $meta,
+			'post_type' => 'tg_inventory',
+			'post_title' => $product['name'],
+			'post_name' => $slug,
+			'menu_order' => $tg_order,
+			'meta_input' => $meta,
 			'post_status' => 'publish',
 		);
 	
-		// If we are inserting a new post
 		if (false === $post_id) {
 			$insert = wp_insert_post($post_arr, true);
 			if (is_wp_error($insert)) {
@@ -611,23 +626,18 @@ class Tapgoods_Connection {
 				return false;
 			}
 			update_post_meta($insert, 'tg_token', $product['token']);
-			$post_id = $insert; // Make sure $post_id is the ID of the new post
-			$this->console_log('New post inserted with ID: ' . $post_id . ' for tg_token: ' . $product['token']);
+			$post_id = $insert;
 		} else {
-			// We updated the existing post
 			$post_arr['ID'] = $post_id;
 			$update = wp_update_post($post_arr, true);
 			if (is_wp_error($update)) {
 				$this->console_log('Error updating item: ' . $product['id'] . ' - ' . $update->get_error_message());
 				return false;
 			}
-			$this->console_log('Post updated with ID: ' . $post_id . ' for tg_token: ' . $product['token']);
 		}
 	
-		// Here we check if post_id is valid before calling tg_assign_terms
 		if ($post_id) {
-			$this->console_log('Calling tg_assign_terms for post ID: ' . $post_id);
-			$this->tg_assign_terms($post_id); // Calling the term assignment function
+			$this->tg_assign_terms($post_id);
 		} else {
 			$this->console_log('Failed to assign terms: post ID is invalid');
 		}
@@ -638,88 +648,111 @@ class Tapgoods_Connection {
 	
 	
 	
-
+	
 	public function sync_categories_from_api() {
-
-		$config = array(
-			'cache_enabled' => true,
-		);
-
-		$client       = $this->get_connection( $config );
+		$this->console_log('Starting sync_categories_from_api...');
+		
+		$client = $this->get_connection();
 		$location_ids = $client->get_location_ids();
-
-		if ( false === $location_ids ) {
+	
+		if (false === $location_ids || is_wp_error($location_ids)) {
+			$this->console_log('Failed to retrieve location IDs.');
 			return false;
 		}
-
-		$cat_count = 0;
-		$tag_count = 0;
-
-		foreach ( $location_ids as $lid ) {
-			$data = $client->get_categories_from_graph( $lid );
-
-			// if we couldn't get the categories bail out b/c we cannot proceed
-			if ( false === $data ) {
-				return false;
+	
+		$valid_category_ids = [];
+		$valid_tag_ids = [];
+	
+		foreach ($location_ids as $lid) {
+			$categories = $client->get_categories_from_graph($lid);
+	
+			if (false === $categories || is_wp_error($categories)) {
+				$this->console_log("Failed to fetch categories for location ID: {$lid}");
+				continue;
 			}
-
-			update_option( "tg_categories_{$lid}", $data );
-
-			foreach ( $data as $category ) {
-
-				// setup category fields
-				$tg_id = $category['id'];
-				$subs  = $category['sfSubCategories'];
-				$tax   = 'tg_category';
-
-				$term = $this->tg_insert_or_update_term( $category, $tax );
-
-				if ( false === $term ) {
-					continue;
+	
+			foreach ($categories as $category) {
+				$category_term = $this->tg_insert_or_update_term($category, 'tg_category');
+				if ($category_term) {
+					$valid_category_ids[] = $category_term;
 				}
-
-				update_term_meta( $term['term_id'], 'tg_id', $tg_id );
-				update_term_meta( $term['term_id'], 'tg_subcategories', $subs );
-				update_term_meta( $term['term_id'], 'tg_hash', $this->hash );
-
-				++$cat_count;
-
-				if ( is_array( $subs ) && count( $subs ) > 0 ) {
-					// tg_write_log( 'updating term: ' . $category['name'] );
-					// tg_write_log( $subs );
-
-					foreach ( $subs as $tag ) {
-
-						$wp_tag = $this->tg_insert_or_update_term( $tag, 'tg_tags' );
-						if ( false !== $wp_tag ) {
-							update_term_meta( $wp_tag['term_id'], 'tg_id', $tag['id'] );
-							update_term_meta( $wp_tag['term_id'], 'tg_sfCategories', $tag['sfCategories'] );
-							// update_term_meta( $wp_tag['term_id'], 'tg_category_wp_id', $term['term_id'], false );
-							// update_term_meta( $wp_tag['term_id'], 'tg_category_id', $tg_id, false );
-							update_term_meta( $wp_tag['term_id'], 'tg_hash', $this->hash );
-							++$tag_count;
+	
+				// Process subcategories as tags.
+				if (!empty($category['sfSubCategories'])) {
+					foreach ($category['sfSubCategories'] as $tag) {
+						$tag_term = $this->tg_insert_or_update_term($tag, 'tg_tags');
+						if ($tag_term) {
+							$valid_tag_ids[] = $tag_term;
 						}
 					}
 				}
 			}
 		}
-		return array(
-			'cat_count' => $cat_count,
-			'tag_count' => $tag_count,
-		);
+	
+		// Remove obsolete terms.
+		$this->remove_obsolete_terms('tg_category', $valid_category_ids);
+		$this->remove_obsolete_terms('tg_tags', $valid_tag_ids);
+	
+		$this->console_log('Categories and tags synchronized successfully.');
+		return true;
 	}
+	
+	
+	
+	
+	
+	public function remove_obsolete_terms($taxonomy, $valid_ids) {
+		$existing_terms = get_terms(array(
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+			'fields'     => 'ids',
+		));
+	
+		foreach ($existing_terms as $term_id) {
+			if (!in_array($term_id, $valid_ids)) {
+				wp_delete_term($term_id, $taxonomy);
+				$this->console_log("Removed obsolete term ID: {$term_id} from taxonomy: {$taxonomy}");
+			}
+		}
+	}
+	
+	
+	
+	
+	public function remove_missing_terms($taxonomy, $valid_ids) {
+		$existing_terms = get_terms(array(
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+			'fields'     => 'ids',
+		));
+	
+		foreach ($existing_terms as $term_id) {
+			$tg_id = get_term_meta($term_id, 'tg_id', true);
+			$tg_hash = get_term_meta($term_id, 'tg_hash', true);
+	
+			// Si el término tiene un tg_id o tg_hash válido, no lo elimines
+			if (in_array($tg_id, $valid_ids) || $tg_hash === $this->hash) {
+				continue;
+			}
+	
+			wp_delete_term($term_id, $taxonomy);
+			$this->console_log("Removed term ID: {$term_id} from taxonomy: {$taxonomy}");
+		}
+	}
+	
+	
+
+	
 
 	public function tg_insert_or_update_term($term, $tax) {
-		$tg_id = $term['id'];
-		$name = $term['name'];
-		$slug = array_key_exists('slug', $term) ? str_replace('_', '-', $term['slug']) : sanitize_title($term['name']);
+		$tg_id = $term['id']; // The unique ID of the term from the external source.
+		$name = $term['name']; // The name of the term.
+		$slug = str_replace('_', '-', $term['slug'] ?? sanitize_title($term['name'])); // Generate a sanitized slug.
 	
-		$term_args = array(
-			'slug' => $slug,
-		);
+		$term_args = array('slug' => $slug);
 	
-		// Check if term already exists by tg_id
-		$query_args = array(
+		// Check if a term already exists using the tg_id meta.
+		$existing_term = get_terms([
 			'taxonomy' => $tax,
 			'hide_empty' => false,
 			'meta_key' => 'tg_id',
@@ -727,43 +760,38 @@ class Tapgoods_Connection {
 			'meta_compare' => '=',
 			'number' => 1,
 			'fields' => 'ids',
-		);
-		$existing_term_by_id = get_terms($query_args);
+		]);
 	
-		if (!is_wp_error($existing_term_by_id) && count($existing_term_by_id) > 0) {
-			// The term already exists by tg_id, we simply return it
-			$this->console_log("Found existing term by tg_id: $tg_id");
-			return $existing_term_by_id[0];
+		if (!empty($existing_term)) {
+			$this->console_log("Term exists for tg_id: $tg_id (ID: {$existing_term[0]})");
+			return $existing_term[0]; // Return the existing term ID.
 		}
 	
-		// Check if term already exists by name
-		$existing_term_by_name = get_term_by('name', $name, $tax);
+		// Attempt to insert the new term.
+		$term_result = wp_insert_term($name, $tax, $term_args);
 	
-		if ($existing_term_by_name) {
-			// The term already exists by name
-			$this->console_log("Found existing term by name: $name (ID: {$existing_term_by_name->term_id})");
-			if (!get_term_meta($existing_term_by_name->term_id, 'tg_id', true)) {
-				// If the term does not have a tg_id, we add it
-				update_term_meta($existing_term_by_name->term_id, 'tg_id', $tg_id);
-				$this->console_log("Updated term with tg_id: $tg_id");
-			}
-			return $existing_term_by_name->term_id;
-		}
-	
-		// If it does not exist, insert the new term
-		$wp_term = wp_insert_term($name, $tax, $term_args);
-	
-		if (is_wp_error($wp_term)) {
-			$this->console_log("Error inserting term: " . $wp_term->get_error_message());
+		// Check if the result is a WP_Error and log it if necessary.
+		if (is_wp_error($term_result)) {
+			$this->console_log("Error inserting term: {$term_result->get_error_message()}");
 			return false;
 		}
 	
-		// Save tg_id as meta
-		update_term_meta($wp_term['term_id'], 'tg_id', $tg_id);
-		$this->console_log("Inserted new term: $name (tg_id: $tg_id)");
+		// Ensure that the term ID exists in the result.
+		$term_id = isset($term_result['term_id']) ? $term_result['term_id'] : null;
+		if (!$term_id) {
+			$this->console_log("Failed to retrieve term_id for term: {$name}");
+			return false;
+		}
 	
-		return $wp_term['term_id'];
+		// Save metadata for the term.
+		update_term_meta($term_id, 'tg_id', $tg_id);
+		update_term_meta($term_id, 'tg_hash', $this->hash);
+		$this->console_log("Inserted term: $name with tg_id: $tg_id and taxonomy: $tax");
+	
+		return $term_id; // Return the new term ID.
 	}
+	
+	
 	
 	
 	
@@ -773,122 +801,178 @@ class Tapgoods_Connection {
 	
 
 	public function tg_assign_terms($post_id) {
-		$this->console_log('Assigning terms for post ID: ' . $post_id);
+		// Fetch categories and subcategories (tags) from post meta
+		$categories = get_post_meta($post_id, 'tg_sfCategories', true);
+		$tags = get_post_meta($post_id, 'tg_sfSubCategories', true);
 	
-		// Get Categories (tg_sfCategories)
-		$tg_categories = get_post_meta($post_id, 'tg_sfCategories', true);
-		$category_ids = array();
+		$assigned_categories = [];
+		$assigned_tags = [];
 	
-		if (is_array($tg_categories) && count($tg_categories) > 0) {
-			foreach ($tg_categories as $category) {
-				$this->console_log('Processing category: ' . $category['id']);
+		// Process categories
+		if (!empty($categories)) {
+			foreach ($categories as $category) {
+				// Check if a term with the given tg_id exists
+				$term = get_terms([
+					'taxonomy' => 'tg_category',
+					'hide_empty' => false,
+					'meta_query' => [
+						[
+							'key' => 'tg_id',
+							'value' => $category['id'],
+							'compare' => '='
+						]
+					],
+					'fields' => 'ids',
+				]);
 	
-				// Search the category by the meta 'tg_id'
-				$query_args = array(
-					'taxonomy'     => 'tg_category',
-					'hide_empty'   => false,
-					'meta_key'     => 'tg_id',
-					'meta_value'   => $category['id'],
-					'meta_compare' => '=',
-					'number'       => 1,
-					'fields'       => 'ids',
-				);
-				$category_terms = get_terms($query_args);
+				if (empty($term)) {
+					// Check if a term with the same name exists
+					$existing_term = get_terms([
+						'taxonomy' => 'tg_category',
+						'hide_empty' => false,
+						'name' => $category['name'],
+						'fields' => 'ids',
+					]);
 	
-				// If the category does not exist, it is inserted
-				if (empty($category_terms)) {
-					$this->console_log('Category not found. Inserting new category: ' . $category['name']);
-	
-					$wp_category = wp_insert_term(
-						$category['name'],  // The name of the category
-						'tg_category',      // The taxonomy
-						array(
-							'slug' => sanitize_title($category['slug'])
-						)
-					);
-	
-					if (!is_wp_error($wp_category)) {
-						// If the category is created successfully, save the meta tg_id
-						update_term_meta($wp_category['term_id'], 'tg_id', $category['id']);
-						$category_ids[] = $wp_category['term_id'];
-						$this->console_log('Inserted new category with ID: ' . $wp_category['term_id']);
+					if (!empty($existing_term)) {
+						// Use the existing term
+						$this->console_log("Category found by name: {$category['name']}. Assigning to post.");
+						$assigned_categories[] = $existing_term[0];
 					} else {
-						$this->console_log('Error inserting category: ' . $wp_category->get_error_message());
+						// Create category by name if it doesn't exist
+						$this->console_log("Category not found for tg_id: {$category['id']}. Creating by name: {$category['name']}");
+						$result = wp_insert_term($category['name'], 'tg_category', ['slug' => sanitize_title($category['slug'])]);
+						if (is_wp_error($result)) {
+							$this->console_log("Error creating category: {$category['name']} - {$result->get_error_message()}");
+						} else {
+							$term_id = $result['term_id'];
+							update_term_meta($term_id, 'tg_id', $category['id']);
+							$assigned_categories[] = $term_id;
+						}
 					}
 				} else {
-					$category_ids[] = $category_terms[0]; // If it already exists, the ID is added
-					$this->console_log('Found existing category ID: ' . $category_terms[0]);
+					$assigned_categories[] = $term[0];
 				}
 			}
 	
-			if (count($category_ids) > 0) {
-				wp_set_post_terms($post_id, $category_ids, 'tg_category');
-				$this->console_log('Categories assigned for post ID: ' . $post_id);
-			} else {
-				$this->console_log('No categories found for post ID: ' . $post_id);
+			// Assign categories to the post
+			if (!empty($assigned_categories)) {
+				wp_set_post_terms($post_id, $assigned_categories, 'tg_category');
+				$this->console_log("Assigned categories to post ID: $post_id");
 			}
-		} else {
-			$this->console_log('No tg_sfCategories meta found for post ID: ' . $post_id);
 		}
 	
-		// Get tags (tg_sfSubCategories)
-		$tg_tags = get_post_meta($post_id, 'tg_sfSubCategories', true);
-		$tag_ids = array();
+		// Process tags
+		if (!empty($tags)) {
+			foreach ($tags as $tag) {
+				// Check if a term with the given tg_id exists
+				$term = get_terms([
+					'taxonomy' => 'tg_tags',
+					'hide_empty' => false,
+					'meta_query' => [
+						[
+							'key' => 'tg_id',
+							'value' => $tag['id'],
+							'compare' => '='
+						]
+					],
+					'fields' => 'ids',
+				]);
 	
-		if (is_array($tg_tags) && count($tg_tags) > 0) {
-			foreach ($tg_tags as $tag) {
-				$this->console_log('Processing tag: ' . $tag['id']);
+				if (empty($term)) {
+					// Check if a term with the same name exists
+					$existing_term = get_terms([
+						'taxonomy' => 'tg_tags',
+						'hide_empty' => false,
+						'name' => $tag['name'],
+						'fields' => 'ids',
+					]);
 	
-				// Search for the tag by the meta 'tg_id'
-				$query_args = array(
-					'taxonomy'     => 'tg_tags',
-					'hide_empty'   => false,
-					'meta_key'     => 'tg_id',
-					'meta_value'   => $tag['id'],
-					'meta_compare' => '=',
-					'number'       => 1,
-					'fields'       => 'ids',
-				);
-				$tag_terms = get_terms($query_args);
-	
-				// If the tag does not exist, it is inserted
-				if (empty($tag_terms)) {
-					$this->console_log('Tag not found. Inserting new tag: ' . $tag['name']);
-	
-					$wp_tag = wp_insert_term(
-						$tag['name'],  // The name of the label
-						'tg_tags',     // The taxonomy
-						array(
-							'slug' => sanitize_title($tag['name'])
-						)
-					);
-	
-					if (!is_wp_error($wp_tag)) {
-						// If the tag is created successfully, save the meta tg_id
-						update_term_meta($wp_tag['term_id'], 'tg_id', $tag['id']);
-						$tag_ids[] = $wp_tag['term_id'];
-						$this->console_log('Inserted new tag with ID: ' . $wp_tag['term_id']);
+					if (!empty($existing_term)) {
+						// Use the existing term
+						$this->console_log("Tag found by name: {$tag['name']}. Assigning to post.");
+						$assigned_tags[] = $existing_term[0];
 					} else {
-						$this->console_log('Error inserting tag: ' . $wp_tag->get_error_message());
+						// Create tag by name if it doesn't exist
+						$this->console_log("Tag not found for tg_id: {$tag['id']}. Creating by name: {$tag['name']}");
+						$result = wp_insert_term($tag['name'], 'tg_tags', ['slug' => sanitize_title($tag['name'])]);
+						if (is_wp_error($result)) {
+							$this->console_log("Error creating tag: {$tag['name']} - {$result->get_error_message()}");
+						} else {
+							$term_id = $result['term_id'];
+							update_term_meta($term_id, 'tg_id', $tag['id']);
+							$assigned_tags[] = $term_id;
+						}
 					}
 				} else {
-					$tag_ids[] = $tag_terms[0]; // If it already exists, the ID is added
-					$this->console_log('Found existing tag ID: ' . $tag_terms[0]);
+					$assigned_tags[] = $term[0];
 				}
 			}
 	
-			if (count($tag_ids) > 0) {
-				wp_set_post_terms($post_id, $tag_ids, 'tg_tags');
-				$this->console_log('Tags assigned for post ID: ' . $post_id);
-			} else {
-				$this->console_log('No tags found for post ID: ' . $post_id);
+			// Assign tags to the post
+			if (!empty($assigned_tags)) {
+				wp_set_post_terms($post_id, $assigned_tags, 'tg_tags');
+				$this->console_log("Assigned tags to post ID: $post_id");
 			}
-		} else {
-			$this->console_log('No tg_sfSubCategories meta found for post ID: ' . $post_id);
 		}
 	}
 	
 	
+	
+	
+	
+	
+	public function remove_unused_terms($taxonomy) {
+		$this->console_log("Starting cleanup for unused terms in taxonomy: $taxonomy");
+	
+		// Fetch all terms in the taxonomy.
+		$terms = get_terms([
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false, // Include terms even if they're not assigned to posts.
+		]);
+	
+		if (is_wp_error($terms)) {
+			$this->console_log("Error fetching terms for taxonomy: $taxonomy - " . $terms->get_error_message());
+			return;
+		}
+	
+		foreach ($terms as $term) {
+			// Check if the term is assigned to any posts.
+			$term_count = $term->count;
+	
+			if ($term_count === 0) {
+				// Delete the term if it has no assignments.
+				$deleted = wp_delete_term($term->term_id, $taxonomy);
+	
+				if (is_wp_error($deleted)) {
+					$this->console_log("Error deleting term ID: {$term->term_id} - " . $deleted->get_error_message());
+				} else {
+					$this->console_log("Deleted unused term ID: {$term->term_id}, name: {$term->name}");
+				}
+			}
+		}
+	
+		$this->console_log("Finished cleanup for taxonomy: $taxonomy");
+	}
+	
+	
+	
+	
+	
+
+	
+	public function sync_terms_from_api($taxonomy, $data) {
+		$api_ids = array();
+	
+		foreach ($data as $item) {
+			$tg_id = $item['id'];
+			$api_ids[] = $tg_id;
+	
+			$this->tg_insert_or_update_term($item, $taxonomy);
+		}
+	
+		$this->remove_missing_terms($taxonomy, $api_ids);
+	}
 	
 
 	public function tg_async_sync_from_api( $action = 'tg_api_sync' ) {
@@ -1023,37 +1107,42 @@ class Tapgoods_Connection {
 	}
 
 
-    public function sync_from_api() {
-        // Start manual synchronization without cron, using a step-based approach
-        error_log('Starting manual inventory sync');
-		$location_info = $this->sync_location_settings(true);
-		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
+	public function sync_from_api() {
+		$this->console_log('Starting full sync');
 	
-        $result = $this->sync_inventory_in_batches(false);
-        return array(
-            'success' => $result['success'],
-            'message' => wpautop($result['message']),
-        );
-    }
-
+		// Sync categories and tags
+		$categories_result = $this->sync_categories_from_api();
+		$this->console_log('Categories sync result: ' . print_r($categories_result, true));
+	
+		// Sync inventory
+		$inventory_result = $this->sync_inventory_in_batches(false);
+		$this->console_log('Inventory sync result: ' . print_r($inventory_result, true));
+	
+		return array(
+			'success' => true,
+			'message' => 'Sync completed successfully.',
+		);
+	}
+	
 	public function sync_inventory_item($item) {
 		try {
 			$existing_item_by_id = $this->get_existing_inventory_item_by_tg_id($item['id']);
+			
 			if ($existing_item_by_id) {
 				$this->console_log('Updating item with tg_id: ' . $item['id'] . ' (' . $item['name'] . ')');
-				// Log para verificar la llamada a tg_update_inventory
-				$this->console_log('Calling tg_update_inventory for item ID: ' . $existing_item_by_id->ID);
 				$this->update_inventory_item($existing_item_by_id->ID, $item);
 			} else {
 				$this->console_log('Inserting new item: ' . $item['name']);
-				// Log para verificar la llamada a tg_insert_inventory
-				$this->console_log('Calling tg_insert_inventory for new item: ' . $item['name']);
 				$this->tg_insert_inventory($item);
 			}
+	
+			// Assign categories and tags to the item.
+			$this->tg_assign_terms($existing_item_by_id ? $existing_item_by_id->ID : $item['id']);
 		} catch (Exception $e) {
 			$this->console_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
 		}
 	}
+	
 	
 	
 	// Function to remove duplicates after synchronization
@@ -1071,7 +1160,6 @@ class Tapgoods_Connection {
 		$duplicates = $wpdb->get_results($duplicates_query);
 	
 		foreach ($duplicates as $duplicate) {
-			// Get duplicate post IDs (excluding the one we want to keep)
 			$duplicate_ids_query = "
 				SELECT post_id
 				FROM {$wpdb->postmeta}
@@ -1079,7 +1167,6 @@ class Tapgoods_Connection {
 			";
 			$duplicate_ids = $wpdb->get_col($wpdb->prepare($duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id));
 	
-			// Delete the duplicate posts
 			foreach ($duplicate_ids as $post_id) {
 				wp_delete_post($post_id, true);
 				$this->console_log('Removed duplicate item with post ID: ' . $post_id);
@@ -1152,53 +1239,33 @@ public function update_inventory_item($post_id, $item) {
 	}
 	
 	public function tg_insert_inventory($product) {
-		global $wpdb;
-	
-		// Direct verification in the database to avoid duplicates
-		$existing_item_id = $wpdb->get_var($wpdb->prepare(
-			"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'tg_id' AND meta_value = %s LIMIT 1",
-			$product['id']
-		));
-	
-		if ($existing_item_id) {
-			$this->console_log('Skipping creation: Item with tg_id ' . $product['id'] . ' already exists.');
-			return $existing_item_id; // If it already exists, returns the ID of the existing item
-		}
-	
-		// Preparing slug and metadata
-		$slug = str_replace('_', '-', $product['slug']);
-		$meta = $this->prepare_meta_input($product);
-		$post_arr = array(
-			'post_type' => 'tg_inventory',
-			'post_title' => $product['name'],
-			'post_name' => wp_unique_post_slug($slug, 0, 'publish', 'tg_inventory', 0),
-			'meta_input' => $meta,
-			'post_status' => 'publish',
-		);
-	
-		if (1 === get_option('tg_description_as_content')) {
-			$post_arr['post_content'] = $product['description'];
-		}
-	
-		// Try to insert the item using `wp_insert_post`
-		$insert = wp_insert_post($post_arr, true);
-	
-		// Check for errors during insertion
-		if (is_wp_error($insert)) {
-			$this->console_log('Error inserting item: ' . $product['id'] . ' - ' . $insert->get_error_message());
+		$tg_id = $product['id'];
+		if (!$tg_id) {
+			$this->console_log("Skipping item: No tg_id found");
 			return false;
 		}
 	
-		// Save the 'tg_id' as metadata
-		update_post_meta($insert, 'tg_id', $product['id']);
+		$slug = str_replace('_', '-', $product['slug']);
+		$post_arr = [
+			'post_type' => 'tg_inventory',
+			'post_title' => $product['name'],
+			'post_name' => wp_unique_post_slug($slug, 0, 'publish', 'tg_inventory', 0),
+			'meta_input' => $this->prepare_meta_input($product),
+			'post_status' => 'publish',
+		];
 	
-		// This is where you put the **1**, right after the metadata is saved
-		$this->console_log('Meta tg_sfCategories: ' . print_r(get_post_meta($insert, 'tg_sfCategories', true), true));
-		$this->console_log('Meta tg_sfSubCategories: ' . print_r(get_post_meta($insert, 'tg_sfSubCategories', true), true));
+		$post_id = wp_insert_post($post_arr, true);
 	
-		$this->console_log('Inserted new item with tg_id: ' . $product['id']);
-		return $insert;
+		if (is_wp_error($post_id)) {
+			$this->console_log("Error inserting item with tg_id: $tg_id - {$post_id->get_error_message()}");
+			return false;
+		}
+	
+		update_post_meta($post_id, 'tg_id', $tg_id);
+		$this->console_log("Inserted item with tg_id: $tg_id and post ID: $post_id");
+		return $post_id;
 	}
+	
 	
 	
 	
