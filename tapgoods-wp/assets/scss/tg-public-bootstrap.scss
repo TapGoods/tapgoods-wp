@@ -232,7 +232,7 @@
 		#eventEndDate,
 		#eventEndTime {
 			border-radius: var(--tg-button-border);
-			background-color: white;
+			background-color: white !important;
 			font-size: 12px;
 			color: var(--tg-dark-font);
 		}
