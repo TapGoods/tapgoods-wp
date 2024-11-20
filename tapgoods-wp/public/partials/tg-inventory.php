@@ -25,7 +25,7 @@ ob_start();
 <div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
 	<?php if ( false !== $show_search ) : ?>
 		<?php do_action( 'tg_before_inventory_search' ); ?>
-		<?php echo do_shortcode( '[tapgoods-search]' ) ?>
+		<?php echo do_shortcode( '[tapgoods-search nos="true"]' ) ?>
 		<?php do_action( 'tg_after_inventory_search' ); ?>
 	<?php endif; ?>
 	<div class="container shop">
