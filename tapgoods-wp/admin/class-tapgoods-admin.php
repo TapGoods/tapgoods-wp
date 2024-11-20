@@ -268,7 +268,7 @@ class Tapgoods_Admin {
 		add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $function, $icon, 65 );
 
 		add_submenu_page( $this->plugin_name, $page_title . ' Connection Settings', 'Connection', $capability, $this->plugin_name, $function, 1 );
-		add_submenu_page( $this->plugin_name, $page_title . ' Styling Settings', 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
+		// add_submenu_page( $this->plugin_name, $page_title . ' Styling Settings', 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
 		add_submenu_page( $this->plugin_name, $page_title . ' Shortcodes', 'Shortcodes', $capability, $this->plugin_name . '#shortcodes', $function, 3 );
 	    add_submenu_page( $this->plugin_name, $page_title . ' Advanced Options', 'Advanced Options', $capability, $this->plugin_name . '#options', $function, 4 );
 	}
