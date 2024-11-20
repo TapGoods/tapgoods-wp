@@ -8,13 +8,17 @@ if (!is_array($locations)) {
 // Check if a selection exists and display its details
 $selected_location = isset($_POST['selected_location']) ? sanitize_text_field($_POST['selected_location']) : null;
 
+// Get the current default location if no selection exists
+$default_location = get_option('tg_default_location');
+if (empty($selected_location)) {
+    $selected_location = $default_location;
+}
+
 // Save default location when "Set as Default" button is pressed
 if (isset($_POST['set_default_location']) && $selected_location) {
     update_option('tg_default_location', $selected_location);
+    $default_location = $selected_location;
 }
-
-// Get the current default location
-$default_location = get_option('tg_default_location');
 
 // Get the data for the selected location only if it exists
 $location_data = null;
@@ -30,7 +34,7 @@ if (!empty($selected_location)) {
     <!-- Form to select location -->
     <form method="post" action="">
         <label for="selected_location">Select Default Location:</label>
-        <select name="selected_location" id="selected_location">
+        <select name="selected_location" id="selected_location" onchange="this.form.submit();">
             <?php
             foreach ($locations as $location_id) {
                 // Retrieve the location data for each ID
@@ -45,16 +49,20 @@ if (!empty($selected_location)) {
             }
             ?>
         </select>
-        <button type="submit" class="button button-primary">View Details</button>
     </form>
 
-    <!-- Show data for the selected location only if a location has been selected -->
+    <!-- Show data for the selected location automatically if a location has been selected -->
     <?php if (!empty($selected_location) && $location_data): ?>
         <h2>Location Details</h2>
         <form method="post" action="">
             <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
             <button type="submit" name="set_default_location" class="button button-secondary">Set as Default</button>
         </form>
+        
+        <?php if (!empty($default_location) && $default_location == $selected_location): ?>
+            <p id="default_message"><em>This is the current default location.</em></p>
+        <?php endif; ?>
+
         <ul>
             <?php foreach ($location_data as $key => $value): ?>
                 <li><strong><?php echo esc_html($key); ?>:</strong> 
@@ -68,9 +76,5 @@ if (!empty($selected_location)) {
                 </li>
             <?php endforeach; ?>
         </ul>
-        
-        <?php if ($default_location == $selected_location): ?>
-            <p><em>This is the current default location.</em></p>
-        <?php endif; ?>
     <?php endif; ?>
 </div>
