@@ -231,28 +231,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 const quantity = cartData[locationId][itemId];
 
                 // Update all buttons and inputs for this item ID in the current container
-                const quantityInputs = shortcodeContainer.querySelectorAll(`#qty-${itemId}`);
-                const buttons = shortcodeContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`);
+                shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
+                    input.value = quantity;
+                });
 
-                // If buttons or inputs exist, update them
-                if (buttons.length > 0) {
-                    buttons.forEach(button => {
-                        button.style.setProperty("background-color", "green", "important");
-                        button.textContent = "Added";
+                shortcodeContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`).forEach(button => {
+                    button.style.setProperty("background-color", "green", "important");
+                    button.textContent = "Added";
 
-                        // Restore to original state after 10 seconds
-                        setTimeout(() => {
-                            button.style.removeProperty("background-color");
-                            button.textContent = "Add";
-                        }, 10000);
-                    });
-                }
-
-                if (quantityInputs.length > 0) {
-                    quantityInputs.forEach(input => {
-                        input.value = quantity;
-                    });
-                }
+                    // Restore to original state after 10 seconds
+                    setTimeout(() => {
+                        button.style.removeProperty("background-color");
+                        button.textContent = "Add";
+                    }, 10000);
+                });
             });
         }
     }
@@ -263,15 +255,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const button = event.currentTarget;
         const itemId = button.getAttribute("data-item-id");
-        const quantityInput = button.closest('.tapgoods-inventory').querySelector(`#qty-${itemId}`);
+        const container = button.closest(".tapgoods-inventory");
+        const quantityInput = container.querySelector(`#qty-${itemId}`);
 
         if (!quantityInput) {
             alert("Quantity input field is missing.");
             return;
         }
 
-        let quantityValue = quantityInput.value.trim();
-        if (quantityValue === "" || isNaN(parseInt(quantityValue, 10)) || parseInt(quantityValue, 10) <= 0) {
+        const quantityValue = quantityInput.value.trim();
+        if (!quantityValue || isNaN(quantityValue) || parseInt(quantityValue, 10) <= 0) {
             alert("Please enter a valid quantity.");
             return;
         }
@@ -282,33 +275,23 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
-
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
-        // Update button and quantity inputs in the current container
-        const currentContainer = button.closest('.tapgoods-inventory');
-        const quantityInputs = currentContainer.querySelectorAll(`#qty-${itemId}`);
-        const buttons = currentContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`);
+        // Update button state
+        button.style.setProperty("background-color", "green", "important");
+        button.textContent = "Added";
 
-        if (buttons.length > 0) {
-            buttons.forEach(btn => {
-                btn.style.setProperty("background-color", "green", "important");
-                btn.textContent = "Added";
+        // Restore button to original state after 10 seconds
+        setTimeout(() => {
+            button.style.removeProperty("background-color");
+            button.textContent = "Add";
+        }, 10000);
 
-                // Restore to original state after 10 seconds
-                setTimeout(() => {
-                    btn.style.removeProperty("background-color");
-                    btn.textContent = "Add";
-                }, 10000);
-            });
-        }
-
-        if (quantityInputs.length > 0) {
-            quantityInputs.forEach(input => {
-                input.value = quantity;
-            });
-        }
+        // Update quantity input fields in the same container
+        container.querySelectorAll(`#qty-${itemId}`).forEach(input => {
+            input.value = quantity;
+        });
 
         // Send request to add item to cart
         const url = button.getAttribute("data-target");
@@ -322,24 +305,16 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error("Request error:", error));
     }
 
-    // Iterate over each instance of the shortcode container to set up event listeners and update UI
+    // Initialize cart UI and event listeners
     document.querySelectorAll(".tapgoods-inventory").forEach(shortcodeContainer => {
         updateCartItems(shortcodeContainer);
 
-        // Set up event listeners for all add-to-cart buttons within the current container
+        // Add event listeners to buttons
         shortcodeContainer.querySelectorAll(".add-cart").forEach(button => {
-            button.removeEventListener("click", handleAddToCart);
             button.addEventListener("click", handleAddToCart);
         });
     });
 });
-
-
-
-
-
-
-
 
 
 
