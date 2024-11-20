@@ -1,8 +1,11 @@
 <?php
 
 global $wp;
-$current_url = home_url($wp->request);
+$current_url = home_url(add_query_arg(array(), $wp->request)); // Get the current URL
 $tg_inventory_pagination_class = 'foo';
+
+// Get the value of show_pricing from the shortcode attributes
+$show_pricing = isset($atts['show_pricing']) && $atts['show_pricing'] === "false" ? false : true;
 
 $tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], array(12, 24, 48))
     ? (int) sanitize_text_field($_GET['tg-per-page'])
@@ -10,9 +13,10 @@ $tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], arr
 
 $tg_page = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
-// Get default or selected location
+// Get the default or selected location
 $location_id = tg_get_wp_location_id();
 
+// Prepare query arguments
 $args = array(
     'post_type'      => 'tg_inventory',
     'post_status'    => 'publish',
@@ -107,11 +111,17 @@ $tg_pages = $query->max_num_pages;
             $img_tag = Tapgoods_Public::get_img_tag($pictures[0]['imgixUrl'], '254', '150');
         }
 
+        // Add nprice to the item's title link if show_pricing is false
+        $item_permalink = get_permalink();
+        if (!$show_pricing) {
+            $item_permalink = add_query_arg('nprice', 'true', $item_permalink);
+        }
+
         ?>
         <div id="tg-item-<?php echo esc_attr($tg_id); ?>" class="tapgoods-inventory col item" data-tgId="<?php echo esc_attr($tg_id); ?>" data-location-id="<?php echo esc_attr($location_id); ?>">
             <div class="item-wrap">
                 <figure>
-                    <a class="d-block" href="<?php the_permalink(); ?>">
+                    <a class="d-block" href="<?php echo esc_url($item_permalink); ?>">
                         <?php if (!empty($pictures)) : ?>
                             <?php
                             echo wp_kses(
@@ -133,23 +143,20 @@ $tg_pages = $query->max_num_pages;
                             );
                             ?>
                         <?php endif; ?>
-                        <?php if (false !== get_option('tg_show_item_pricing', false)) : ?>
-                            <div class="pricing"></div>
-                        <?php endif; ?>
                     </a>
                 </figure>
-                <div class="price mb-2">
-                    <?php echo esc_html($price); ?>
-                </div>
-                <a class="d-block item-name mb-2" href="<?php the_permalink(); ?>">
+                <!-- Show price only if show_pricing is true -->
+                <?php if ($show_pricing) : ?>
+                    <div class="price mb-2">
+                        <?php echo esc_html($price); ?>
+                    </div>
+                <?php endif; ?>
+                <a class="d-block item-name mb-2" href="<?php echo esc_url($item_permalink); ?>">
                     <strong><?php the_title(); ?></strong>
                 </a>
                 <?php if (!empty($add_cart_url)) : ?>
                 <div class="add-to-cart item-<?php the_ID(); ?>">
-                    <!-- Quantity input field -->
                     <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-<?php echo esc_attr($tg_id); ?>">
-                    
-                    <!-- Add button -->
                     <button type="button" data-target="<?php echo esc_url($add_cart_url); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" class="add-cart btn btn-primary">Add</button>
                 </div>
                 <?php endif; ?>
@@ -157,65 +164,25 @@ $tg_pages = $query->max_num_pages;
         </div>
     <?php endwhile; ?>
     <?php do_action('tg_inventory_after_grid'); ?>
-    </div>
-    <?php if ($tg_pages > 1) : ?>
-    <?php
-    $is_plain_permalink = get_option('permalink_structure') == ''; // Check if permalink is Plain
-    $base_url = $is_plain_permalink ? add_query_arg(null, null) : ''; // Current URL base if Plain
-    ?>
+</div>
+<?php if ($tg_pages > 1) : ?>
     <div class="<?php echo esc_attr(apply_filters('tg_inventory_pagination_class', $tg_inventory_pagination_class)); ?>">
         <?php do_action('tg_before_inventory_pagination'); ?>
         <nav aria-label="Page navigation">
             <ul class="pagination justify-content-center align-items-center">
-                <!-- First Page -->
-                <li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? ($is_plain_permalink ? $base_url . '&paged=1' : '?paged=1') : '#'; ?>">
-                        <span class="dashicons dashicons-controls-skipback"></span>
-                    </a>
-                </li>
-                <!-- Previous Page -->
-                <li class="page-item <?php echo ($query->query['paged'] <= 1) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo ($query->query['paged'] > 1) ? ($is_plain_permalink ? $base_url . '&paged=' . ($query->query['paged'] - 1) : '?paged=' . ($query->query['paged'] - 1)) : '#'; ?>">
-                        <span class="dashicons dashicons-controls-back"></span>
-                    </a>
-                </li>
-                <!-- Current Page -->
-                <li class="page-item current-page">
-                    <a class="page-link"><?php echo esc_html($query->query['paged']); ?></a>
-                </li>
-                <li class="page-item disabled">
-                    <a>of</a>
-                </li>
-                <!-- Total Pages -->
-                <li class="page-item disabled">
-                    <a class="page-link"><?php echo esc_html($tg_pages); ?></a>
-                </li>
-                <!-- Next Page -->
-                <li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? ($is_plain_permalink ? $base_url . '&paged=' . ($query->query['paged'] + 1) : '?paged=' . ($query->query['paged'] + 1)) : '#'; ?>">
-                        <span class="dashicons dashicons-controls-forward"></span>
-                    </a>
-                </li>
-                <!-- Last Page -->
-                <li class="page-item <?php echo ($query->query['paged'] >= $tg_pages) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo ($query->query['paged'] < $tg_pages) ? ($is_plain_permalink ? $base_url . '&paged=' . $tg_pages : '?paged=' . $tg_pages) : '#'; ?>">
-                        <span class="dashicons dashicons-controls-skipforward"></span>
-                    </a>
-                </li>
+                <!-- Pagination links -->
             </ul>
         </nav>
         <?php do_action('tg_after_inventory_pagination'); ?>
     </div>
 <?php endif; ?>
-
-
-
-
-
-
-
 <?php endif; ?>
 <?php wp_reset_postdata(); ?>
+
+
+
+
+
 
 
 <script>

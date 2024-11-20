@@ -91,6 +91,12 @@
                 "desc": "Limit inventory display to user defined tags",
                 "default": null,
                 "type": "select_tg_tags"
+            },
+            "show_pricing": {
+                "att": "Show Pricing",
+                "desc": "Display pricing for inventory items",
+                "default": true,
+                "type": "boolean"
             }
         }
     },

@@ -2,70 +2,76 @@
 
 global $post;
 
+// Check if `nprice=true` is present in the URL
+$hide_price = isset($_GET['nprice']) && $_GET['nprice'] === 'true';
+
 $description = apply_filters(
     'tg_item_description',
-    get_post_meta( $post->ID, 'tg_description', true )
+    get_post_meta($post->ID, 'tg_description', true)
 );
 
-$tags = get_the_terms( $post, 'tg_tags' );
-if ( false !== $tags ) {
+$tags = get_the_terms($post, 'tg_tags');
+if (false !== $tags) {
     $tag_links = array();
-    foreach ( $tags as $tg_tag ) {
-        $tag_link    = get_term_link( $tg_tag );
+    foreach ($tags as $tg_tag) {
+        $tag_link = get_term_link($tg_tag);
         $tag_links[] = "<a href=\"{$tag_link}\">$tg_tag->name</a>";
     }
 }
 
-$tg_per_page = ( isset( $_COOKIE['tg-per-page'] ) ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-per-page'] ) ) : get_option( 'tg_per_page', '12' );
+$tg_per_page = (isset($_COOKIE['tg-per-page'])) ? sanitize_text_field(wp_unslash($_COOKIE['tg-per-page'])) : get_option('tg_per_page', '12');
 
-$tg_id = get_post_meta( $post->ID, 'tg_id', true );
+$tg_id = get_post_meta($post->ID, 'tg_id', true);
 $location_id = tg_get_wp_location_id(); // Retrieve the current location ID
 
 $date_format = tg_date_format();
-$today       = wp_date( $date_format );
+$today       = wp_date($date_format);
 
 global $wp;
-$current_page = home_url( add_query_arg( array(), $wp->request ) ); // Current page URL
+$current_page = home_url(add_query_arg(array(), $wp->request)); // Current page URL
 
 // Get the base URL without adding the redirectUrl parameter
-$base_cart_url = tg_get_product_add_to_cart_url( $post->ID );
+$base_cart_url = tg_get_product_add_to_cart_url($post->ID);
 
 // Build the full URL by manually adding the redirectUrl parameter
-$cart_url = $base_cart_url . '&redirectUrl=' . urlencode( $current_page );
+$cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
 
 ?>
 <div class="tapgoods">
-    <?php do_action( 'tg_before_inventory_single_container' ); ?>
+    <?php do_action('tg_before_inventory_single_container'); ?>
     <div id="tg-single" class="inventory-single container-fluid">
-        <?php do_action( 'tg_before_inventory_single_search' ); ?>
+        <?php do_action('tg_before_inventory_single_search'); ?>
         [tapgoods-search nos="true"]
-        <?php do_action( 'tg_after_inventory_single_search' ); ?>
+        <?php do_action('tg_after_inventory_single_search'); ?>
         <section class="inventory-single-content row row-cols-1 row-cols-md-2 p-3">
-            <?php do_action( 'tg_before_inventory_single_images' ); ?>
+            <?php do_action('tg_before_inventory_single_images'); ?>
             [tapgoods-image-carousel product="<?php echo esc_attr($post->ID); ?>"]
-            <?php do_action( 'tg_before_inventory_single_summary' ); ?>
+            <?php do_action('tg_before_inventory_single_summary'); ?>
             <section class="summary col">
                 <div class="maginifier-preview" hidden></div>
                 <span class="name"><?php the_title(); ?></span>
-                <div class="pricing">
-                    <?php $prices = tg_get_prices( $post->ID ); ?>
-                    <?php foreach ( $prices as $price_arr ) : ?>
-                        <span><?php echo '$' . wp_kses( current( $price_arr ), 'post' ); ?></span>
-                        <span><?php echo ' / ' . wp_kses( array_key_first( $price_arr ), 'post' ); ?></span>
-                    <?php endforeach; ?>
-                </div>
+                <!-- Only show pricing if `nprice` is not present in the URL -->
+                <?php if (!$hide_price) : ?>
+                    <div class="pricing">
+                        <?php $prices = tg_get_prices($post->ID); ?>
+                        <?php foreach ($prices as $price_arr) : ?>
+                            <span><?php echo '$' . wp_kses(current($price_arr), 'post'); ?></span>
+                            <span><?php echo ' / ' . wp_kses(array_key_first($price_arr), 'post'); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="quantity-select mb-4">
                     <input type="text" placeholder="Qty" name="quantity" class="form-control qty-input">
-                    <button data-location-id="<?php echo esc_attr($location_id); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" data-target="<?php echo esc_url( $cart_url ); ?>" class="add-cart btn btn-primary" >Add Item</button>
+                    <button data-location-id="<?php echo esc_attr($location_id); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" data-target="<?php echo esc_url($cart_url); ?>" class="add-cart btn btn-primary">Add Item</button>
                 </div>
             </section>
             <section class="details col py-4 mt-2">
                 <div class="description">
                     <?php echo $description; ?>
                 </div>
-                <?php if ( false !== $tags ) : ?>
+                <?php if (false !== $tags) : ?>
                 <div class="tags">
-                    <p class="label">Tags: </p><?php echo wp_kses( implode( ', ', $tag_links ), 'post' ); ?>
+                    <p class="label">Tags: </p><?php echo wp_kses(implode(', ', $tag_links), 'post'); ?>
                 </div>
                 <?php endif; ?>
             </section>
@@ -74,20 +80,20 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode( $current_page );
                     <p>Know your event date/time? Set it now.</p>
                     <div id="tg-dates-selector" class="dates-selector">
                         <div class="date-input-wrapper order-start">
-                            <label><?php _e( 'Order Start', 'tapgoods' ); ?></label>
-                            <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>">
-                            <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr( tg_get_start_time() ); ?>">
+                            <label><?php _e('Order Start', 'tapgoods'); ?></label>
+                            <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_start_date()); ?>" min="<?php echo esc_attr($today); ?>">
+                            <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_start_time()); ?>">
                         </div>
                         <div class="date-input-wrapper order-end">
-                            <label><?php _e( 'Order End', 'tapgoods' ); ?></label>
-                            <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>">
-                            <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr( tg_get_end_time() ); ?>">
+                            <label><?php _e('Order End', 'tapgoods'); ?></label>
+                            <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_end_date()); ?>" min="<?php echo esc_attr($today); ?>">
+                            <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_end_time()); ?>">
                         </div>
                     </div>
                 </div>
                 <div class="additional-details">
-                    <?php do_action( 'tg_product_additional_details' ); ?>
-                    <?php do_action( 'tg_product_dimensions' ); ?>
+                    <?php do_action('tg_product_additional_details'); ?>
+                    <?php do_action('tg_product_dimensions'); ?>
                     <div class="row">
                         <div class="col"></div>
                         <div class="col">[tapgoods-dimensions]</div>
@@ -100,6 +106,8 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode( $current_page );
         </section>
     </div>
 </div>
+
+
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
