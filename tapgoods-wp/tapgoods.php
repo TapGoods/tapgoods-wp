@@ -10,7 +10,7 @@
  * Author:            Aaron Valiente <aaron.valiente@tapgoods.com> and Jeremy Benson <jeremy.benson@tapgoods.com> and TapGoods
  * Author URI:        https://www.tapgoods.com/pro/
  * License:           MIT
- * Text Domain:       tapgoods
+ * Text Domain:       tapgoods-wp
  * Domain Path:       /languages
  *
  *
