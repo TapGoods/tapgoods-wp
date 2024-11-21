@@ -3,7 +3,9 @@
 $wp_load_paths = [
     dirname(__DIR__, 3) . '/wp-load.php',
     dirname(__DIR__, 4) . '/wp-load.php',
-    dirname(__DIR__, 5) . '/wp-load.php'
+    dirname(__DIR__, 5) . '/wp-load.php',
+    dirname($_SERVER['SCRIPT_FILENAME'], 5) . '/wp-load.php',
+    dirname($_SERVER['SCRIPT_FILENAME'], 6) . '/wp-load.php'
 ];
 
 $wp_load_found = false;
