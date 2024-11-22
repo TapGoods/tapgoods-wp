@@ -1,8 +1,11 @@
 <?php
 
-// Initial PHP code to get connection information and variables
+// Initialize connection information and variables
 $tg_api  = Tapgoods_Connection::get_instance();
 $api_key = $tg_api->get_key();
+
+// Debug: Log the API key loaded from the options
+error_log('Loaded API Key from options: ' . $api_key);
 
 $connected       = ( ! empty( get_option( 'tg_api_connected', false ) ) );
 $button_text     = ( $connected ) ? 'CONNECTED' : 'CONNECT';
@@ -12,20 +15,27 @@ $sync_hidden     = ( $connected ) ? '' : 'hidden style="display: none;"';
 
 $location_settings = get_option( 'tg_location_settings' );
 
-// Process the action if the confirmation form is submitted
+// Debug: Log location settings
+error_log('Location Settings: ' . print_r($location_settings, true));
+
+// Handle the "Reset to Default" action
 if (isset($_POST['confirm_reset'])) {
+    error_log('Reset action triggered. Deleting all TapGoods data.');
+
     echo "<p style='color: red;'>Reset action triggered. Deleting data...</p>";
 
-    // Delete all related TapGoods data
+    // Delete all related TapGoods options
     delete_option('tg_key'); // Remove the API key
-    delete_option('tg_api_connected'); // Remove connection flag
+    delete_option('tg_api_connected'); // Remove connection status
     delete_option('tg_location_settings'); // Remove location settings
     delete_option('tg_default_location'); // Remove default location
     delete_option('tg_locationIds'); // Remove location IDs
     delete_option('tg_businessId'); // Remove business ID
-    delete_option('tg_last_api_key'); // Remove stored API key
-    delete_option('tg_last_sync_progress'); // Remove sync progress
+    delete_option('tg_last_api_key'); // Remove last stored API key
+    delete_option('tg_last_sync_progress'); // Remove last sync progress
     delete_option('tg_last_sync_info'); // Remove last sync info
+
+    error_log('All options deleted.');
 
     // Delete all categories and tags
     $taxonomies = ['tg_category', 'tg_tags', 'tg_location'];
@@ -37,6 +47,7 @@ if (isset($_POST['confirm_reset'])) {
         ]);
         foreach ($terms as $term_id) {
             wp_delete_term($term_id, $taxonomy);
+            error_log("Deleted term ID $term_id in taxonomy $taxonomy.");
         }
     }
 
@@ -50,16 +61,15 @@ if (isset($_POST['confirm_reset'])) {
     $posts = get_posts($args);
     foreach ($posts as $post_id) {
         wp_delete_post($post_id, true);
+        error_log("Deleted inventory post ID $post_id.");
     }
 
-    // Success message
     echo "<p style='color: green;'>All data has been successfully deleted.</p>";
     echo '<script>showSuccessMessage();</script>';
     exit;
 }
-
-
 ?>
+
 <h2>Connect to your TapGoods account</h2>
 <div id="tg_ajax_connection" hidden></div>
 <form name="tapgoods_connection" id="tg_connection_form" method="post" action="">
@@ -73,22 +83,21 @@ if (isset($_POST['confirm_reset'])) {
             <button type="submit" name="submit" id="tg_update_connection" value="tg_update_connection" class="btn btn-primary bg-blue w-100 py-2 round" data-original="<?php _e( "{$button_text}", 'tapgoods-wp' ); ?>" <?php echo $button_disabled; ?>><?php _e( "{$button_text}", 'tapgoods-wp' ); ?></button>
         </div>
         <div class="col col-sm-3">
-            <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 py-2 round" <?php echo $sync_hidden; //phpcs:ignore ?>>SYNC</button>
+            <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 py-2 round" <?php echo $sync_hidden; ?>>SYNC</button>
         </div>
     </div>
     <?php if ( '' !== $key_disabled ) { ?>
-        <p class="help-text">Company Key was defined in config files and cannot be changed here</p>
+        <p class="help-text">The Company Key is defined in the configuration file and cannot be changed here.</p>
     <?php } ?>
     
-    <?php
-    if ( $connected ) { ?>
-    <p class="help-text">Your site is connected to TapGoods. To generate a new API key, please contact <a href="mailto:support@tapgoods.com">support@tapgoods.com</a></p>
-
+    <?php if ( $connected ) { ?>
+    <p class="help-text">Your site is connected to TapGoods. To generate a new API key, please contact <a href="mailto:support@tapgoods.com">support@tapgoods.com</a>.</p>
     <?php } ?>
 </form>
 
 <?php
 $sync_message = $tg_api->last_sync_message();
+error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
 ?>
 
 <div id="tg_connection_test">
@@ -99,15 +108,14 @@ $sync_message = $tg_api->last_sync_message();
 
 <?php if ( $connected ) : ?>
 <p class="help-text">
-    <!-- Link to open the popup -->
     <a href="#popup">Reset to Default</a>
 </p>
 <?php endif; ?>
 
-<!-- HTML and CSS Popup -->
+<!-- Reset confirmation popup -->
 <div id="popup" class="overlay">
     <div class="popup">
-        <h1 style="color: white">Are you sure you want to reset to default?</h1>
+        <h1 style="color: white;">Are you sure you want to reset to default?</h1>
         <p>This will disconnect your website from TapGoods and delete all inventory from your website. This action cannot be undone.</p>
         <form method="post">
             <button type="submit" name="confirm_reset" style="background-color: #e74c3c; color: white; margin-top: 20px; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Yes, Reset to Default</button>
@@ -115,9 +123,6 @@ $sync_message = $tg_api->last_sync_message();
         </form>
     </div>
 </div>
-
-<!-- Success message and JavaScript functions -->
-<p id="success-message" style="display: none; color: green; text-align: center;">All data has been successfully deleted, including locations and API key.</p>
 
 <script>
     function closePopup() {
@@ -127,16 +132,18 @@ $sync_message = $tg_api->last_sync_message();
     function showSuccessMessage() {
         document.getElementById('success-message').style.display = 'block';
     }
+
+    jQuery(document).ready(function ($) {
+        // Debug: Check input elements
+        console.log('API Key Input:', $('#tapgoods_api_key'));
+        console.log('Connection Form:', $('#tg_connection_form'));
+    });
 </script>
 
-<!-- CSS Styles for the popup -->
 <style>
-    /* Hide the popup by default */
     .overlay {
         display: none;
     }
-
-    /* Display the popup only when accessed with #popup */
     .overlay:target {
         display: flex;
         position: fixed;
@@ -149,8 +156,6 @@ $sync_message = $tg_api->last_sync_message();
         align-items: center;
         z-index: 9999;
     }
-
-    /* Popup styling */
     .popup {
         background: #333;
         color: #ecf0f1;
@@ -158,12 +163,5 @@ $sync_message = $tg_api->last_sync_message();
         border-radius: 8px;
         width: 400px;
         text-align: center;
-    }
-
-    /* Link styling for opening the popup */
-    .help-text a[href="#popup"] {
-        color: blue;
-        text-decoration: underline;
-        cursor: pointer;
     }
 </style>

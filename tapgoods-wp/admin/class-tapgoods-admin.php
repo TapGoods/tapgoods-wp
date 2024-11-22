@@ -128,6 +128,8 @@ class Tapgoods_Admin {
 		if ( isset( $_REQUEST['tapgoods_api_key'] ) ) {
 			$encryption        = new Tapgoods_Encryption();
 			$submitted_api_key = sanitize_text_field( wp_unslash( $_REQUEST['tapgoods_api_key'] ) );
+
+			error_log('Captured API Key: ' . $submitted_api_key);
 			$api_key           = $encryption->tg_encrypt( $submitted_api_key );
 		}
 	
