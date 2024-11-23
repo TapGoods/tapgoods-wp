@@ -4,27 +4,17 @@
 $tg_api  = Tapgoods_Connection::get_instance();
 $api_key = $tg_api->get_key();
 
-// Debug: Log the API key loaded from the options
-error_log('Loaded API Key from options: ' . $api_key);
-
 $connected       = ( ! empty( get_option( 'tg_api_connected', false ) ) );
 $button_text     = ( $connected ) ? 'CONNECTED' : 'CONNECT';
 $key_disabled    = ( defined( 'TAPGOODS_KEY' ) ) ? 'disabled' : '';
 $button_disabled = ( defined( 'TAPGOODS_KEY' ) || '' !== $api_key ) ? 'disabled' : '';
 $sync_hidden     = ( $connected ) ? '' : 'hidden style="display: none;"';
 
-$location_settings = get_option( 'tg_location_settings' );
-
-// Debug: Log location settings
-error_log('Location Settings: ' . print_r($location_settings, true));
+// Check if a reset occurred
+$reset_done = get_option('tg_reset_done', false);
 
 // Handle the "Reset to Default" action
 if (isset($_POST['confirm_reset'])) {
-    error_log('Reset action triggered. Deleting all TapGoods data.');
-
-    echo "<p style='color: red;'>Reset action triggered. Deleting data...</p>";
-
-    // Delete all related TapGoods options
     delete_option('tg_key'); // Remove the API key
     delete_option('tg_api_connected'); // Remove connection status
     delete_option('tg_location_settings'); // Remove location settings
@@ -34,8 +24,6 @@ if (isset($_POST['confirm_reset'])) {
     delete_option('tg_last_api_key'); // Remove last stored API key
     delete_option('tg_last_sync_progress'); // Remove last sync progress
     delete_option('tg_last_sync_info'); // Remove last sync info
-
-    error_log('All options deleted.');
 
     // Delete all categories and tags
     $taxonomies = ['tg_category', 'tg_tags', 'tg_location'];
@@ -47,7 +35,6 @@ if (isset($_POST['confirm_reset'])) {
         ]);
         foreach ($terms as $term_id) {
             wp_delete_term($term_id, $taxonomy);
-            error_log("Deleted term ID $term_id in taxonomy $taxonomy.");
         }
     }
 
@@ -61,9 +48,11 @@ if (isset($_POST['confirm_reset'])) {
     $posts = get_posts($args);
     foreach ($posts as $post_id) {
         wp_delete_post($post_id, true);
-        error_log("Deleted inventory post ID $post_id.");
     }
 
+    // Set a flag to indicate the reset has occurred
+    update_option('tg_reset_done', true);
+    $connected = false; // Reset connection state
     echo "<p style='color: green;'>All data has been successfully deleted.</p>";
     echo '<script>showSuccessMessage();</script>';
     exit;
@@ -86,32 +75,35 @@ if (isset($_POST['confirm_reset'])) {
             <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 py-2 round" <?php echo $sync_hidden; ?>>SYNC</button>
         </div>
     </div>
-    <?php if ( '' !== $key_disabled ) { ?>
+
+    <?php if ( '' !== $key_disabled || $reset_done  || get_option( 'tg_api_connected' ) == false ) { ?>
+        <!-- Show message for API key generation -->
         <p class="help-text"> Generate an API key in your <a href="#">TapGoods WordPress Settings</a> </p>
-    <p style="font-weight: bold; color: #d63638; margin: 0;">Important note:</p>
-    <p>This key is only generated once and won't be displayed again. <br>Make sure to copy and save it immediately in a secure place.</p>
-    <?php } ?>
-    
-    <?php if ( $connected ) { ?>
-    <p class="help-text">Your site is connected to TapGoods. To generate a new API key, please contact <a href="mailto:support@tapgoods.com">support@tapgoods.com</a>.</p>
+        <p> <span style="font-weight: bold; color: #d63638; margin: 0;">Important note:</span> This key is only generated once and won't be displayed again. <br>
+    Make sure to copy and save it immediately in a secure place.</p>       
+    <?php if ($reset_done) delete_option('tg_reset_done'); // Clear reset flag ?>
+    <?php } elseif ($connected) { ?>
+        <p class="help-text">Your site is connected to TapGoods. To generate a new API key, please contact <a href="mailto:support@tapgoods.com">support@tapgoods.com</a>.</p>
     <?php } ?>
 </form>
 
-<?php
+
+<?php 
 $sync_message = $tg_api->last_sync_message();
 error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
-?>
+ ?>
+
 
 <div id="tg_connection_test">
-<?php if ( $sync_message ) : ?>
+<?php if ( $sync_message && get_option( 'tg_api_connected' ) == !false  ) : ?>
     <?php echo wp_kses( wpautop( $sync_message ), 'post' ); ?>
 <?php endif; ?>
 </div>
 
-<?php if ( $connected ) : ?>
-<p class="help-text">
-    <a href="#popup">Reset to Default</a>
-</p>
+<?php if ($connected) : ?>
+    <p class="help-text">
+        <a href="#popup">Reset to Default</a>
+    </p>
 <?php endif; ?>
 
 <!-- Reset confirmation popup -->
@@ -134,12 +126,6 @@ error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
     function showSuccessMessage() {
         document.getElementById('success-message').style.display = 'block';
     }
-
-    jQuery(document).ready(function ($) {
-        // Debug: Check input elements
-        console.log('API Key Input:', $('#tapgoods_api_key'));
-        console.log('Connection Form:', $('#tg_connection_form'));
-    });
 </script>
 
 <style>
