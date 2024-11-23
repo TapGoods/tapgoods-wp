@@ -110,9 +110,13 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
 
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
     const addButton = document.querySelector(".add-cart");
     const quantityInput = document.querySelector(".qty-input");
+    const startDateInput = document.querySelector("input[name='eventStartDate']");
+    const startTimeInput = document.querySelector("input[name='eventStartTime']");
+    const endDateInput = document.querySelector("input[name='eventEndDate']");
+    const endTimeInput = document.querySelector("input[name='eventEndTime']");
     const itemId = addButton ? addButton.getAttribute("data-item-id") : null;
     const locationId = addButton ? addButton.getAttribute("data-location-id") : null;
 
@@ -121,33 +125,46 @@ document.addEventListener("DOMContentLoaded", function() {
         return;
     }
 
-    // Retrieve cart data from localStorage
+    // Retrieve cart data and date/time inputs from localStorage
     let cartData = JSON.parse(localStorage.getItem("cartData")) || {};
+    const storedStartDate = localStorage.getItem("tg_eventStartDate");
+    const storedStartTime = localStorage.getItem("tg_eventStartTime");
+    const storedEndDate = localStorage.getItem("tg_eventEndDate");
+    const storedEndTime = localStorage.getItem("tg_eventEndTime");
 
-    // Check if location data exists in cartData, and update quantity input and button if so
+    // Apply stored date/time values to inputs
+    if (storedStartDate) startDateInput.value = storedStartDate;
+    if (storedStartTime) startTimeInput.value = storedStartTime;
+    if (storedEndDate) endDateInput.value = storedEndDate;
+    if (storedEndTime) endTimeInput.value = storedEndTime;
+
+    // Load stored quantity for the current item and location
     if (cartData[locationId] && cartData[locationId][itemId]) {
         quantityInput.value = cartData[locationId][itemId];
-        addButton.style.backgroundColor = "green";
-        addButton.textContent = "Added";
-
-        // Change text back to "Add" after 10 seconds
-        setTimeout(() => {
-            addButton.style.backgroundColor = ""; // Restore to default color
-            addButton.textContent = "Add";
-        }, 10000);
+        updateCartButton(addButton, true);
     }
 
-    // Check if the cart icon exists and update based on location data
-    const cartIcon = document.getElementById("tg_cart");
-    if (cartIcon) {
-        if (cartData[locationId] && Object.keys(cartData[locationId]).length > 0) {
-            cartIcon.classList.add("has-items");
-        } else {
-            cartIcon.classList.remove("has-items");
-        }
+    // Check cart icon status
+    updateCartIcon(cartData, locationId);
+
+    // Save date and time inputs to localStorage and reload data
+    function saveDateTimeToLocalStorage() {
+        localStorage.setItem("tg_eventStartDate", startDateInput.value || "");
+        localStorage.setItem("tg_eventStartTime", startTimeInput.value || "");
+        localStorage.setItem("tg_eventEndDate", endDateInput.value || "");
+        localStorage.setItem("tg_eventEndTime", endTimeInput.value || "");
+
+        // Reload data dynamically
+        reloadData();
     }
 
-    addButton.addEventListener("click", function(event) {
+    startDateInput.addEventListener("change", saveDateTimeToLocalStorage);
+    startTimeInput.addEventListener("change", saveDateTimeToLocalStorage);
+    endDateInput.addEventListener("change", saveDateTimeToLocalStorage);
+    endTimeInput.addEventListener("change", saveDateTimeToLocalStorage);
+
+    // Add item to cart on button click
+    addButton.addEventListener("click", function (event) {
         event.preventDefault();
 
         const url = this.getAttribute("data-target");
@@ -158,39 +175,106 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // Initialize location data if it does not exist
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
 
-        // Update item quantity under the location
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
-        // Change button to green and update text to "Added"
-        this.style.backgroundColor = "green";
-        this.textContent = "Added";
+        updateCartButton(addButton, true);
 
-        // Change text back to "Add" after 10 seconds
-        setTimeout(() => {
-            this.style.backgroundColor = ""; // Restore to default color
-            this.textContent = "Add";
-        }, 10000);
-
-        // Send request to add item to cart without redirection
+        // Send request to add item to cart
         fetch(url + `&quantity=${quantity}`, {
             method: "GET",
-            credentials: "include"
+            credentials: "include",
         })
-        .then(response => {
-            if (response.ok) {
-                alert("Item added to cart!");
-            } else {
-                console.error("Error adding item to cart.");
-            }
-        })
-        .catch(error => console.error("Request error:", error));
+            .then((response) => {
+                if (response.ok) {
+                    alert("Item added to cart!");
+                    reloadData(); // Reload data after item is added
+                } else {
+                    console.error("Error adding item to cart.");
+                }
+            })
+            .catch((error) => console.error("Request error:", error));
     });
+
+    // Helper function to update cart button appearance
+    function updateCartButton(button, isAdded) {
+        if (isAdded) {
+            button.style.backgroundColor = "green";
+            button.textContent = "Added";
+            setTimeout(() => {
+                button.style.backgroundColor = ""; // Reset color
+                button.textContent = "Add";
+                quantityInput.value = ""; // Clear quantity after 10 seconds
+            }, 10000);
+        }
+    }
+
+    // Helper function to update cart icon status
+    function updateCartIcon(cartData, locationId) {
+        const cartIcon = document.getElementById("tg_cart");
+        if (cartIcon) {
+            if (cartData[locationId] && Object.keys(cartData[locationId]).length > 0) {
+                cartIcon.classList.add("has-items");
+            } else {
+                cartIcon.classList.remove("has-items");
+            }
+        }
+    }
+
+    // Function to reload data dynamically
+    function reloadData() {
+        fetch(window.location.href, {
+            method: "GET",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        })
+            .then((response) => response.text())
+            .then((html) => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, "text/html");
+
+                // Update date selector and cart sections
+                const newDatesSelector = doc.querySelector("#tg-dates-selector");
+                const datesSelector = document.querySelector("#tg-dates-selector");
+                if (newDatesSelector && datesSelector) {
+                    datesSelector.innerHTML = newDatesSelector.innerHTML;
+                }
+
+                const newCartSection = doc.querySelector(".quantity-select");
+                const cartSection = document.querySelector(".quantity-select");
+                if (newCartSection && cartSection) {
+                    cartSection.innerHTML = newCartSection.innerHTML;
+                    reinitializeEventListeners(); // Reinitialize listeners after replacing HTML
+                }
+            })
+            .catch((error) => console.error("Error reloading data:", error));
+    }
+
+    // Reinitialize event listeners after reloading content dynamically
+    function reinitializeEventListeners() {
+        const updatedAddButton = document.querySelector(".add-cart");
+        const updatedQuantityInput = document.querySelector(".qty-input");
+
+        if (updatedAddButton && updatedQuantityInput) {
+            updatedAddButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                const quantity = updatedQuantityInput.value || 1;
+                if (!quantity || isNaN(quantity) || quantity <= 0) {
+                    alert("Please enter a valid quantity.");
+                    return;
+                }
+                // Reuse existing logic to add to cart
+                updatedQuantityInput.value = "";
+                alert("Item added to cart after reload!");
+            });
+        }
+    }
 });
+
 
 </script>

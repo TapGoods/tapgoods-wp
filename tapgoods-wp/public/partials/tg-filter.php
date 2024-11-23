@@ -59,25 +59,58 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
 
+
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        var accordionCollapse = document.getElementById("collapseOne");
-        var accordionButton = document.querySelector(".accordion-button");
+document.addEventListener("DOMContentLoaded", function() {
+    var accordionCollapse = document.getElementById("collapseOne");
+    var accordionButton = document.querySelector(".accordion-button");
 
-        function toggleAccordion() {
-            if (window.innerWidth >= 1000) {
-                accordionCollapse.classList.add("show");
-                accordionButton.classList.remove("collapsed");
-                accordionButton.setAttribute("aria-expanded", "true");
-            } else {
-                accordionCollapse.classList.remove("show");
-                accordionButton.classList.add("collapsed");
-                accordionButton.setAttribute("aria-expanded", "false");
-            }
+    // Date and time inputs
+    const startDateInput = document.getElementById("eventStartDate");
+    const startTimeInput = document.getElementById("eventStartTime");
+    const endDateInput = document.getElementById("eventEndDate");
+    const endTimeInput = document.getElementById("eventEndTime");
+
+    // Keys for localStorage
+    const startDateKey = "tg_eventStartDate";
+    const startTimeKey = "tg_eventStartTime";
+    const endDateKey = "tg_eventEndDate";
+    const endTimeKey = "tg_eventEndTime";
+
+    // Set default values from localStorage
+    startDateInput.value = localStorage.getItem(startDateKey) || startDateInput.value;
+    startTimeInput.value = localStorage.getItem(startTimeKey) || startTimeInput.value;
+    endDateInput.value = localStorage.getItem(endDateKey) || endDateInput.value;
+    endTimeInput.value = localStorage.getItem(endTimeKey) || endTimeInput.value;
+
+    // Save values to localStorage on change
+    function saveToLocalStorage(key, value) {
+        if (value) {
+            localStorage.setItem(key, value);
         }
+    }
 
-        // Run function on page load and on window resize
-        toggleAccordion();
-        window.addEventListener("resize", toggleAccordion);
-    });
+    startDateInput.addEventListener("change", () => saveToLocalStorage(startDateKey, startDateInput.value));
+    startTimeInput.addEventListener("change", () => saveToLocalStorage(startTimeKey, startTimeInput.value));
+    endDateInput.addEventListener("change", () => saveToLocalStorage(endDateKey, endDateInput.value));
+    endTimeInput.addEventListener("change", () => saveToLocalStorage(endTimeKey, endTimeInput.value));
+
+    // Toggle accordion
+    function toggleAccordion() {
+        if (window.innerWidth >= 1000) {
+            accordionCollapse.classList.add("show");
+            accordionButton.classList.remove("collapsed");
+            accordionButton.setAttribute("aria-expanded", "true");
+        } else {
+            accordionCollapse.classList.remove("show");
+            accordionButton.classList.add("collapsed");
+            accordionButton.setAttribute("aria-expanded", "false");
+        }
+    }
+
+    // Run function on page load and on window resize
+    toggleAccordion();
+    window.addEventListener("resize", toggleAccordion);
+});
+
 </script>
