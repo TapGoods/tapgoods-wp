@@ -15,6 +15,9 @@
         "name": "Inventory",
         "description": "Displays the TapGoods Shop with Inventory, Filters, and Search",
         "atts": {
+            "per_page_default": {
+                "default": 12
+            },
             "show_search": {
                 "att": "Show Search",
                 "desc": "Displays a search input above the product grid, defaults to true",
@@ -38,6 +41,12 @@
                 "desc": "Limit inventory display to user defined tags",
                 "default": null,
                 "type": "select_tg_tags"
+            },
+            "show_pricing": {
+                    "att": "Show Pricing",
+                    "desc": "Display pricing for inventory items",
+                    "default": true,
+                    "type": "boolean"
             }
         }
     },

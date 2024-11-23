@@ -7,6 +7,8 @@ $tg_inventory_pagination_class = '';
 
 $category = '';
 $tags     = '';
+$show_pricing = '';
+$per_page_default ='';
 $show_search  = filter_var( $atts['show_search'], FILTER_VALIDATE_BOOLEAN );
 $show_filters = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
 
@@ -16,6 +18,14 @@ if ( ! empty( $atts['category'] ) ) {
 
 if ( ! empty( $atts['tags'] ) ) {
 	$tags = "tags={$atts['tags']}";
+}
+
+if ( isset( $atts['show_pricing'] ) ) {
+    $show_pricing = 'show_pricing="' . ( filter_var( $atts['show_pricing'], FILTER_VALIDATE_BOOLEAN ) ? 'true' : 'false' ) . '"';
+}
+
+if ( ! empty( $atts['per_page_default'] ) ) {
+    $per_page_default = "per_page_default=\"{$atts['per_page_default']}\"";
 }
 
 do_action( 'tg_before_inventory', $atts );
@@ -35,7 +45,7 @@ ob_start();
 				<?php endif; ?>
 			<section class="<?php echo esc_attr( apply_filters( 'tg_inventory_grid_class', $tg_inventory_grid_class ) ); ?>">
 				<?php do_action( 'tg_before_inventory_grid' ); ?>		
-				[tapgoods-inventory-grid <?php echo $category; ?> <?php echo $tags; ?>]
+				[tapgoods-inventory-grid <?php echo $category; ?> <?php echo $tags; ?> <?php echo $show_pricing; ?> <?php echo $per_page_default; ?>]
 				<?php do_action( 'tg_after_inventory_grid' ); ?>
 			</section>
 		</div>
