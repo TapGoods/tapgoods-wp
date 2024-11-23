@@ -87,7 +87,9 @@ if (isset($_POST['confirm_reset'])) {
         </div>
     </div>
     <?php if ( '' !== $key_disabled ) { ?>
-        <p class="help-text">The Company Key is defined in the configuration file and cannot be changed here.</p>
+        <p class="help-text"> Generate an API key in your <a href="#">TapGoods WordPress Settings</a> </p>
+    <p style="font-weight: bold; color: #d63638; margin: 0;">Important note:</p>
+    <p>This key is only generated once and won't be displayed again. <br>Make sure to copy and save it immediately in a secure place.</p>
     <?php } ?>
     
     <?php if ( $connected ) { ?>
