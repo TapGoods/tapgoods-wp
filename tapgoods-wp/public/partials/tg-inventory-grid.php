@@ -243,10 +243,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     button.style.setProperty("background-color", "green", "important");
                     button.textContent = "Added";
 
-                    // Restore to original state after 10 seconds
+                    // Remove localStorage entry and reset UI after 10 seconds
                     setTimeout(() => {
+                        delete cartData[locationId][itemId]; // Remove item from localStorage
+                        if (Object.keys(cartData[locationId]).length === 0) {
+                            delete cartData[locationId]; // Remove location if empty
+                        }
+                        localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
+
                         button.style.removeProperty("background-color");
                         button.textContent = "Add";
+
                         // Clear all associated quantity inputs
                         shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
                             input.value = ""; // Clear the input field
@@ -290,8 +297,14 @@ document.addEventListener("DOMContentLoaded", function () {
         button.style.setProperty("background-color", "green", "important");
         button.textContent = "Added";
 
-        // Restore button to original state after 10 seconds
+        // Remove localStorage entry and reset UI after 10 seconds
         setTimeout(() => {
+            delete cartData[locationId][itemId]; // Remove item from localStorage
+            if (Object.keys(cartData[locationId]).length === 0) {
+                delete cartData[locationId]; // Remove location if empty
+            }
+            localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
+
             button.style.removeProperty("background-color");
             button.textContent = "Add";
 
