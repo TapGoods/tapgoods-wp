@@ -247,6 +247,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     setTimeout(() => {
                         button.style.removeProperty("background-color");
                         button.textContent = "Add";
+                        // Clear all associated quantity inputs
+                        shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
+                            input.value = ""; // Clear the input field
+                        });
                     }, 10000);
                 });
             });
@@ -290,6 +294,11 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(() => {
             button.style.removeProperty("background-color");
             button.textContent = "Add";
+
+            // Clear all associated quantity inputs
+            container.querySelectorAll(`#qty-${itemId}`).forEach(input => {
+                input.value = ""; // Clear the input field
+            });
         }, 10000);
 
         // Update quantity input fields in the same container
@@ -319,6 +328,8 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
+
+
 
 
 
