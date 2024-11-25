@@ -78,7 +78,7 @@ if (isset($_POST['confirm_reset'])) {
 
     <?php if ( '' !== $key_disabled || $reset_done  || get_option( 'tg_api_connected' ) == false ) { ?>
         <!-- Show message for API key generation -->
-        <p class="help-text"> Generate an API key in your <a href="#">TapGoods WordPress Settings</a> </p>
+        <p class="help-text"> Generate an API key in your <a href="https://business.tapgoods.com/admin/storefront/wordpress">TapGoods WordPress Settings</a> </p>
         <p> <span style="font-weight: bold; color: #d63638; margin: 0;">Important note:</span> This key is only generated once and won't be displayed again. <br>
     Make sure to copy and save it immediately in a secure place.</p>       
     <?php if ($reset_done) delete_option('tg_reset_done'); // Clear reset flag ?>
