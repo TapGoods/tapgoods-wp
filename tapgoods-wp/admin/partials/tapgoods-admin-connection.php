@@ -100,40 +100,47 @@ error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
 <?php endif; ?>
 </div>
 
-<?php if ($connected) : ?>
+<!-- <?php if ($connected) : ?>
     <p class="help-text">
         <a href="#popup">Reset to Default</a>
     </p>
-<?php endif; ?>
+<?php endif; ?> -->
 
 <!-- Reset confirmation popup -->
-<div id="popup" class="overlay">
+<div id="popup" class="overlay" style="display: none;">
     <div class="popup">
         <h1 style="color: white;">Are you sure you want to reset to default?</h1>
         <p>This will disconnect your website from TapGoods and delete all inventory from your website. This action cannot be undone.</p>
         <form method="post">
             <button type="submit" name="confirm_reset" style="background-color: #e74c3c; color: white; margin-top: 20px; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Yes, Reset to Default</button>
-            <a href="#" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #bdc3c7; color: black; border: none; border-radius: 5px; text-decoration: none; cursor: pointer;" onclick="closePopup();">Cancel</a>
+            <button type="button" style="background-color: #bdc3c7; color: black; margin-top: 20px; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;" onclick="closePopup();">Cancel</button>
         </form>
     </div>
 </div>
 
+<p class="help-text">
+    <a href="javascript:void(0);" onclick="openPopup()">Reset to Default</a>
+</p>
+
 <script>
-    function closePopup() {
-        document.getElementById('popup').style.display = 'none';
+    function openPopup() {
+        const popup = document.getElementById('popup');
+        if (popup) {
+            popup.style.display = 'flex';
+        }
     }
 
-    function showSuccessMessage() {
-        document.getElementById('success-message').style.display = 'block';
+    function closePopup() {
+        const popup = document.getElementById('popup');
+        if (popup) {
+            popup.style.display = 'none';
+        }
     }
 </script>
 
 <style>
     .overlay {
         display: none;
-    }
-    .overlay:target {
-        display: flex;
         position: fixed;
         top: 0;
         left: 0;
