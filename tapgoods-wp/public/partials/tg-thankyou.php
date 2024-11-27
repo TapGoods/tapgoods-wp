@@ -10,10 +10,23 @@
     <p>Your order has been completed successfully.</p>
     
     <script>
-        // Verify and delete `cartData` from Local Storage. 
-        if (localStorage.getItem('cartData')) {
-            localStorage.removeItem('cartData');
-        }
+        // Verify and delete cart-related data from Local Storage
+        const keysToRemove = [
+            'cartData',
+            'tg_eventStartDate',
+            'tg_eventStartTime',
+            'tg_eventEndDate',
+            'tg_eventEndTime',
+            'cart' // Cart status key
+        ];
+
+        keysToRemove.forEach((key) => {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+            }
+        });
+
+        console.log('Cart and related data cleared from Local Storage.');
     </script>
 </body>
 </html>

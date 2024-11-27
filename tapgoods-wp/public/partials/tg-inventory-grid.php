@@ -251,6 +251,11 @@ document.addEventListener("DOMContentLoaded", function () {
                         }
                         localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
 
+                        // If no items are left, reset cart status
+                        if (!Object.keys(cartData).length) {
+                            localStorage.setItem("cart", "0");
+                        }
+
                         button.style.removeProperty("background-color");
                         button.textContent = "Add";
 
@@ -293,6 +298,9 @@ document.addEventListener("DOMContentLoaded", function () {
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
+        // Set cart status to active
+        localStorage.setItem("cart", "1");
+
         // Update button state
         button.style.setProperty("background-color", "green", "important");
         button.textContent = "Added";
@@ -304,6 +312,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 delete cartData[locationId]; // Remove location if empty
             }
             localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
+
+            // If no items are left, reset cart status
+            if (!Object.keys(cartData).length) {
+                localStorage.setItem("cart", "0");
+            }
 
             button.style.removeProperty("background-color");
             button.textContent = "Add";
@@ -341,9 +354,5 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
-
-
-
-
-
 </script>
+

@@ -182,6 +182,9 @@ document.addEventListener("DOMContentLoaded", function () {
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
+        // Set cart status to active
+        localStorage.setItem("cart", "1"); // Ensure "cart" key is always 1 when an item is added
+
         updateCartButton(addButton, true);
 
         // Send request to add item to cart
@@ -216,9 +219,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // Helper function to update cart icon status
     function updateCartIcon(cartData, locationId) {
         const cartIcon = document.getElementById("tg_cart");
+        const isCartActive = localStorage.getItem("cart") === "1"; // Check if cart is active
         if (cartIcon) {
-            if (cartData[locationId] && Object.keys(cartData[locationId]).length > 0) {
-                cartIcon.classList.add("has-items");
+            if (isCartActive) {
+                cartIcon.classList.add("has-items"); // Change icon or style
             } else {
                 cartIcon.classList.remove("has-items");
             }
@@ -275,6 +279,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 });
+
 
 
 </script>
