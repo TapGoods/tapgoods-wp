@@ -29,7 +29,7 @@ if (!empty($selected_location)) {
 ?>
 
 <div class="wrap">
-    <h1>Options - Select Default Location</h1>
+    <h1>Multi Location - Select Default Location</h1>
     
     <!-- Form to select location -->
     <form method="post" action="">

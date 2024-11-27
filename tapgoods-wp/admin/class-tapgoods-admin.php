@@ -272,7 +272,8 @@ class Tapgoods_Admin {
 		add_submenu_page( $this->plugin_name, $page_title . ' Connection Settings', 'Connection', $capability, $this->plugin_name, $function, 1 );
 		// add_submenu_page( $this->plugin_name, $page_title . ' Styling Settings', 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
 		add_submenu_page( $this->plugin_name, $page_title . ' Shortcodes', 'Shortcodes', $capability, $this->plugin_name . '#shortcodes', $function, 3 );
-	    add_submenu_page( $this->plugin_name, $page_title . ' Advanced Options', 'Advanced Options', $capability, $this->plugin_name . '#options', $function, 4 );
+	    add_submenu_page( $this->plugin_name, $page_title . ' Multi Location', 'Multi Location', $capability, $this->plugin_name . '#options', $function, 4 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Status', 'Status', $capability, $this->plugin_name . '#status', $function, 5 );
 	}
 
 	// Add a link to this plugin to the action links.
