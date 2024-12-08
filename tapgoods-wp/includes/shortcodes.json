@@ -67,6 +67,21 @@
             "nos": {
                 "default": false,
                 "type": "toggle"
+            },
+            "per_page_default": {
+                "default": 12
+            },
+            "category": {
+                "att": "Filter Category",
+                "desc": "Limit inventory display to user defined category",
+                "default": null,
+                "type": "select_tg_category"
+            },
+            "tags": {
+                "att": "Filter Tags",
+                "desc": "Limit inventory display to user defined tags",
+                "default": null,
+                "type": "select_tg_tags"
             }
         }
     },

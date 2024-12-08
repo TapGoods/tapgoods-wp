@@ -7,8 +7,10 @@ $tg_inventory_pagination_class = 'foo';
 // Get the value of show_pricing from the shortcode attributes
 $show_pricing = isset($atts['show_pricing']) && $atts['show_pricing'] === "false" ? false : true;
 
-// Get per_page_default from shortcode attributes or fallback to default (12)
-$per_page_default = isset($atts['per_page_default']) ? (int) $atts['per_page_default'] : 12;
+// Get the 'per_page_default' attribute or set it to '12' if not present
+$per_page_default = isset($atts['per_page_default']) 
+    ? (int) preg_replace('/[^0-9]/', '', trim($atts['per_page_default'], '“”"')) // Clean the value by removing non-numeric characters and quotes, then convert to integer
+    : 12; // Default value is 12 if the attribute is not set
 
 $tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], array(12, 24, 48))
     ? (int) sanitize_text_field($_GET['tg-per-page'])
@@ -82,6 +84,10 @@ if (count($tax_args) > 1) {
 }
 
 $query = new WP_Query($args);
+
+// Log the number of results
+error_log('Total number of results: ' . $query->found_posts);
+
 
 $tg_pages = $query->max_num_pages;
 
@@ -224,44 +230,83 @@ $tg_pages = $query->max_num_pages;
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Retrieve cart data from localStorage
-    const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
-    const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
+    console.log("DOM fully loaded and parsed");
 
-    // Function to update buttons and quantity inputs based on cart data
+    const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
+    console.log("Location ID:", locationId);
+
+    // Function to fetch results from the server
+    function fetchResults(query, page = 1) {
+        console.log(`Fetching results for query: "${query}" on page: ${page}`);
+
+        fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                action: "tg_search", // The AJAX action defined in WordPress
+                s: query,
+                tg_location_id: locationId,
+                tg_tags: "<?php echo esc_js($tg_tags ?? ''); ?>",
+                tg_categories: "<?php echo esc_js($categories ?? ''); ?>",
+                per_page_default: <?php echo esc_js($tg_per_page); ?>,
+                paged: page,
+            }),
+        })
+            .then(response => response.text()) // Parse response as HTML
+            .then(html => {
+                // Log the full HTML for debugging
+                console.log("HTML Response:", html);
+
+                // Create a temporary DOM element to parse the HTML
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = html;
+
+                // Count the number of result items (assuming they have a specific class, e.g., "result-item")
+                const resultItems = tempDiv.querySelectorAll(".item-wrap");
+                console.log(`Results: ${resultItems.length}`);
+
+                // Log each result (optional, for debugging purposes)
+                resultItems.forEach((item, index) => {
+                    console.log(`Result ${index + 1}:`, item.textContent.trim());
+                });
+
+                // Pagination handling can also be added here if required
+            })
+            .catch(error => {
+                console.error("Fetch error:", error);
+            });
+    }
+
+    // Function to update cart data in localStorage
     function updateCartItems(shortcodeContainer) {
+        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
         if (cartData[locationId]) {
             Object.keys(cartData[locationId]).forEach(itemId => {
                 const quantity = cartData[locationId][itemId];
 
-                // Update all buttons and inputs for this item ID in the current container
+                // Update quantity inputs
                 shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
                     input.value = quantity;
                 });
 
+                // Update buttons
                 shortcodeContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`).forEach(button => {
                     button.style.setProperty("background-color", "green", "important");
                     button.textContent = "Added";
 
-                    // Remove localStorage entry and reset UI after 10 seconds
+                    // Reset UI after 10 seconds
                     setTimeout(() => {
-                        delete cartData[locationId][itemId]; // Remove item from localStorage
+                        delete cartData[locationId][itemId];
                         if (Object.keys(cartData[locationId]).length === 0) {
-                            delete cartData[locationId]; // Remove location if empty
+                            delete cartData[locationId];
                         }
-                        localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
-
-                        // If no items are left, reset cart status
-                        if (!Object.keys(cartData).length) {
-                            localStorage.setItem("cart", "0");
-                        }
+                        localStorage.setItem("cartData", JSON.stringify(cartData));
 
                         button.style.removeProperty("background-color");
                         button.textContent = "Add";
 
-                        // Clear all associated quantity inputs
                         shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-                            input.value = ""; // Clear the input field
+                            input.value = "";
                         });
                     }, 10000);
                 });
@@ -269,7 +314,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Function to handle adding items to the cart
+    // Function to handle "Add to Cart" functionality
     function handleAddToCart(event) {
         event.preventDefault();
 
@@ -290,49 +335,32 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const quantity = parseInt(quantityValue, 10);
+        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
 
-        // Update cart data in localStorage
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
 
-        // Set cart status to active
-        localStorage.setItem("cart", "1");
-
-        // Update button state
         button.style.setProperty("background-color", "green", "important");
         button.textContent = "Added";
 
-        // Remove localStorage entry and reset UI after 10 seconds
         setTimeout(() => {
-            delete cartData[locationId][itemId]; // Remove item from localStorage
+            delete cartData[locationId][itemId];
             if (Object.keys(cartData[locationId]).length === 0) {
-                delete cartData[locationId]; // Remove location if empty
+                delete cartData[locationId];
             }
-            localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
-
-            // If no items are left, reset cart status
-            if (!Object.keys(cartData).length) {
-                localStorage.setItem("cart", "0");
-            }
+            localStorage.setItem("cartData", JSON.stringify(cartData));
 
             button.style.removeProperty("background-color");
             button.textContent = "Add";
 
-            // Clear all associated quantity inputs
             container.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-                input.value = ""; // Clear the input field
+                input.value = "";
             });
         }, 10000);
 
-        // Update quantity input fields in the same container
-        container.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-            input.value = quantity;
-        });
-
-        // Send request to add item to cart
         const url = button.getAttribute("data-target");
         const addToCartUrl = `${url}&quantity=${quantity}`;
         fetch(addToCartUrl, { method: "GET", credentials: "include" })
@@ -344,15 +372,51 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error("Request error:", error));
     }
 
-    // Initialize cart UI and event listeners
+    // Attach event listeners for cart buttons
     document.querySelectorAll(".tapgoods-inventory").forEach(shortcodeContainer => {
         updateCartItems(shortcodeContainer);
 
-        // Add event listeners to buttons
         shortcodeContainer.querySelectorAll(".add-cart").forEach(button => {
             button.addEventListener("click", handleAddToCart);
         });
     });
-});
-</script>
 
+    // Attach event listener to the search input
+    const searchInput = document.querySelector("#tg-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", function () {
+            const query = searchInput.value.trim();
+            console.log("Search input changed. Query:", query);
+
+            if (query) {
+                fetchResults(query); // Fetch results as user types
+            } else {
+                console.log("Empty query. No search performed.");
+            }
+        });
+    } else {
+        console.error("Search input not found.");
+    }
+
+    // Attach event listener for pagination links
+    document.addEventListener("click", function (e) {
+        if (e.target.matches(".pagination a")) {
+            e.preventDefault();
+            const page = e.target.getAttribute("data-page");
+            const query = searchInput ? searchInput.value.trim() : "";
+            console.log(`Pagination clicked. Page: ${page}, Query: "${query}"`);
+            fetchResults(query, page);
+        }
+    });
+});
+
+
+
+
+
+
+
+
+
+
+</script>

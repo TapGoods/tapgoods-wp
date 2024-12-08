@@ -809,3 +809,101 @@ add_action('template_redirect', function () {
         exit;
     }
 });
+
+
+// Register the AJAX handlers for logged-in and logged-out users
+add_action('wp_ajax_tg_search', 'handle_tg_search');
+add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
+
+/**
+ * Handles the AJAX search request for tg_inventory.
+ *
+ * This function receives the search term and location ID from the client,
+ * queries the database for matching tg_inventory posts, and returns the
+ * results in JSON format.
+ */
+ 
+
+ function handle_tg_search() {
+    error_log("AJAX Request Received: " . print_r($_POST, true));
+
+    $search_term = isset($_POST['s']) ? sanitize_text_field($_POST['s']) : '';
+    $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field($_POST['tg_location_id']) : '';
+    $tags        = isset($_POST['tg_tags']) && !empty($_POST['tg_tags']) ? explode(',', sanitize_text_field($_POST['tg_tags'])) : [];
+    $categories  = isset($_POST['tg_categories']) && !empty($_POST['tg_categories']) ? explode(',', sanitize_text_field($_POST['tg_categories'])) : [];
+    $per_page    = isset($_POST['per_page_default']) ? (int) sanitize_text_field($_POST['per_page_default']) : 12;
+
+    // Remove any encoding issues from the category (such as HTML entities or extra characters)
+    $categories = array_map(function($category) {
+        return htmlspecialchars_decode($category); // Decode any HTML entities like &quot;
+    }, $categories);
+
+    // Debugging the received categories and tags
+    error_log("Categories: " . print_r($categories, true));
+    error_log("Tags: " . print_r($tags, true));
+
+    $args = [
+        'post_type'      => 'tg_inventory',
+        'post_status'    => 'publish',
+        'posts_per_page' => $per_page,
+        'meta_query'     => [
+            [
+                'key'     => 'tg_locationId',
+                'value'   => $location_id,
+                'compare' => '='
+            ]
+        ],
+        'tax_query'      => [],
+    ];
+
+    if (!empty($search_term)) {
+        $args['s'] = $search_term;
+    }
+
+    if (!empty($categories)) {
+        // Clean and sanitize categories, ensuring there are no extra characters
+        $args['tax_query'][] = [
+            'taxonomy' => 'tg_category',
+            'field'    => 'slug',
+            'terms'    => $categories,
+            'operator' => 'IN',
+        ];
+    }
+
+    if (!empty($tags)) {
+        $args['tax_query'][] = [
+            'taxonomy' => 'tg_tags',
+            'field'    => 'slug',
+            'terms'    => $tags,
+            'operator' => 'IN',
+        ];
+    }
+
+    if (count($args['tax_query']) > 1) {
+        $args['tax_query']['relation'] = 'AND';
+    }
+
+    error_log("Query Args: " . print_r($args, true));
+
+    $query = new WP_Query($args);
+
+    $results = [];
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $results[] = [
+                'title'   => get_the_title(),
+                'excerpt' => wp_trim_words(get_the_content(), 15),
+                'url'     => get_permalink(),
+                'img_url' => get_the_post_thumbnail_url(get_the_ID(), 'medium'),
+                'tg_id'   => get_post_meta(get_the_ID(), 'tg_id', true),
+                'price'   => tg_get_single_display_price(get_the_ID()),
+            ];
+        }
+    } else {
+        error_log("No posts found.");
+    }
+
+    wp_reset_postdata();
+    wp_send_json_success($results);
+}
