@@ -63,29 +63,29 @@ document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById("tg-search");
     const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-1.row-cols-sm-1");
 
-    // Path to the placeholder image
+    // Placeholder image path
     const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.jpg'); ?>";
 
-    // Categories, tags, and results per page from shortcode attributes
+    // Categories, tags, and per page attributes
     const categories = "<?php echo esc_js($category); ?>";
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
 
-    // Prevent "Enter" key from submitting the form
+    // Prevent "Enter" from submitting the form
     searchInput.addEventListener("keydown", function (event) {
         if (event.key === "Enter") {
             event.preventDefault();
         }
     });
 
-    // Fetch results when typing in the search input
+    // Fetch results when typing
     searchInput.addEventListener("input", function () {
         fetchResults(searchInput.value.trim());
     });
 
-    // Fetch results from the server
+    // Fetch data from the server
     function fetchResults(query) {
         fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
             method: "POST",
@@ -110,8 +110,13 @@ document.addEventListener("DOMContentLoaded", function () {
         .catch(error => console.error("Fetch error:", error));
     }
 
-    // Update the grid with fetched results
+    // Update the results grid
     function updateGrid(data) {
+        if (!resultsContainer) {
+            console.error("Results container not found!");
+            return;
+        }
+
         resultsContainer.innerHTML = ""; // Clear current results
 
         if (!data || data.length === 0) {
@@ -122,8 +127,8 @@ document.addEventListener("DOMContentLoaded", function () {
         data.forEach(item => {
             const imgUrl = item.img_url || placeholderImage;
 
-            resultsContainer.innerHTML += `
-                <div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
+            resultsContainer.innerHTML += 
+                `<div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
                     <div class="item-wrap">
                         <figure>
                             <a class="d-block" href="${item.url}">
@@ -136,7 +141,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         </a>
                         <div class="add-to-cart">
                             <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-${item.tg_id}">
-                            <a href="#" class="btn btn-primary add-to-cart-btn" data-item-id="${item.tg_id}">Add</a>
+                            <button 
+                                type="button" 
+                                data-item-id="${item.tg_id}" 
+                                class="btn btn-primary add-cart" 
+                                data-base-url="https://kdzyxktugudogqpvlsnt.preprod.tapgoods.dev/addToCart"
+                                data-redirect-url="${redirectUrl}">
+                                Add
+                            </button>
                         </div>
                     </div>
                 </div>`;
@@ -145,25 +157,66 @@ document.addEventListener("DOMContentLoaded", function () {
         attachAddToCartListeners();
     }
 
-    // Attach event listeners to dynamically handle "Add" buttons
+    // Attach event listeners for Add buttons
     function attachAddToCartListeners() {
-        const addButtons = document.querySelectorAll(".add-to-cart-btn");
+        const addButtons = document.querySelectorAll(".add-cart");
         addButtons.forEach(button => {
-            button.addEventListener("click", function (e) {
-                e.preventDefault();
+            button.addEventListener("click", function () {
                 const itemId = this.getAttribute("data-item-id");
+                const baseUrl = this.getAttribute("data-base-url");
+                const redirectUrl = decodeURIComponent(this.getAttribute("data-redirect-url"));
                 const qtyInput = document.getElementById(`qty-${itemId}`);
                 const quantity = qtyInput && qtyInput.value ? qtyInput.value : 1;
 
-                // Build the final URL dynamically
-                const finalUrl = `https://kdzyxktugudogqpvlsnt.preprod.tapgoods.dev/addToCart?itemId=${itemId}&itemType=items&quantity=${quantity}&redirectUrl=${redirectUrl}`;
+                // Update localStorage
+                let cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+                if (!cartData[locationId]) cartData[locationId] = {};
+                cartData[locationId][itemId] = quantity;
+                localStorage.setItem("cartdata", JSON.stringify(cartData));
+
+                // Change button to "Added" and green color
+                this.innerText = "Added";
+                this.style.backgroundColor = "green";
+                this.disabled = true;
+
+                // Clear after 10 seconds
+                setTimeout(() => {
+                    this.innerText = "Add";
+                    this.style.backgroundColor = "";
+                    this.disabled = false;
+                    if (qtyInput) qtyInput.value = "";
+                    delete cartData[locationId][itemId];
+                    if (Object.keys(cartData[locationId]).length === 0) delete cartData[locationId];
+                    localStorage.setItem("cartdata", JSON.stringify(cartData));
+                }, 10000);
+
+                // Construct the final URL
+                const finalUrl = `${baseUrl}?itemId=${itemId}&itemType=items&quantity=${quantity}&redirectUrl=${redirectUrl}`;
 
                 // Redirect to the final URL
                 window.location.href = finalUrl;
             });
         });
     }
+
+    // Restore button states on page load
+    const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+    Object.keys(cartData[locationId] || {}).forEach(itemId => {
+        const button = document.querySelector(`button[data-item-id="${itemId}"]`);
+        if (button) {
+            button.innerText = "Added";
+            button.style.backgroundColor = "green";
+            button.disabled = true;
+
+            setTimeout(() => {
+                button.innerText = "Add";
+                button.style.backgroundColor = "";
+                button.disabled = false;
+                delete cartData[locationId][itemId];
+                if (Object.keys(cartData[locationId]).length === 0) delete cartData[locationId];
+                localStorage.setItem("cartdata", JSON.stringify(cartData));
+            }, 10000);
+        }
+    });
 });
-
-
 </script>

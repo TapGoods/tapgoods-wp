@@ -26,7 +26,8 @@ $args = array(
     'post_type'      => 'tg_inventory',
     'post_status'    => 'publish',
     'posts_per_page' => $tg_per_page,
-    'order_by'       => 'menu_order',
+    'orderby'        => 'title', // Order by title
+    'order'          => 'ASC',   // Order in asc
     'paged'          => $tg_page,
     'meta_query'     => array(
         array(
@@ -230,137 +231,106 @@ $tg_pages = $query->max_num_pages;
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    console.log("DOM fully loaded and parsed");
+    console.log("DOM fully loaded");
 
     const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
-    console.log("Location ID:", locationId);
 
-    // Function to fetch results from the server
-    function fetchResults(query, page = 1) {
-        console.log(`Fetching results for query: "${query}" on page: ${page}`);
-
-        fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                action: "tg_search", // The AJAX action defined in WordPress
-                s: query,
-                tg_location_id: locationId,
-                tg_tags: "<?php echo esc_js($tg_tags ?? ''); ?>",
-                tg_categories: "<?php echo esc_js($categories ?? ''); ?>",
-                per_page_default: <?php echo esc_js($tg_per_page); ?>,
-                paged: page,
-            }),
-        })
-            .then(response => response.text()) // Parse response as HTML
-            .then(html => {
-                // Log the full HTML for debugging
-                console.log("HTML Response:", html);
-
-                // Create a temporary DOM element to parse the HTML
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = html;
-
-                // Count the number of result items (assuming they have a specific class, e.g., "result-item")
-                const resultItems = tempDiv.querySelectorAll(".item-wrap");
-                console.log(`Results: ${resultItems.length}`);
-
-                // Log each result (optional, for debugging purposes)
-                resultItems.forEach((item, index) => {
-                    console.log(`Result ${index + 1}:`, item.textContent.trim());
-                });
-
-                // Pagination handling can also be added here if required
-            })
-            .catch(error => {
-                console.error("Fetch error:", error);
-            });
-    }
-
-    // Function to update cart data in localStorage
-    function updateCartItems(shortcodeContainer) {
-        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
+    /**
+     * Load cart data from localStorage and update UI on page load
+     */
+    function updateCartItemsOnLoad(container) {
+        const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
         if (cartData[locationId]) {
             Object.keys(cartData[locationId]).forEach(itemId => {
                 const quantity = cartData[locationId][itemId];
 
                 // Update quantity inputs
-                shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-                    input.value = quantity;
-                });
+                const qtyInput = container.querySelector(`#qty-${itemId}`);
+                if (qtyInput) {
+                    qtyInput.value = quantity;
+                }
 
-                // Update buttons
-                shortcodeContainer.querySelectorAll(`.add-cart[data-item-id="${itemId}"]`).forEach(button => {
-                    button.style.setProperty("background-color", "green", "important");
+                // Update button to "Added" with green color
+                const button = container.querySelector(`.add-cart[data-item-id="${itemId}"]`);
+                if (button) {
                     button.textContent = "Added";
+                    button.style.setProperty("background-color", "green", "important");
+                    button.disabled = true;
 
-                    // Reset UI after 10 seconds
+                    // Reset after 10 seconds
                     setTimeout(() => {
                         delete cartData[locationId][itemId];
                         if (Object.keys(cartData[locationId]).length === 0) {
                             delete cartData[locationId];
                         }
-                        localStorage.setItem("cartData", JSON.stringify(cartData));
+                        localStorage.setItem("cartdata", JSON.stringify(cartData));
 
-                        button.style.removeProperty("background-color");
                         button.textContent = "Add";
+                        button.style.removeProperty("background-color");
+                        button.disabled = false;
 
-                        shortcodeContainer.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-                            input.value = "";
-                        });
+                        if (qtyInput) {
+                            qtyInput.value = "";
+                        }
                     }, 10000);
-                });
+                }
             });
         }
     }
 
-    // Function to handle "Add to Cart" functionality
+    /**
+     * Handle "Add to Cart" button click
+     */
     function handleAddToCart(event) {
         event.preventDefault();
 
         const button = event.currentTarget;
         const itemId = button.getAttribute("data-item-id");
         const container = button.closest(".tapgoods-inventory");
-        const quantityInput = container.querySelector(`#qty-${itemId}`);
+        const qtyInput = container.querySelector(`#qty-${itemId}`);
 
-        if (!quantityInput) {
+        if (!qtyInput) {
             alert("Quantity input field is missing.");
             return;
         }
 
-        const quantityValue = quantityInput.value.trim();
+        const quantityValue = qtyInput.value.trim();
         if (!quantityValue || isNaN(quantityValue) || parseInt(quantityValue, 10) <= 0) {
             alert("Please enter a valid quantity.");
             return;
         }
 
         const quantity = parseInt(quantityValue, 10);
-        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
 
+        // Update localStorage with cart data
+        const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
         cartData[locationId][itemId] = quantity;
-        localStorage.setItem("cartData", JSON.stringify(cartData));
+        localStorage.setItem("cartdata", JSON.stringify(cartData));
 
-        button.style.setProperty("background-color", "green", "important");
+        // Update button to "Added" with green color
         button.textContent = "Added";
+        button.style.setProperty("background-color", "green", "important");
+        button.disabled = true;
 
+        // Reset after 10 seconds
         setTimeout(() => {
             delete cartData[locationId][itemId];
             if (Object.keys(cartData[locationId]).length === 0) {
                 delete cartData[locationId];
             }
-            localStorage.setItem("cartData", JSON.stringify(cartData));
+            localStorage.setItem("cartdata", JSON.stringify(cartData));
 
-            button.style.removeProperty("background-color");
             button.textContent = "Add";
+            button.style.removeProperty("background-color");
+            button.disabled = false;
 
-            container.querySelectorAll(`#qty-${itemId}`).forEach(input => {
-                input.value = "";
-            });
+            qtyInput.value = "";
         }, 10000);
 
+        // Optional: Send a request to the server to process the addition
         const url = button.getAttribute("data-target");
         const addToCartUrl = `${url}&quantity=${quantity}`;
         fetch(addToCartUrl, { method: "GET", credentials: "include" })
@@ -372,16 +342,21 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error("Request error:", error));
     }
 
-    // Attach event listeners for cart buttons
-    document.querySelectorAll(".tapgoods-inventory").forEach(shortcodeContainer => {
-        updateCartItems(shortcodeContainer);
+    /**
+     * Attach event listeners to all "Add to Cart" buttons
+     */
+    document.querySelectorAll(".tapgoods-inventory").forEach(container => {
+        updateCartItemsOnLoad(container);
 
-        shortcodeContainer.querySelectorAll(".add-cart").forEach(button => {
+        // Add click event listeners to all "Add to Cart" buttons
+        container.querySelectorAll(".add-cart").forEach(button => {
             button.addEventListener("click", handleAddToCart);
         });
     });
 
-    // Attach event listener to the search input
+    /**
+     * Search input handling
+     */
     const searchInput = document.querySelector("#tg-search");
     if (searchInput) {
         searchInput.addEventListener("input", function () {
@@ -389,7 +364,7 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log("Search input changed. Query:", query);
 
             if (query) {
-                fetchResults(query); // Fetch results as user types
+                fetchResults(query); // Call a function to fetch results as user types
             } else {
                 console.log("Empty query. No search performed.");
             }
@@ -398,24 +373,19 @@ document.addEventListener("DOMContentLoaded", function () {
         console.error("Search input not found.");
     }
 
-    // Attach event listener for pagination links
+    /**
+     * Pagination click handling
+     */
     document.addEventListener("click", function (e) {
         if (e.target.matches(".pagination a")) {
             e.preventDefault();
             const page = e.target.getAttribute("data-page");
             const query = searchInput ? searchInput.value.trim() : "";
             console.log(`Pagination clicked. Page: ${page}, Query: "${query}"`);
-            fetchResults(query, page);
+            fetchResults(query, page); // Call a function to fetch results for the selected page
         }
     });
 });
-
-
-
-
-
-
-
 
 
 

@@ -846,6 +846,8 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
         'post_type'      => 'tg_inventory',
         'post_status'    => 'publish',
         'posts_per_page' => $per_page,
+        'orderby'        => 'title', // Order by title
+        'order'          => 'ASC',   // Order in asc
         'meta_query'     => [
             [
                 'key'     => 'tg_locationId',
