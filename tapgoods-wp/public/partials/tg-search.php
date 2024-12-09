@@ -167,27 +167,58 @@ document.addEventListener("DOMContentLoaded", function () {
 
         attachAddToCartListeners();
     }
+// Update pagination links
+function updatePagination(totalPages, currentPage) {
+    paginationContainer.innerHTML = ""; // Clear pagination
+    if (totalPages <= 1) return;
 
-    // Update pagination links
-    function updatePagination(totalPages, currentPage) {
-        paginationContainer.innerHTML = ""; // Clear pagination
-        if (totalPages <= 1) return;
+    const createPageItem = (label, isDisabled, page = null, icon = null) => {
+        const disabledClass = isDisabled ? "disabled" : "";
+        const iconHtml = icon ? `<span class="${icon}"></span>` : label;
+        const href = page ? `#` : "javascript:void(0);";
+        return `
+            <li class="page-item ${disabledClass}">
+                <a class="page-link" href="${href}" data-page="${page || ''}">${iconHtml}</a>
+            </li>`;
+    };
 
-        for (let i = 1; i <= totalPages; i++) {
-            const activeClass = i === currentPage ? "active" : "";
-            paginationContainer.innerHTML += `
-                <a href="#" class="pagination-link ${activeClass}" data-page="${i}">${i}</a>`;
-        }
+    // First Page
+    paginationContainer.innerHTML += createPageItem("First", currentPage <= 1, 1, "dashicons dashicons-controls-skipback");
 
-        document.querySelectorAll(".pagination-link").forEach(link => {
-            link.addEventListener("click", function (e) {
-                e.preventDefault();
-                const page = parseInt(this.dataset.page, 10);
+    // Previous Page
+    paginationContainer.innerHTML += createPageItem("Previous", currentPage <= 1, currentPage - 1, "dashicons dashicons-controls-back");
+
+    // Current Page and Total Pages
+    paginationContainer.innerHTML += `
+        <li class="page-item current-page">
+            <a class="page-link">${currentPage}</a>
+        </li>
+        <li class="page-item disabled">
+            <a class="page-link">of</a>
+        </li>
+        <li class="page-item disabled">
+            <a class="page-link">${totalPages}</a>
+        </li>`;
+
+    // Next Page
+    paginationContainer.innerHTML += createPageItem("Next", currentPage >= totalPages, currentPage + 1, "dashicons dashicons-controls-forward");
+
+    // Last Page
+    paginationContainer.innerHTML += createPageItem("Last", currentPage >= totalPages, totalPages, "dashicons dashicons-controls-skipforward");
+
+    // Attach event listeners for each page link
+    document.querySelectorAll(".page-link").forEach(link => {
+        link.addEventListener("click", function (e) {
+            e.preventDefault();
+            const page = parseInt(this.dataset.page, 10);
+            if (!isNaN(page)) {
                 const query = searchInput.value.trim();
                 fetchResults(query || null, page, query.length === 0);
-            });
+            }
         });
-    }
+    });
+}
+
 
  // Attach event listeners for Add buttons
  function attachAddToCartListeners() {
