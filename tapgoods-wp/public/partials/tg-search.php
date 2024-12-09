@@ -21,6 +21,12 @@ if (isset($atts['per_page_default'])) {
     $tg_per_page  = 12; 
 }
 
+// Get the default location ID from the settings
+$default_location_id = get_option('tg_default_location');
+
+// Get the base URL for adding items to the cart
+$base_url = tg_get_add_to_cart_url( $default_location_id );
+
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
 
@@ -65,25 +71,14 @@ do_action('tg_before_search_form');
 document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById("tg-search");
     const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-1.row-cols-sm-1");
-
-
-    /////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////
-    const paginationContainer = document.querySelector("#tg-pagination-container");
-
-    
-    /////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////
-
-
-
-
+    const paginationContainer = document.querySelector(".pagination.justify-content-center.align-items-center");
     const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.jpg'); ?>";
     const categories = "<?php echo esc_js($category); ?>";
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
+    const baseurl = "<?php echo esc_js($base_url); ?>";
 
     // Prevent "Enter" from submitting the form
     searchInput.addEventListener("keydown", function (event) {
@@ -161,7 +156,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                 type="button" 
                                 data-item-id="${item.tg_id}" 
                                 class="btn btn-primary add-cart" 
-                                data-base-url="https://kdzyxktugudogqpvlsnt.preprod.tapgoods.dev/addToCart"
+                                data-base-url="${baseurl}"
                                 data-redirect-url="${redirectUrl}">
                                 Add
                             </button>
