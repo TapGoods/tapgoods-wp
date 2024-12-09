@@ -827,43 +827,41 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
  function handle_tg_search() {
     error_log("AJAX Request Received: " . print_r($_POST, true));
 
-    $search_term = isset($_POST['s']) ? sanitize_text_field($_POST['s']) : '';
+    $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field($_POST['s']) : null;
     $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field($_POST['tg_location_id']) : '';
     $tags        = isset($_POST['tg_tags']) && !empty($_POST['tg_tags']) ? explode(',', sanitize_text_field($_POST['tg_tags'])) : [];
     $categories  = isset($_POST['tg_categories']) && !empty($_POST['tg_categories']) ? explode(',', sanitize_text_field($_POST['tg_categories'])) : [];
     $per_page    = isset($_POST['per_page_default']) ? (int) sanitize_text_field($_POST['per_page_default']) : 12;
+    $paged       = isset($_POST['paged']) ? (int) sanitize_text_field($_POST['paged']) : 1;
+    $is_default  = isset($_POST['default']) && $_POST['default'] === 'true';
 
-    // Remove any encoding issues from the category (such as HTML entities or extra characters)
     $categories = array_map(function($category) {
-        return htmlspecialchars_decode($category); // Decode any HTML entities like &quot;
+        return htmlspecialchars_decode($category);
     }, $categories);
-
-    // Debugging the received categories and tags
-    error_log("Categories: " . print_r($categories, true));
-    error_log("Tags: " . print_r($tags, true));
 
     $args = [
         'post_type'      => 'tg_inventory',
         'post_status'    => 'publish',
         'posts_per_page' => $per_page,
-        'orderby'        => 'title', // Order by title
-        'order'          => 'ASC',   // Order in asc
+        'paged'          => $paged,
+        'orderby'        => 'title',
+        'order'          => 'ASC',
         'meta_query'     => [
             [
                 'key'     => 'tg_locationId',
                 'value'   => $location_id,
-                'compare' => '='
-            ]
+                'compare' => '=',
+            ],
         ],
         'tax_query'      => [],
     ];
 
-    if (!empty($search_term)) {
+    // Apply filters based on whether it's a default load or a search
+    if (!$is_default && !empty($search_term)) {
         $args['s'] = $search_term;
     }
 
     if (!empty($categories)) {
-        // Clean and sanitize categories, ensuring there are no extra characters
         $args['tax_query'][] = [
             'taxonomy' => 'tg_category',
             'field'    => 'slug',
@@ -885,8 +883,6 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
         $args['tax_query']['relation'] = 'AND';
     }
 
-    error_log("Query Args: " . print_r($args, true));
-
     $query = new WP_Query($args);
 
     $results = [];
@@ -907,5 +903,11 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
     }
 
     wp_reset_postdata();
-    wp_send_json_success($results);
+
+    wp_send_json_success([
+        'results'      => $results,
+        'total_pages'  => $query->max_num_pages,
+        'current_page' => $paged,
+    ]);
 }
+

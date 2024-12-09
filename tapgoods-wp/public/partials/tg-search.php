@@ -10,9 +10,16 @@ $posts_per_page_options = apply_filters(
 );
 
 // Get the 'tg-per-page' value from the cookie or fallback to the default option
-$tg_per_page = (isset($_COOKIE['tg-per-page'])) 
-    ? sanitize_text_field(wp_unslash($_COOKIE['tg-per-page'])) 
-    : get_option('tg_per_page', '12');
+if (isset($atts['per_page_default'])) {
+    // extract the value
+    $tg_per_page  = str_replace('per_page_default=', '', $atts['per_page_default']);
+    
+    // vonvert to integer
+    $tg_per_page  = intval($tg_per_page );
+} else {
+    // ddefault value
+    $tg_per_page  = 12; 
+}
 
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
@@ -30,11 +37,9 @@ do_action('tg_before_search_form');
 <!-- Search container -->
 <div id="tg-search-container" class="container mb-5">
     <form id="tg-search-form">
-        <!-- Search input -->
         <input type="hidden" name="post_type" value="tg_inventory">
-        <input id="tg-search" class="form-control form-control-lg" name="s" type="text" placeholder="Search" aria-label=".form-control-lg example">
+        <input id="tg-search" class="form-control form-control-lg" name="s" type="text" placeholder="Search" aria-label="Search">
 
-        <!-- Posts per page dropdown -->
         <?php if (!$nos): ?>
             <select id="tg-per-page" name="per-page" class="number-select">
                 <?php foreach ($posts_per_page_options as $option) : ?>
@@ -45,28 +50,35 @@ do_action('tg_before_search_form');
             </select>
         <?php endif; ?>
 
-        <!-- Hidden input for location ID -->
         <input type="hidden" name="tg_location_id" value="<?php echo esc_attr($location_id); ?>">
-
-        <!-- Hidden inputs for category and tags -->
-        <input type="hidden" name="category" value="<?php echo esc_attr($category); ?>"> <!-- Sanitized category -->
+        <input type="hidden" name="category" value="<?php echo esc_attr($category); ?>">
         <input type="hidden" name="tags" value="<?php echo esc_attr($atts['tags'] ?? ''); ?>">
-        <input type="hidden" name="per_page_default" value="<?php echo esc_attr($atts['per_page_default'] ?? '12'); ?>">
-
+        <input type="hidden" name="per_page_default" value="<?php echo esc_attr($tg_per_page); ?>">
     </form>
 
     <div id="tg-results-container" class="tapgoods-results row mt-4"></div>
+    <div id="tg-pagination-container" class="pagination-container mt-4"></div>
 </div>
+
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById("tg-search");
     const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-1.row-cols-sm-1");
 
-    // Placeholder image path
-    const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.jpg'); ?>";
 
-    // Categories, tags, and per page attributes
+    /////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////
+    const paginationContainer = document.querySelector("#tg-pagination-container");
+
+    
+    /////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////
+
+
+
+
+    const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.jpg'); ?>";
     const categories = "<?php echo esc_js($category); ?>";
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
@@ -80,45 +92,50 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // Fetch results when typing
+    // Fetch results dynamically
     searchInput.addEventListener("input", function () {
-        fetchResults(searchInput.value.trim());
+        const query = searchInput.value.trim();
+        if (query.length === 0) {
+            // Reset to default results if no search query
+            fetchResults(null, 1, true);
+        } else {
+            fetchResults(query, 1, false);
+        }
     });
 
-    // Fetch data from the server
-    function fetchResults(query) {
+    function fetchResults(query, page = 1, isDefault = false) {
+        const params = new URLSearchParams({
+            action: "tg_search",
+            s: query,
+            tg_location_id: locationId,
+            tg_tags: tags,
+            tg_categories: categories,
+            per_page_default: perPage,
+            paged: page,
+            default: isDefault ? "true" : "false",
+        });
+
         fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                action: "tg_search",
-                s: query,
-                tg_location_id: locationId,
-                tg_tags: tags,
-                tg_categories: categories,
-                per_page_default: perPage,
-            }),
+            body: params,
         })
-        .then(response => response.json())
-        .then(data => {
-            if (!data.success) {
-                console.error("Server error:", data.message);
-                return;
-            }
-            updateGrid(data.data);
-        })
-        .catch(error => console.error("Fetch error:", error));
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    console.error("Server error:", data.message);
+                    return;
+                }
+
+                updateGrid(data.data.results);
+                updatePagination(data.data.total_pages, data.data.current_page);
+            })
+            .catch(error => console.error("Fetch error:", error));
     }
 
     // Update the results grid
     function updateGrid(data) {
-        if (!resultsContainer) {
-            console.error("Results container not found!");
-            return;
-        }
-
-        resultsContainer.innerHTML = ""; // Clear current results
-
+        resultsContainer.innerHTML = ""; // Clear results
         if (!data || data.length === 0) {
             resultsContainer.innerHTML = "<p>No items found.</p>";
             return;
@@ -126,7 +143,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         data.forEach(item => {
             const imgUrl = item.img_url || placeholderImage;
-
             resultsContainer.innerHTML += 
                 `<div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
                     <div class="item-wrap">
@@ -157,8 +173,29 @@ document.addEventListener("DOMContentLoaded", function () {
         attachAddToCartListeners();
     }
 
-    // Attach event listeners for Add buttons
-    function attachAddToCartListeners() {
+    // Update pagination links
+    function updatePagination(totalPages, currentPage) {
+        paginationContainer.innerHTML = ""; // Clear pagination
+        if (totalPages <= 1) return;
+
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? "active" : "";
+            paginationContainer.innerHTML += `
+                <a href="#" class="pagination-link ${activeClass}" data-page="${i}">${i}</a>`;
+        }
+
+        document.querySelectorAll(".pagination-link").forEach(link => {
+            link.addEventListener("click", function (e) {
+                e.preventDefault();
+                const page = parseInt(this.dataset.page, 10);
+                const query = searchInput.value.trim();
+                fetchResults(query || null, page, query.length === 0);
+            });
+        });
+    }
+
+ // Attach event listeners for Add buttons
+ function attachAddToCartListeners() {
         const addButtons = document.querySelectorAll(".add-cart");
         addButtons.forEach(button => {
             button.addEventListener("click", function () {
@@ -219,4 +256,5 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 });
+
 </script>
