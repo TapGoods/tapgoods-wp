@@ -118,7 +118,7 @@ class Tapgoods_Post_Types {
 				'tapgoods_taxonomy_args_tg_tags',
 				array(
 					'labels'                => array(
-						'name'                       => _x( 'TG Tags', 'Taxonomy General Name', 'tapgoods' ),
+						'name'                       => _x( 'Tags', 'Taxonomy General Name', 'tapgoods' ),
 						'singular_name'              => _x( 'Tag', 'Taxonomy Singular Name', 'tapgoods' ),
 						'menu_name'                  => __( 'Tags', 'tapgoods' ),
 						'all_items'                  => __( 'All Tags', 'tapgoods' ),
