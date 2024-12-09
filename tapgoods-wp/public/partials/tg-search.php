@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const searchInput = document.getElementById("tg-search");
     const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-1.row-cols-sm-1");
     const paginationContainer = document.querySelector(".pagination.justify-content-center.align-items-center");
-    const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.jpg'); ?>";
+    const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.png'); ?>";
     const categories = "<?php echo esc_js($category); ?>";
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
