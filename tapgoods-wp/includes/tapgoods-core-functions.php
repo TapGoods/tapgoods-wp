@@ -911,3 +911,50 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
     ]);
 }
 
+
+add_action('wp_ajax_load_status_tab_content', function () {
+    ob_start();
+
+    $api_connected = get_option('tg_api_connected');
+    $key_defined = defined('TAPGOODS_KEY');
+    $location_settings = maybe_unserialize(get_option('tg_location_settings'));
+    $reset_done = get_option('tg_reset_done');
+
+    ?>
+    <h2>Status Information</h2>
+    <ul>
+        <li><strong>API Connected:</strong> 
+            <span class="<?php echo $api_connected ? 'status-yes' : 'status-no'; ?>">
+                <?php echo $api_connected ? 'Yes' : 'No'; ?>
+            </span>
+        </li>
+        <li><strong>TAPGOODS_KEY Defined:</strong> 
+            <span class="<?php echo $key_defined ? 'status-yes' : 'status-no'; ?>">
+                <?php echo $key_defined ? 'Yes' : 'No'; ?>
+            </span>
+        </li>
+        <li><strong>Reset Done:</strong> 
+            <span class="<?php echo $reset_done ? 'status-yes' : 'status-no'; ?>">
+                <?php echo $reset_done ? 'Yes' : 'No'; ?>
+            </span>
+        </li>
+    </ul>
+
+    <?php if (!empty($location_settings)): ?>
+        <h2>Location Settings</h2>
+        <ul>
+            <?php foreach ($location_settings as $key => $value): ?>
+                <li><strong><?php echo esc_html($key); ?>:</strong> 
+                    <?php echo esc_html(is_array($value) ? json_encode($value) : $value); ?>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php else: ?>
+        <p><em>No location settings found.</em></p>
+    <?php endif;
+
+    echo ob_get_clean();
+    wp_die();
+});
+
+

@@ -12,14 +12,14 @@ $location_settings = maybe_unserialize(get_option('tg_location_settings'));
 $reset_done = get_option('tg_reset_done');
 ?>
 
-<div class="wrap">
+<div class="wrap"  id="status-content">
     <h1>Status Overview</h1>
     
     <style>
-        .wrap {
+        #status-content .wrap {
             overflow: auto;
         }
-        .wrap ul {
+        #status-content .wrap ul {
             word-wrap: break-word; /* Break long words */
             white-space: pre-wrap; /* Maintain line breaks and wrap text */
             background: #ffffff; /* White background */
@@ -27,11 +27,11 @@ $reset_done = get_option('tg_reset_done');
             border: 1px solid #ddd; /* Optional: Border */
             border-radius: 5px; /* Optional: Rounded corners */
         }
-        .status-yes {
+        #status-content .status-yes {
             color: green;
             font-weight: bold;
         }
-        .status-no {
+        #status-content .status-no {
             color: red;
             font-weight: bold;
         }
@@ -56,20 +56,13 @@ $reset_done = get_option('tg_reset_done');
             </span>
         </li>
     </ul>
-    
-    <!-- Location Settings -->
+
     <?php if (!empty($location_settings)): ?>
         <h2>Location Settings</h2>
         <ul>
             <?php foreach ($location_settings as $key => $value): ?>
                 <li><strong><?php echo esc_html($key); ?>:</strong> 
-                    <?php 
-                    if (is_array($value)) {
-                        echo esc_html(json_encode($value));
-                    } else {
-                        echo esc_html((string)$value);
-                    }
-                    ?>
+                    <?php echo esc_html(is_array($value) ? json_encode($value) : $value); ?>
                 </li>
             <?php endforeach; ?>
         </ul>
@@ -77,3 +70,28 @@ $reset_done = get_option('tg_reset_done');
         <p><em>No location settings found.</em></p>
     <?php endif; ?>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const statusTab = document.querySelector('#nav-status-tab');
+    const statusContent = document.querySelector('#status-content');
+
+    if (statusTab) {
+        statusTab.addEventListener('click', function () {
+            // reload the content when the tab is clicked
+            fetch("<?php echo admin_url('admin-ajax.php'); ?>", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    action: "load_status_tab_content", // custom ajax action
+                }),
+            })
+            .then(response => response.text())
+            .then(data => {
+                statusContent.innerHTML = data; // replace the content
+            })
+            .catch(error => console.error("Error loading status content:", error));
+        });
+    }
+});
+</script>
