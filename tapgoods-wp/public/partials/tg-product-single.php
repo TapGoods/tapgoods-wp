@@ -40,9 +40,9 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
 <div class="tapgoods">
     <?php do_action('tg_before_inventory_single_container'); ?>
     <div id="tg-single" class="inventory-single container-fluid">
-        <?php do_action('tg_before_inventory_single_search'); ?>
+        <!-- <?php do_action('tg_before_inventory_single_search'); ?>
         [tapgoods-search nos="true"]
-        <?php do_action('tg_after_inventory_single_search'); ?>
+        <?php do_action('tg_after_inventory_single_search'); ?> -->
         <section class="inventory-single-content row row-cols-1 row-cols-md-2 p-3">
             <?php do_action('tg_before_inventory_single_images'); ?>
             [tapgoods-image-carousel product="<?php echo esc_attr($post->ID); ?>"]
