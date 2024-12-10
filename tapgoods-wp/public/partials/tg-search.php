@@ -342,6 +342,9 @@ function attachAddToCartListeners() {
             cartData[locationId][itemId] = quantity;
             localStorage.setItem("cartData", JSON.stringify(cartData));
 
+            // Set cart status to active
+            localStorage.setItem("cart", "1"); // Mark the cart as active
+
             // Change button to "Added" and green color
             this.innerText = "Added";
             this.style.backgroundColor = "green";

@@ -328,6 +328,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
+    // Set cart status to active
+    localStorage.setItem("cart", "1"); // Mark the cart as active
 
         // Update button to "Added" with green color
         button.textContent = "Added";
