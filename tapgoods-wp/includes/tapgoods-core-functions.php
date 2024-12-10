@@ -1009,3 +1009,81 @@ function tg_set_local_storage_location() {
 
     wp_die();
 }
+
+
+
+
+add_action('wp_ajax_get_item_image', 'get_item_image');
+add_action('wp_ajax_nopriv_get_item_image', 'get_item_image'); // For non-logged-in users
+
+function get_item_image() {
+    error_log('AJAX call received in get_item_image');
+    error_log('POST Data: ' . print_r($_POST, true));
+
+    if (!isset($_POST['item_id']) || empty($_POST['item_id'])) {
+        error_log('Item ID is missing or invalid.');
+        wp_send_json_error(['message' => 'Item ID is missing or invalid.']);
+        return;
+    }
+
+    $item_id = intval($_POST['item_id']);
+    error_log('Item ID: ' . $item_id);
+
+    if ($item_id <= 0) {
+        error_log('Invalid Item ID.');
+        wp_send_json_error(['message' => 'Invalid Item ID.']);
+        return;
+    }
+
+    $pictures = get_post_meta($item_id, 'tg_pictures', true);
+    error_log('Pictures Meta: ' . print_r($pictures, true));
+
+    if (!empty($pictures) && isset($pictures[0]['imgixUrl'])) {
+        $img_url = $pictures[0]['imgixUrl'];
+        error_log("Image found for Item ID $item_id: $img_url");
+        wp_send_json_success(['img_url' => $img_url]);
+    } else {
+        $placeholder_url = 'https://your-placeholder-url.com/placeholder.png';
+        error_log("No image found for Item ID $item_id. Using placeholder: $placeholder_url");
+        wp_send_json_success(['img_url' => $placeholder_url]);
+    }
+}
+
+add_action('wp_ajax_get_image_by_item_id', 'get_image_by_item_id');
+add_action('wp_ajax_nopriv_get_image_by_item_id', 'get_image_by_item_id');
+
+function get_image_by_item_id() {
+    if (!isset($_POST['item_id']) || empty($_POST['item_id'])) {
+        wp_send_json_error(['message' => 'Invalid item_id provided.']);
+    }
+
+    $item_id = sanitize_text_field($_POST['item_id']);
+
+    global $wpdb;
+
+    // Get the post_id from the postmeta table
+    $post_id = $wpdb->get_var($wpdb->prepare(
+        "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'tg_id' AND meta_value = %s",
+        $item_id
+    ));
+
+    if (!$post_id) {
+        wp_send_json_error(['message' => "No post found for item_id $item_id."]);
+    }
+
+    // Get the images from meta_key 'tg_pictures'
+    $pictures = get_post_meta($post_id, 'tg_pictures', true);
+
+    if (empty($pictures) || !is_array($pictures)) {
+        wp_send_json_error(['message' => "No images found for post_id $post_id."]);
+    }
+
+    // Send the first image
+    $image_url = $pictures[0]['imgixUrl'] ?? null;
+
+    if (!$image_url) {
+        wp_send_json_error(['message' => "Image URL missing for post_id $post_id."]);
+    }
+
+    wp_send_json_success(['image_url' => $image_url]);
+}
