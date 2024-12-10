@@ -81,7 +81,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                 <?php endif; ?>
             </section>
             <section class="misc col">
-                <div class="date-range">
+                <!-- <div class="date-range"  style="display: none;">
                     <p>Know your event date/time? Set it now.</p>
                     <div id="tg-dates-selector" class="dates-selector">
                         <div class="date-input-wrapper order-start">
@@ -95,7 +95,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                             <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_end_time()); ?>">
                         </div>
                     </div>
-                </div>
+                </div> -->
                 <div class="additional-details">
                     <?php do_action('tg_product_additional_details'); ?>
                     <?php do_action('tg_product_dimensions'); ?>

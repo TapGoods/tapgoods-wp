@@ -11,7 +11,7 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_before_inventory_filter' ); ?>
 <div class="breadcrumb"></div>
 <?php do_action( 'tg_before_date_filter' ); ?>
-<div id="tg-dates-selector" class="dates-selector px-4">
+<div id="tg-dates-selector" class="dates-selector px-4"  style="display: none;">
 	<div class="date-input-wrapper order-start">
 		<label><?php _e( 'Order Start', 'tapgoods' ); //phpcs:ignore ?></label>
 		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
