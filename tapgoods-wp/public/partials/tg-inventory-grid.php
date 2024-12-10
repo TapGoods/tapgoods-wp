@@ -5,7 +5,12 @@ $current_url = home_url(add_query_arg(array(), $wp->request)); // Get the curren
 $tg_inventory_pagination_class = 'foo';
 
 // Get the value of show_pricing from the shortcode attributes
-$show_pricing = isset($atts['show_pricing']) && $atts['show_pricing'] === "false" ? false : true;
+$show_pricing = true; // 
+
+if (isset($atts['show_pricing'])) {
+    $normalized_value = str_replace(['“', '”', '"'], '', $atts['show_pricing']);
+    $show_pricing = filter_var($normalized_value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
+}
 
 // Get the 'per_page_default' attribute or set it to '12' if not present
 $per_page_default = isset($atts['per_page_default']) 
@@ -243,12 +248,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (savedLocation) {
         document.cookie = `tg_user_location=${savedLocation}; path=/;`;
     }
-});
+
     /**
      * Load cart data from localStorage and update UI on page load
      */
     function updateCartItemsOnLoad(container) {
-        const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
         if (cartData[locationId]) {
             Object.keys(cartData[locationId]).forEach(itemId => {
                 const quantity = cartData[locationId][itemId];
@@ -266,22 +271,27 @@ document.addEventListener("DOMContentLoaded", function () {
                     button.style.setProperty("background-color", "green", "important");
                     button.disabled = true;
 
-                    // Reset after 10 seconds
+                    // Reset button and remove item from localStorage after 10 seconds
                     setTimeout(() => {
+                        // Remove the item from cartData
                         delete cartData[locationId][itemId];
                         if (Object.keys(cartData[locationId]).length === 0) {
-                            delete cartData[locationId];
+                            delete cartData[locationId]; // Remove the location if empty
                         }
-                        localStorage.setItem("cartdata", JSON.stringify(cartData));
+                        localStorage.setItem("cartData", JSON.stringify(cartData)); // Save updated cartData
 
+                        // Reset button appearance
                         button.textContent = "Add";
                         button.style.removeProperty("background-color");
                         button.disabled = false;
 
+                        // Clear quantity input
                         if (qtyInput) {
                             qtyInput.value = "";
                         }
-                    }, 10000);
+
+                        console.log(`Item ${itemId} removed from cartData.`);
+                    }, 10000); // Reset after 10 seconds
                 }
             });
         }
@@ -312,12 +322,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const quantity = parseInt(quantityValue, 10);
 
         // Update localStorage with cart data
-        const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+        const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
         if (!cartData[locationId]) {
             cartData[locationId] = {};
         }
         cartData[locationId][itemId] = quantity;
-        localStorage.setItem("cartdata", JSON.stringify(cartData));
+        localStorage.setItem("cartData", JSON.stringify(cartData));
 
         // Update button to "Added" with green color
         button.textContent = "Added";
@@ -330,7 +340,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (Object.keys(cartData[locationId]).length === 0) {
                 delete cartData[locationId];
             }
-            localStorage.setItem("cartdata", JSON.stringify(cartData));
+            localStorage.setItem("cartData", JSON.stringify(cartData));
 
             button.textContent = "Add";
             button.style.removeProperty("background-color");
@@ -385,7 +395,7 @@ document.addEventListener("DOMContentLoaded", function () {
     /**
      * Pagination click handling
      */
-
+    document.addEventListener("click", function (e) {
         if (e.target.matches(".pagination a")) {
             e.preventDefault();
             const page = e.target.getAttribute("data-page");
@@ -393,6 +403,9 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log(`Pagination clicked. Page: ${page}, Query: "${query}"`);
             fetchResults(query, page); // Call a function to fetch results for the selected page
         }
+    });
+});
+
 
 
 

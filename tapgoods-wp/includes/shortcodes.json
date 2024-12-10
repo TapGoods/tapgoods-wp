@@ -71,6 +71,12 @@
             "per_page_default": {
                 "default": 12
             },
+            "show_pricing": {
+                "att": "Show Pricing",
+                "desc": "Display pricing for inventory items",
+                "default": true,
+                "type": "boolean"
+            },
             "category": {
                 "att": "Filter Category",
                 "desc": "Limit inventory display to user defined category",

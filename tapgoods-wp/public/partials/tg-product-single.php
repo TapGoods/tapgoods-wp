@@ -118,43 +118,25 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
 document.addEventListener("DOMContentLoaded", function () {
     const addButton = document.querySelector(".add-cart");
     const quantityInput = document.querySelector(".qty-input");
-    const startDateInput = document.querySelector("input[name='eventStartDate']");
-    const startTimeInput = document.querySelector("input[name='eventStartTime']");
-    const endDateInput = document.querySelector("input[name='eventEndDate']");
-    const endTimeInput = document.querySelector("input[name='eventEndTime']");
+    
     const itemId = addButton ? addButton.getAttribute("data-item-id") : null;
     const locationId = addButton ? addButton.getAttribute("data-location-id") : null;
-
+    const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
     const savedLocation = localStorage.getItem('tg_user_location');
-    console.log('Saved location from localStorage:', savedLocation);
-
     if (savedLocation) {
         // configures the cookie to save the location
         document.cookie = `tg_user_location=${savedLocation}; path=/`;
         console.log('Location saved to cookie:', savedLocation);
     }
 
-
-
-
-
     if (!addButton || !quantityInput || !itemId || !locationId) {
         console.warn("Required elements or attributes are missing.");
         return;
     }
 
-    // Retrieve cart data and date/time inputs from localStorage
-    let cartData = JSON.parse(localStorage.getItem("cartData")) || {};
-    const storedStartDate = localStorage.getItem("tg_eventStartDate");
-    const storedStartTime = localStorage.getItem("tg_eventStartTime");
-    const storedEndDate = localStorage.getItem("tg_eventEndDate");
-    const storedEndTime = localStorage.getItem("tg_eventEndTime");
 
-    // Apply stored date/time values to inputs
-    if (storedStartDate) startDateInput.value = storedStartDate;
-    if (storedStartTime) startTimeInput.value = storedStartTime;
-    if (storedEndDate) endDateInput.value = storedEndDate;
-    if (storedEndTime) endTimeInput.value = storedEndTime;
+
+
 
     // Load stored quantity for the current item and location
     if (cartData[locationId] && cartData[locationId][itemId]) {
@@ -165,74 +147,90 @@ document.addEventListener("DOMContentLoaded", function () {
     // Check cart icon status
     updateCartIcon(cartData, locationId);
 
-    // Save date and time inputs to localStorage and reload data
-    function saveDateTimeToLocalStorage() {
-        localStorage.setItem("tg_eventStartDate", startDateInput.value || "");
-        localStorage.setItem("tg_eventStartTime", startTimeInput.value || "");
-        localStorage.setItem("tg_eventEndDate", endDateInput.value || "");
-        localStorage.setItem("tg_eventEndTime", endTimeInput.value || "");
 
-        // Reload data dynamically
-        reloadData();
-    }
-
-    startDateInput.addEventListener("change", saveDateTimeToLocalStorage);
-    startTimeInput.addEventListener("change", saveDateTimeToLocalStorage);
-    endDateInput.addEventListener("change", saveDateTimeToLocalStorage);
-    endTimeInput.addEventListener("change", saveDateTimeToLocalStorage);
 
     // Add item to cart on button click
-    addButton.addEventListener("click", function (event) {
-        event.preventDefault();
+addButton.addEventListener("click", function (event) {
+    event.preventDefault();
 
-        const url = this.getAttribute("data-target");
-        const quantity = quantityInput.value || 1;
+    const url = this.getAttribute("data-target");
+    const quantity = quantityInput.value || 1;
 
-        if (!quantity || isNaN(quantity) || quantity <= 0) {
-            alert("Please enter a valid quantity.");
-            return;
-        }
-
-        if (!cartData[locationId]) {
-            cartData[locationId] = {};
-        }
-
-        cartData[locationId][itemId] = quantity;
-        localStorage.setItem("cartData", JSON.stringify(cartData));
-
-        // Set cart status to active
-        localStorage.setItem("cart", "1"); // Ensure "cart" key is always 1 when an item is added
-
-        updateCartButton(addButton, true);
-
-        // Send request to add item to cart
-        fetch(url + `&quantity=${quantity}`, {
-            method: "GET",
-            credentials: "include",
-        })
-            .then((response) => {
-                if (response.ok) {
-                    alert("Item added to cart!");
-                    reloadData(); // Reload data after item is added
-                } else {
-                    console.error("Error adding item to cart.");
-                }
-            })
-            .catch((error) => console.error("Request error:", error));
-    });
-
-    // Helper function to update cart button appearance
-    function updateCartButton(button, isAdded) {
-        if (isAdded) {
-            button.style.backgroundColor = "green";
-            button.textContent = "Added";
-            setTimeout(() => {
-                button.style.backgroundColor = ""; // Reset color
-                button.textContent = "Add";
-                quantityInput.value = ""; // Clear quantity after 10 seconds
-            }, 10000);
-        }
+    // Ensure valid quantity input
+    if (!quantity || isNaN(quantity) || quantity <= 0) {
+        alert("Please enter a valid quantity.");
+        return;
     }
+    if (!locationId || !itemId) {
+        console.error("Invalid locationId or itemId:", { locationId, itemId });
+        return;
+    }
+
+    // Initialize location in cartData if it doesn't exist
+    if (!cartData[locationId]) {
+        cartData[locationId] = {};
+    }
+
+    // Add or update the item in localStorage
+    cartData[locationId][itemId] = quantity;
+    try {
+        localStorage.setItem("cartData", JSON.stringify(cartData));
+        console.log("Item added to localStorage:", cartData);
+    } catch (e) {
+        console.error("Error saving to localStorage:", e);
+    }
+
+    // Set cart status to active
+    localStorage.setItem("cart", "1"); // Mark the cart as active
+
+    updateCartButton(addButton, true);
+
+    // Send a request to add the item to the cart
+    fetch(url + `&quantity=${quantity}`, {
+        method: "GET",
+        credentials: "include",
+    })
+        .then((response) => {
+            if (response.ok) {
+                console.log("Item added successfully via fetch.");
+                reloadData(); // Reload data after the item is added
+            } else {
+                console.error("Error adding item to cart via fetch:", response.status);
+            }
+        })
+        .catch((error) => console.error("Fetch request error:", error));
+});
+
+
+// Update the appearance of the cart button
+function updateCartButton(button, isAdded) {
+    if (isAdded) {
+        button.style.backgroundColor = "green";
+        button.textContent = "Added";
+
+        setTimeout(() => {
+            // Reset button appearance
+            button.style.backgroundColor = "";
+            button.textContent = "Add";
+            quantityInput.value = ""; // Clear quantity input
+
+            // Remove item from cartData in localStorage
+            const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
+            if (cartData[locationId] && cartData[locationId][itemId]) {
+                delete cartData[locationId][itemId];
+
+                // Remove location if no more items
+                if (Object.keys(cartData[locationId]).length === 0) {
+                    delete cartData[locationId];
+                }
+
+                localStorage.setItem("cartData", JSON.stringify(cartData)); // Update localStorage
+                console.log(`Item ${itemId} removed from cartData.`);
+            }
+        }, 10000); // Clear after 10 seconds
+    }
+}
+
 
     // Helper function to update cart icon status
     function updateCartIcon(cartData, locationId) {

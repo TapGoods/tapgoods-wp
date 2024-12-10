@@ -16,8 +16,21 @@ $local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text
 $cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
 $location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
 
+// Get the value of show_pricing from the shortcode attributes
+
+$show_pricing = true; // default value
+
+if (isset($atts['show_pricing'])) {
+    // delete the prefix
+    $cleaned_value = preg_replace('/^show_pricing=/', '', trim($atts['show_pricing']));
+    // normalize the value
+    $cleaned_value = str_replace(['“', '”'], '"', $cleaned_value);
+    // convert to boolean
+    $show_pricing = ($cleaned_value === 'false') ? false : filter_var($cleaned_value, FILTER_VALIDATE_BOOLEAN);
+}
 
 
+;
 // Get the 'tg-per-page' value from the cookie or fallback to the default option
 if (isset($atts['per_page_default'])) {
     // extract the value
@@ -42,6 +55,8 @@ $current_url = home_url(add_query_arg(array(), $wp->request));
 // Action hook before rendering the search form
 do_action('tg_before_search_form');
 ?>
+
+
 
 <!-- Search container -->
 <div id="tg-search-container" class="container mb-5">
@@ -80,9 +95,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
-    console.log('locationId:', locationId);
+    console.log(locationId);
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
     const baseurl = "<?php echo esc_js($base_url); ?>";
+    const showPricing = <?php echo json_encode($show_pricing); ?>;
+
+    console.log("cartData in localStorage:", JSON.parse(localStorage.getItem("cartData")));
+
 
     // Prevent "Enter" from submitting the form
     searchInput.addEventListener("keydown", function (event) {
@@ -134,40 +153,47 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Update the results grid
     function updateGrid(data) {
-        resultsContainer.innerHTML = ""; // Clear results
+        resultsContainer.innerHTML = ""; // 
         if (!data || data.length === 0) {
             resultsContainer.innerHTML = "<p>No items found.</p>";
             return;
         }
 
         data.forEach(item => {
-            const imgUrl = item.img_url || placeholderImage;
-            resultsContainer.innerHTML += 
-                `<div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
-                    <div class="item-wrap">
-                        <figure>
-                            <a class="d-block" href="${item.url}">
-                                <img src="${imgUrl}" alt="${item.title}" onerror="this.onerror=null;this.src='${placeholderImage}';">
-                            </a>
-                        </figure>
-                        <div class="price mb-2">${item.price || ''}</div>
-                        <a class="d-block item-name mb-2" href="${item.url}">
-                            <strong>${item.title}</strong>
-                        </a>
-                        <div class="add-to-cart">
-                            <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-${item.tg_id}">
-                            <button 
-                                type="button" 
-                                data-item-id="${item.tg_id}" 
-                                class="btn btn-primary add-cart" 
-                                data-base-url="${baseurl}"
-                                data-redirect-url="${redirectUrl}">
-                                Add
-                            </button>
-                        </div>
-                    </div>
-                </div>`;
-        });
+    const imgUrl = item.img_url || placeholderImage;
+
+    const itemUrl = !showPricing ? `${item.url}?nprice=true` : item.url;
+
+    const priceHtml = showPricing ? `<div class="price mb-2">${item.price || ''}</div>` : '';
+
+    resultsContainer.innerHTML += 
+        `<div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
+            <div class="item-wrap">
+                <figure>
+                    <a class="d-block" href="${itemUrl}">
+                        <img src="${imgUrl}" alt="${item.title}" onerror="this.onerror=null;this.src='${placeholderImage}';">
+                    </a>
+                </figure>
+                ${priceHtml} <!-- Muestra el precio solo si showPricing es verdadero -->
+                <a class="d-block item-name mb-2" href="${itemUrl}">
+                    <strong>${item.title}</strong>
+                </a>
+                <div class="add-to-cart">
+                    <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-${item.tg_id}">
+                    <button 
+                        type="button" 
+                        data-item-id="${item.tg_id}" 
+                        class="btn btn-primary add-cart" 
+                        data-base-url="${baseurl}"
+                        data-redirect-url="${redirectUrl}">
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>`;
+});
+
+
 
         attachAddToCartListeners();
     }
@@ -224,8 +250,7 @@ function updatePagination(totalPages, currentPage) {
 }
 
 
- // Attach event listeners for Add buttons
- function attachAddToCartListeners() {
+function attachAddToCartListeners() {
         const addButtons = document.querySelectorAll(".add-cart");
         addButtons.forEach(button => {
             button.addEventListener("click", function () {
@@ -236,10 +261,10 @@ function updatePagination(totalPages, currentPage) {
                 const quantity = qtyInput && qtyInput.value ? qtyInput.value : 1;
 
                 // Update localStorage
-                let cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+                let cartData = JSON.parse(localStorage.getItem("cartData")) || {};
                 if (!cartData[locationId]) cartData[locationId] = {};
                 cartData[locationId][itemId] = quantity;
-                localStorage.setItem("cartdata", JSON.stringify(cartData));
+                localStorage.setItem("cartData", JSON.stringify(cartData));
 
                 // Change button to "Added" and green color
                 this.innerText = "Added";
@@ -254,10 +279,9 @@ function updatePagination(totalPages, currentPage) {
                     if (qtyInput) qtyInput.value = "";
                     delete cartData[locationId][itemId];
                     if (Object.keys(cartData[locationId]).length === 0) delete cartData[locationId];
-                    localStorage.setItem("cartdata", JSON.stringify(cartData));
+                    localStorage.setItem("cartData", JSON.stringify(cartData));
                 }, 10000);
 
-                // Construct the final URL
                 const finalUrl = `${baseUrl}?itemId=${itemId}&itemType=items&quantity=${quantity}&redirectUrl=${redirectUrl}`;
 
                 // Redirect to the final URL
@@ -266,8 +290,7 @@ function updatePagination(totalPages, currentPage) {
         });
     }
 
-    // Restore button states on page load
-    const cartData = JSON.parse(localStorage.getItem("cartdata")) || {};
+    const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
     Object.keys(cartData[locationId] || {}).forEach(itemId => {
         const button = document.querySelector(`button[data-item-id="${itemId}"]`);
         if (button) {
@@ -281,7 +304,7 @@ function updatePagination(totalPages, currentPage) {
                 button.disabled = false;
                 delete cartData[locationId][itemId];
                 if (Object.keys(cartData[locationId]).length === 0) delete cartData[locationId];
-                localStorage.setItem("cartdata", JSON.stringify(cartData));
+                localStorage.setItem("cartData", JSON.stringify(cartData));
             }, 10000);
         }
     });
