@@ -2,8 +2,25 @@
 
 // get id location and url cart
 global $post;
-$location = tg_get_wp_location_id();
+// Capture the location ID from the URL if present
+$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+
+// Retrieve the current location ID
+$location_id = $local_storage_location ?: tg_get_wp_location_id();
+//echo esc_html($location_id);
+
+
+// Check if 'local_storage_location' is present in the URL
+$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+
+// Check the cookie 'tg_user_location'
+$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$location = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+
+
+
 $url = tg_get_cart_url($location);
+
 
 ?>
 
@@ -30,6 +47,14 @@ document.addEventListener("DOMContentLoaded", function() {
     const emptyCartIcon = document.querySelector(".empty-cart-icon");
     const cartStatus = localStorage.getItem("cart");
 
+    const savedLocation = localStorage.getItem('tg_user_location');
+    if (savedLocation) {
+        document.cookie = `tg_user_location=${savedLocation}; path=/;`;
+        console.log('Cookie tg_user_location set:', savedLocation);
+    }
+
+
+    
     // Check if cart is active (1) or empty (0)
     if (cartStatus === "1") {
         fullCartIcon.style.display = "inline-block";
@@ -39,4 +64,36 @@ document.addEventListener("DOMContentLoaded", function() {
         emptyCartIcon.style.display = "inline-block";
     }
 });
+
+
+const savedLocation = localStorage.getItem('tg_user_location');
+console.log('Saved location:', savedLocation);
+
+if (savedLocation) {
+        // Enviar el valor al servidor mediante AJAX
+        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                action: 'tg_set_local_storage_location', // Acción definida en PHP
+                local_storage_location: savedLocation,   // Valor de localStorage
+            }),
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.success) {
+                // Mostrar el valor en el contenedor
+                const output = document.getElementById('location-output');
+                if (output) {
+                    output.textContent = `Location ID: ${data.data}`;
+                }
+            } else {
+                console.error('Error setting location:', data.data);
+            }
+        })
+        .catch((error) => console.error('Error sending location to server:', error));
+    }
+
 </script>

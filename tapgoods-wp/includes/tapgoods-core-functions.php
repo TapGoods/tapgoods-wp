@@ -508,12 +508,24 @@ function tg_get_tg_location_id( $post_id = false ) {
 }
 
 //function tg_get_wp_location_id( $post_id = false ) {
-function tg_get_wp_location_id() {
-    $default_location = get_option('tg_default_location');
-    error_log("Default Location: " . print_r($default_location, true)); // Add for debugging
-    return $default_location ?: null;
-
-}
+    function tg_get_wp_location_id() {
+        // Check if the value is provided via a cookie (set by JavaScript)
+        if (isset($_COOKIE['tg_user_location']) && !empty($_COOKIE['tg_user_location'])) {
+            return sanitize_text_field($_COOKIE['tg_user_location']);
+        }
+    
+        // Check session value (optional)
+        if (isset($_SESSION['tg_user_location']) && !empty($_SESSION['tg_user_location'])) {
+            return sanitize_text_field($_SESSION['tg_user_location']);
+        }
+    
+        // Fallback to WordPress option
+        $default_location = get_option('tg_default_location');
+        return $default_location ?: null;
+    }
+    
+    
+    
 
 function tg_locate_template( $template = '' ) {
 
@@ -958,3 +970,42 @@ add_action('wp_ajax_load_status_tab_content', function () {
 });
 
 
+function tg_get_default_location() {
+    // Check if the value is provided via AJAX
+    if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
+        // Sanitize and return the value from localStorage
+        return sanitize_text_field($_POST['local_storage_location']);
+    }
+
+    // Otherwise, return the value from the WordPress options
+    $default_location = get_option('tg_default_location');
+    return $default_location ?: null;
+}
+
+add_action('wp_ajax_tg_get_default_location', 'tg_get_default_location_ajax');
+add_action('wp_ajax_nopriv_tg_get_default_location', 'tg_get_default_location_ajax');
+
+function tg_get_default_location_ajax() {
+    // Use the tg_get_default_location function to determine the value
+    $default_location = tg_get_default_location();
+
+    // Return the value as JSON
+    wp_send_json_success($default_location);
+    wp_die(); // Required to terminate properly
+}
+
+add_action('wp_ajax_tg_set_local_storage_location', 'tg_set_local_storage_location');
+add_action('wp_ajax_nopriv_tg_set_local_storage_location', 'tg_set_local_storage_location');
+
+function tg_set_local_storage_location() {
+    if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
+        // Optionally store in a session or other server-side variable
+        $_SESSION['tg_default_location'] = sanitize_text_field($_POST['local_storage_location']);
+        
+        wp_send_json_success($_SESSION['tg_default_location']);
+    } else {
+        wp_send_json_error('No location provided');
+    }
+
+    wp_die();
+}

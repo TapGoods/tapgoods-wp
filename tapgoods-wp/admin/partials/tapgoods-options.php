@@ -16,8 +16,21 @@ if (empty($selected_location)) {
 
 // Save default location when "Set as Default" button is pressed
 if (isset($_POST['set_default_location']) && $selected_location) {
+    // Update the default location in the database
     update_option('tg_default_location', $selected_location);
+
+    // Assign the selected location to the variable
     $default_location = $selected_location;
+
+    // Output JavaScript to save in Local Storage
+    echo "
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            localStorage.setItem('tg_user_location', '$default_location');
+            console.log('Default location saved to Local Storage:', '$default_location');
+        });
+    </script>
+    ";
 }
 
 // Get the data for the selected location only if it exists

@@ -22,7 +22,12 @@ if (false !== $tags) {
 $tg_per_page = (isset($_COOKIE['tg-per-page'])) ? sanitize_text_field(wp_unslash($_COOKIE['tg-per-page'])) : get_option('tg_per_page', '12');
 
 $tg_id = get_post_meta($post->ID, 'tg_id', true);
-$location_id = tg_get_wp_location_id(); // Retrieve the current location ID
+
+// Get the location ID from the user's Local Storage
+$local_storage_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+
+// Use the default location if no value is present
+$location_id = $local_storage_location ?: tg_get_wp_location_id();
 
 $date_format = tg_date_format();
 $today       = wp_date($date_format);
@@ -119,6 +124,19 @@ document.addEventListener("DOMContentLoaded", function () {
     const endTimeInput = document.querySelector("input[name='eventEndTime']");
     const itemId = addButton ? addButton.getAttribute("data-item-id") : null;
     const locationId = addButton ? addButton.getAttribute("data-location-id") : null;
+
+    const savedLocation = localStorage.getItem('tg_user_location');
+    console.log('Saved location from localStorage:', savedLocation);
+
+    if (savedLocation) {
+        // configures the cookie to save the location
+        document.cookie = `tg_user_location=${savedLocation}; path=/`;
+        console.log('Location saved to cookie:', savedLocation);
+    }
+
+
+
+
 
     if (!addButton || !quantityInput || !itemId || !locationId) {
         console.warn("Required elements or attributes are missing.");

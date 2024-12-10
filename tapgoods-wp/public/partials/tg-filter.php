@@ -34,7 +34,6 @@ $today       = wp_date( $date_format );
 <?php endif; ?>
 <?php do_action( 'tg_before_category_filter' ); ?>
 <div class="categories">
-	<h4><?php _e( apply_filters( 'tg_all_categories_header_text', 'All Categories' ), 'tapgoods' ); //phpcs:ignore ?></h4>
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">

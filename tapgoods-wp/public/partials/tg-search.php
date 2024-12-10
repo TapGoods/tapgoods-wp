@@ -9,6 +9,15 @@ $posts_per_page_options = apply_filters(
     array('12', '24', '48') // Default options
 );
 
+// Check if 'local_storage_location' is present in the URL
+$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+
+// Check the cookie 'tg_user_location'
+$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+
+
+
 // Get the 'tg-per-page' value from the cookie or fallback to the default option
 if (isset($atts['per_page_default'])) {
     // extract the value
@@ -21,17 +30,11 @@ if (isset($atts['per_page_default'])) {
     $tg_per_page  = 12; 
 }
 
-// Get the default location ID from the settings
-$default_location_id = get_option('tg_default_location');
-
 // Get the base URL for adding items to the cart
-$base_url = tg_get_add_to_cart_url( $default_location_id );
+$base_url = tg_get_add_to_cart_url( $location_id );
 
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
-
-// Get the default or selected location ID from the cookie or fallback
-$location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field($_COOKIE['tg_location_id']) : get_option('tg_default_location');
 
 // Get the current URL
 $current_url = home_url(add_query_arg(array(), $wp->request)); 
@@ -77,6 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
+    console.log('locationId:', locationId);
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
     const baseurl = "<?php echo esc_js($base_url); ?>";
 

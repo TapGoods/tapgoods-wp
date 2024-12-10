@@ -9,13 +9,9 @@ if (!defined('DOING_AJAX') || !DOING_AJAX) {
     error_log("tg_location_styles(): Skipping CSS generation due to AJAX request.");
 }
 
-// Log to check if location IDs are being retrieved correctly
+// Retrieve location IDs and default location
 $location_ids = maybe_unserialize(get_option('tg_locationIds', []));
-error_log("Location IDs retrieved: " . print_r($location_ids, true));
-
-$current_location = get_option('tg_default_location'); // Get the current default location
-error_log("Current default location: " . $current_location);
-
+$default_location = get_option('tg_default_location'); // Default location in options
 ?>
 <div class="tapgoods location-select container">
     <div class="wrapper row row-cols-auto align-items-center">
@@ -23,14 +19,10 @@ error_log("Current default location: " . $current_location);
         <select class="form-select col pe-5" id="tg-location-select">
             <option value="">— Choose a Location —</option>
             <?php foreach ($location_ids as $location_id) : 
-                // Get location name from 'tg_location_{ID}'
                 $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
                 $location_name = $location_data['fullName'] ?? "Location {$location_id}";
-                
-                // Log each location data for debugging
-                error_log("Location ID: $location_id, Name: $location_name");
             ?>
-                <option value="<?php echo esc_attr($location_id); ?>" <?php selected($current_location, $location_id); ?>>
+                <option value="<?php echo esc_attr($location_id); ?>">
                     <?php echo esc_html("{$location_id} - {$location_name}"); ?>
                 </option>
             <?php endforeach; ?>
@@ -39,70 +31,74 @@ error_log("Current default location: " . $current_location);
 </div>
 
 <script type="text/javascript">
-var tg_ajax = {
-    ajaxurl: "<?php echo admin_url('admin-ajax.php'); ?>"
-};
+document.addEventListener('DOMContentLoaded', function () {
+    const selectElement = document.getElementById('tg-location-select');
 
-jQuery(document).ready(function($) {
-    $('#tg-location-select').on('change', function() {
-        var selectedLocation = $(this).val();
-        
+    // Priority: Cookie -> LocalStorage -> Default Option
+    const getCookie = (name) => {
+        const cookies = document.cookie.split('; ');
+        for (let cookie of cookies) {
+            const [key, value] = cookie.split('=');
+            if (key === name) {
+                return value;
+            }
+        }
+        return null;
+    };
+
+    const savedCookieLocation = getCookie('tg_user_location');
+    const savedLocalStorageLocation = localStorage.getItem('tg_user_location');
+    const defaultLocation = "<?php echo esc_js($default_location); ?>";
+
+    // Determine the value to select
+    const selectedLocation = savedCookieLocation || savedLocalStorageLocation || defaultLocation;
+
+    // Set the select element to the determined value
+    if (selectedLocation) {
+        selectElement.value = selectedLocation;
+        console.log('Selected location:', selectedLocation);
+    }
+
+    // Save to cookie and localStorage for consistency
+    if (selectedLocation) {
+        document.cookie = `tg_user_location=${selectedLocation}; path=/`;
+        localStorage.setItem('tg_user_location', selectedLocation);
+    }
+
+    // Handle changes in selection
+    selectElement.addEventListener('change', function () {
+        const selectedLocation = selectElement.value;
         if (selectedLocation) {
-            console.log("Attempting to set location:", selectedLocation); // Client-side log
-            $.ajax({
-                type: 'POST',
-                url: tg_ajax.ajaxurl,
-                data: {
-                    action: 'set_default_location',
-                    location_id: selectedLocation,
-                },
-                success: function(response) {
-                    console.log("AJAX response:", response); // Client-side log
-                    if (response.success) {
-                        location.reload(); // Reload page after setting location
-                    } else {
-                        alert('Failed to set default location.');
-                    }
-                },
-                error: function() {
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        } else {
-            alert('Please select a location.');
+            console.log("Selected location:", selectedLocation);
+
+            // Save to localStorage and cookie
+            localStorage.setItem('tg_user_location', selectedLocation);
+            document.cookie = `tg_user_location=${selectedLocation}; path=/`;
+
+            // Reload to apply changes
+            location.reload();
         }
     });
 });
 </script>
 
 <?php
-// Add AJAX action handler in PHP
+// AJAX handler to set the default location (optional if required for server sync)
 add_action('wp_ajax_set_default_location', 'tg_set_default_location');
 add_action('wp_ajax_nopriv_set_default_location', 'tg_set_default_location');
 
 if (!function_exists('tg_set_default_location')) {
     function tg_set_default_location() {
-        error_log("AJAX action 'set_default_location' triggered."); // Log AJAX call
-
-        // Check if 'location_id' is provided
+        error_log("AJAX action 'set_default_location' triggered.");
         if (isset($_POST['location_id'])) {
             $location_id = sanitize_text_field($_POST['location_id']);
             error_log("Received location_id: $location_id");
-
-            // Update default location in 'tg_default_location'
-            if (update_option('tg_default_location', $location_id)) {
-                error_log("Default location updated successfully.");
-                wp_send_json_success();
-            } else {
-                error_log("Failed to update default location.");
-                wp_send_json_error('Failed to update default location.');
-            }
+            wp_send_json_success("Location set to $location_id");
         } else {
-            error_log("No location_id provided in AJAX request.");
+            error_log("No location_id provided.");
             wp_send_json_error('Location ID not provided.');
         }
-
-        wp_die(); // Stop execution to avoid extra output
+        wp_die();
     }
 }
 ?>

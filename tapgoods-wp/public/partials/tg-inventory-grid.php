@@ -18,8 +18,13 @@ $tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], arr
 
 $tg_page = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
-// Get the default or selected location
-$location_id = tg_get_wp_location_id();
+// Check if 'local_storage_location' is present in the URL
+$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+
+// Check the cookie 'tg_user_location'
+$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+
 
 // Prepare query arguments
 $args = array(
@@ -234,7 +239,11 @@ document.addEventListener("DOMContentLoaded", function () {
     console.log("DOM fully loaded");
 
     const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
-
+    const savedLocation = localStorage.getItem('tg_user_location');
+    if (savedLocation) {
+        document.cookie = `tg_user_location=${savedLocation}; path=/;`;
+    }
+});
     /**
      * Load cart data from localStorage and update UI on page load
      */
@@ -376,7 +385,7 @@ document.addEventListener("DOMContentLoaded", function () {
     /**
      * Pagination click handling
      */
-    document.addEventListener("click", function (e) {
+
         if (e.target.matches(".pagination a")) {
             e.preventDefault();
             const page = e.target.getAttribute("data-page");
@@ -384,8 +393,8 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log(`Pagination clicked. Page: ${page}, Query: "${query}"`);
             fetchResults(query, page); // Call a function to fetch results for the selected page
         }
-    });
-});
+
+
 
 
 
