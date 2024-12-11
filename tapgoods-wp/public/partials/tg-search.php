@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.locationId = "<?php echo esc_js($location_id); ?>";
 console.log("Selected location:", window.locationId);
     const searchInput = document.getElementById("tg-search");
-    const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-1.row-cols-sm-1");
+    const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-2.row-cols-sm-2");
     const paginationContainer = document.querySelector(".pagination.justify-content-center.align-items-center");
     const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.png'); ?>";
     const categories = "<?php echo esc_js($category); ?>";
