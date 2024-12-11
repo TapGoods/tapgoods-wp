@@ -11160,10 +11160,10 @@ a > .tapgoods code {
   position: relative;
 }
 .tapgoods #tg-search-form {
-  display: grid;
+  /* display: grid;
   grid-template-columns: 1fr 92px;
   align-items: center;
-  grid-gap: 42px;
+  grid-gap: 42px; */
 }
 .tapgoods #tg-search-form select {
   border-radius: var(--tg-button-border);
