@@ -1087,3 +1087,23 @@ function get_image_by_item_id() {
 
     wp_send_json_success(['image_url' => $image_url]);
 }
+
+
+function tg_update_inventory_grid() {
+    if (isset($_POST['category'])) {
+        $category = sanitize_text_field($_POST['category']);
+        error_log("AJAX received category: " . $category);
+
+        // Generate the shortcode dynamically
+        $shortcode = "[tapgoods-inventory-grid category=\"$category\"]";
+        error_log("Shortcode generated dynamically: " . $shortcode);
+
+        echo do_shortcode($shortcode);
+    } else {
+        error_log("AJAX missing category parameter.");
+        echo "Error: Missing category.";
+    }
+    wp_die();
+}
+add_action( 'wp_ajax_update_inventory_grid', 'tg_update_inventory_grid' );
+add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tg_update_inventory_grid' );

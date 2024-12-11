@@ -13,43 +13,33 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_before_date_filter' ); ?>
 <div id="tg-dates-selector" class="dates-selector px-4"  style="display: none;">
 	<div class="date-input-wrapper order-start">
-		<label><?php _e( 'Order Start', 'tapgoods' ); //phpcs:ignore ?></label>
+		<label><?php _e( 'Order Start', 'tapgoods' ); ?></label>
 		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
 		<input id="eventStartTime" name="eventStartTime" type="time" value="<?php echo esc_attr( tg_get_start_time() ); ?>" class="time-input form-control">
 	</div>
 	<div class="date-input-wrapper order-end">
-		<label><?php _e( 'Order End', 'tapgoods' ); //phpcs:ignore ?></label>
+		<label><?php _e( 'Order End', 'tapgoods' ); ?></label>
 		<input id="eventEndDate" type="date" name="eventEndDate" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
 		<input id="eventEndTime" name="eventEndTime" type="time" value="<?php echo esc_attr( tg_get_end_time() ); ?>" class="time-input form-control">
 	</div>
 </div>
 <?php do_action( 'tg_after_date_filter' ); ?>
-<?php if ( is_archive() ) : ?>
-<?php do_action( 'tg_before_qty_filter' ); ?>
-<div class="quantity-filer"></div>
-<?php do_action( 'tg_before_color_filter' ); ?>
-<div class="color-filter"></div>
-<?php do_action( 'tg_before_tag_filter' ); ?>
-<div class="sub-categories"></div>
-<?php endif; ?>
-<?php do_action( 'tg_before_category_filter' ); ?>
 <div class="categories">
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">
 				<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
-				<?php _e( apply_filters( 'tg_categories_header_text', 'Categories' ), 'tapgoods' ); //phpcs:ignore ?>
+				<?php _e( apply_filters( 'tg_categories_header_text', 'Categories' ), 'tapgoods' ); ?>
 				</button>
 			</h2>
 			<div id="collapseOne" class="accordion-collapse collapse category-links">
+                <a class="category-link" href="#" data-category-id="">
+                    <?php _e( 'All Categories', 'tapgoods' ); ?>
+                </a>
 				<?php foreach ( $categories as $category ) : ?>
-					<?php do_action( 'tg_before_category_link' ); ?>
-					<a class="category-link" href="<?php echo esc_url( get_term_link( $category, 'tg_category' ) ); ?>">
-					<?php do_action( 'tg_before_category_link_text' ); ?>
+					<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
 					<?php echo esc_html( $category->name ); ?>
-					<?php do_action( 'tg_after_category_link_text' ); ?>
 					</a>
-					<?php do_action( 'tg_after_category_link' ); ?>
 				<?php endforeach; ?>
 			</div>
 		</div>
@@ -58,41 +48,10 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
 
-
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     var accordionCollapse = document.getElementById("collapseOne");
     var accordionButton = document.querySelector(".accordion-button");
-
-    // Date and time inputs
-    const startDateInput = document.getElementById("eventStartDate");
-    const startTimeInput = document.getElementById("eventStartTime");
-    const endDateInput = document.getElementById("eventEndDate");
-    const endTimeInput = document.getElementById("eventEndTime");
-
-    // Keys for localStorage
-    const startDateKey = "tg_eventStartDate";
-    const startTimeKey = "tg_eventStartTime";
-    const endDateKey = "tg_eventEndDate";
-    const endTimeKey = "tg_eventEndTime";
-
-    // Set default values from localStorage
-    startDateInput.value = localStorage.getItem(startDateKey) || startDateInput.value;
-    startTimeInput.value = localStorage.getItem(startTimeKey) || startTimeInput.value;
-    endDateInput.value = localStorage.getItem(endDateKey) || endDateInput.value;
-    endTimeInput.value = localStorage.getItem(endTimeKey) || endTimeInput.value;
-
-    // Save values to localStorage on change
-    function saveToLocalStorage(key, value) {
-        if (value) {
-            localStorage.setItem(key, value);
-        }
-    }
-
-    startDateInput.addEventListener("change", () => saveToLocalStorage(startDateKey, startDateInput.value));
-    startTimeInput.addEventListener("change", () => saveToLocalStorage(startTimeKey, startTimeInput.value));
-    endDateInput.addEventListener("change", () => saveToLocalStorage(endDateKey, endDateInput.value));
-    endTimeInput.addEventListener("change", () => saveToLocalStorage(endTimeKey, endTimeInput.value));
 
     // Toggle accordion
     function toggleAccordion() {
@@ -110,6 +69,30 @@ document.addEventListener("DOMContentLoaded", function() {
     // Run function on page load and on window resize
     toggleAccordion();
     window.addEventListener("resize", toggleAccordion);
-});
 
+    // Handle category clicks
+    const categoryLinks = document.querySelectorAll('.category-link');
+
+    categoryLinks.forEach(link => {
+        link.addEventListener('click', function(event) {
+            event.preventDefault();
+
+            const selectedCategory = this.getAttribute('data-category-id');
+
+            // If All Categories or empty category is clicked, reload to the current base URL
+            if (!selectedCategory) {
+                const baseUrl = window.location.origin + window.location.pathname;
+                window.location.href = baseUrl;
+                return;
+            }
+
+            // Update URL with selected category
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('category', selectedCategory);
+            urlParams.delete('paged'); // Reset pagination
+
+            window.location.search = urlParams.toString();
+        });
+    });
+});
 </script>
