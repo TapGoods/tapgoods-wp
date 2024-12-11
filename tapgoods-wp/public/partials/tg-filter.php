@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Toggle accordion
     function toggleAccordion() {
-        if (window.innerWidth >= 1000) {
+        if (window.innerWidth >= 1200) {
             accordionCollapse.classList.add("show");
             accordionButton.classList.remove("collapsed");
             accordionButton.setAttribute("aria-expanded", "true");

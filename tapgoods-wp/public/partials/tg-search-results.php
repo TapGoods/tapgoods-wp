@@ -80,7 +80,7 @@ $query = new WP_Query($args);
 // Check if results are found
 if ($query->have_posts()) {
     ?>
-    <div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-1 row-cols-sm-1">
+    <div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-2 row-cols-sm-2">
         <?php while ($query->have_posts()) : $query->the_post(); ?>
             <?php
             $product_id = get_the_ID();

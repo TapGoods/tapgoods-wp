@@ -2850,7 +2850,7 @@ a > .tapgoods code {
 }
 .tapgoods .row {
   --bs-gutter-x: 1.5rem;
-  --bs-gutter-y: 0;
+  --bs-gutter-y: 0.5rem;
   display: flex;
   flex-wrap: wrap;
   margin-top: calc(-1 * var(--bs-gutter-y));
@@ -3079,8 +3079,14 @@ a > .tapgoods code {
   }
   .tapgoods .col-sm-4 {
     flex: 0 0 auto;
-    width: 33.33333333%;
-  }
+    width: 100%;
+}
+
+@media (min-width: 1200px) {
+    .tapgoods .col-sm-4 {
+        width: 33.33333%;
+    }
+}
   .tapgoods .col-sm-5 {
     flex: 0 0 auto;
     width: 41.66666667%;
@@ -3095,8 +3101,14 @@ a > .tapgoods code {
   }
   .tapgoods .col-sm-8 {
     flex: 0 0 auto;
-    width: 66.66666667%;
-  }
+    width: 100%;
+}
+
+@media (min-width: 1200px) {
+    .tapgoods .col-sm-8 {
+        width: 66.66666667%;
+    }
+}
   .tapgoods .col-sm-9 {
     flex: 0 0 auto;
     width: 75%;
@@ -7227,7 +7239,7 @@ a > .tapgoods code {
   justify-content: space-evenly !important;
 }
 .tapgoods .align-items-start {
-  align-items: flex-start !important;
+  /* align-items: flex-start !important; */
 }
 .tapgoods .align-items-end {
   align-items: flex-end !important;
@@ -11202,6 +11214,7 @@ a > .tapgoods code {
 .tapgoods#tg-grid .item-wrap {
   background: white;
   padding: 10px;
+  margin-bottom: 10px;
 }
 .tapgoods#tg-grid .item-wrap br {
   display: none;
@@ -11238,6 +11251,7 @@ a > .tapgoods code {
   background-color: var(--tg-color-primary);
   color: var(--tg-light-font);
   min-width: 300px;
+  margin-bottom: 15px;
 }
 .tapgoods#tg-shop .tg-filter h4, .tapgoods#tg-shop .tg-filter .h4 {
   font-size: 14px;
