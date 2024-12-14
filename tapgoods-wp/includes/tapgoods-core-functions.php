@@ -1107,3 +1107,26 @@ function tg_update_inventory_grid() {
 }
 add_action( 'wp_ajax_update_inventory_grid', 'tg_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tg_update_inventory_grid' );
+
+add_filter('template_include', 'tg_custom_tax_template');
+function tg_custom_tax_template($template) {
+    // Check if this is a taxonomy archive page for a custom taxonomy
+    if (is_tax('tg_tags')) { // Replace 'tags' with your custom taxonomy slug
+        // Define the correct custom template path
+        $custom_template = WP_PLUGIN_DIR . '/tapgoods-wp/public/partials/tg-tag-results.php';
+
+        // Log to debug
+        error_log('Custom taxonomy template being checked: ' . $custom_template);
+
+        // Check if the custom template file exists
+        if (file_exists($custom_template)) {
+            error_log('Custom taxonomy template found and used.');
+            return $custom_template; // Return the custom template
+        } else {
+            error_log('Custom taxonomy template NOT found.');
+        }
+    }
+
+    return $template; // Return the default template if conditions are not met
+}
+
