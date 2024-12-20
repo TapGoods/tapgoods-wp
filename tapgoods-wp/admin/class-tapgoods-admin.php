@@ -166,7 +166,12 @@ class Tapgoods_Admin {
 		);
 		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
 
-		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect,, ' . $env1 . ' make sure your API Key is entered correctly.', 'tapgoods-wp' ), $args, false );
+		$notice = Tapgoods_Admin::tapgoods_admin_notice( 
+			sprintf( __( 'Unable to Connect, %s. Make sure your API Key is entered correctly.', 'tapgoods-wp' ), $env1 ), 
+			$args, 
+			false 
+		);
+
 		wp_send_json_error( $notice );
 		die();
 	}
@@ -279,7 +284,7 @@ class Tapgoods_Admin {
 	// Add a link to this plugin to the action links.
 	public function add_action_links( $links ) {
 		$settings_link = array(
-			'<a href="' . admin_url( 'admin.php?page=' . $this->plugin_name ) . '">' . __( 'Settings', $this->plugin_name ) . '</a>',
+			'<a href="' . admin_url( 'admin.php?page=' . $this->plugin_name ) . '">' . __( 'Settings', 'tapgoods-wp') . '</a>',
 		);
 		return array_merge( $settings_link, $links );
 	}
