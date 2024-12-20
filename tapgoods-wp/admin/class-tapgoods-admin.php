@@ -167,6 +167,7 @@ class Tapgoods_Admin {
 		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
 
 		$notice = Tapgoods_Admin::tapgoods_admin_notice( 
+			// translators: %s is replaced with the environment name (e.g., 'production', 'staging').
 			sprintf( __( 'Unable to Connect, %s. Make sure your API Key is entered correctly.', 'tapgoods-wp' ), $env1 ), 
 			$args, 
 			false 
