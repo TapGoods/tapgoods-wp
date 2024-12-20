@@ -150,7 +150,7 @@ class Tapgoods_Admin {
 	
 		if ( $success ) {
 			update_option( 'tg_api_connected', true );
-			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
+			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods-wp' ), [], false );
 			wp_send_json_success( $notice );
 		}
 	
@@ -166,7 +166,7 @@ class Tapgoods_Admin {
 		);
 		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
 
-		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect,, ' . $env1 . ' make sure your API Key is entered correctly.', 'tapgoods' ), $args, false );
+		$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Unable to Connect,, ' . $env1 . ' make sure your API Key is entered correctly.', 'tapgoods-wp' ), $args, false );
 		wp_send_json_error( $notice );
 		die();
 	}

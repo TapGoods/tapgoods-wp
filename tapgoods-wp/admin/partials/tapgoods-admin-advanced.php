@@ -2,8 +2,8 @@
 // Settings page for advanced settings
 
 $form_action = ( isset( $_SERVER['REQUEST_URI'] ) ) ? wp_kses( wp_unslash( $_SERVER['REQUEST_URI'] ), 'strip' ) : '';
-$message     = __( 'Warning: Changing these settings could cause errors on your website, proceed with caution.', 'tapgoods' );
-$submit_text = __( 'Save Settings', 'tapgoods' );
+$message     = __( 'Warning: Changing these settings could cause errors on your website, proceed with caution.', 'tapgoods-wp' );
+$submit_text = __( 'Save Settings', 'tapgoods-wp' );
 $notice      = Tapgoods_Admin::tapgoods_admin_notice(
 	$message,
 	array(

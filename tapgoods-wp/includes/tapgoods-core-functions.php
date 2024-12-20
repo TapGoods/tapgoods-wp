@@ -46,9 +46,9 @@ function tg_get_permalink_structure() {
 	$permalinks = wp_parse_args(
 		array_filter( $tg_permalinks ),
 		array(
-			'tg_inventory_base'      => _x( 'products', 'permalink', 'tapgoods' ),
-			'tg_category_base'       => _x( 'categories', 'permalink', 'tapgoods' ),
-			'tg_tag_base'            => _x( 'tags', 'permalink', 'tapgoods' ),
+			'tg_inventory_base'      => _x( 'products', 'permalink', 'tapgoods-wp' ),
+			'tg_category_base'       => _x( 'categories', 'permalink', 'tapgoods-wp' ),
+			'tg_tag_base'            => _x( 'tags', 'permalink', 'tapgoods-wp' ),
 			'use_verbose_page_rules' => 0,
 		)
 	);

@@ -11,7 +11,7 @@ $location = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_i
 // Generate the sign-up URL
 $url = tg_get_sign_up_url( $location );
 ?>
-<a href="<?php echo esc_url( $url ); ?>" target="_self"><?php esc_html_e( 'Sign Up', 'tapgoods' ); ?></a>
+<a href="<?php echo esc_url( $url ); ?>" target="_self"><?php esc_html_e( 'Sign Up', 'tapgoods-wp' ); ?></a>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const savedLocation = localStorage.getItem('tg_user_location');
