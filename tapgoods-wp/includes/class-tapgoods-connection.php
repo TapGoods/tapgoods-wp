@@ -1339,14 +1339,13 @@ add_action('admin_footer', function() {
                             action: 'tapgoods_manual_sync'
                         },
                         success: function(response) {
-                            console.log(response.message);
                             $('#tapgoods_sync_status').text(response.message);
                             if (response.success && response.continue) {
                                 setTimeout(function() {
                                     $('#tg_api_sync').click();
                                 }, 1000); // Wait 1 second before continuing with the next request
                             } else {
-                                console.log('Sync completed or stopped: ' + response.message);
+                             //   console.log('Sync completed or stopped: ' + response.message);
                                 $('#tg_api_sync').prop('disabled', false).text('SYNC');
                             }
                         },

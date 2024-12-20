@@ -1,8 +1,5 @@
 <?php
 
-// Variables passed to template: $tag, $content, $atts
-
-$tg_inventory_grid_class = 'col-sm-8 col-xs-12';
 
 // Priority the value from the URL over $atts['category']
 $category = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : (! empty( $atts['category'] ) ? $atts['category'] : '');
@@ -13,6 +10,12 @@ $per_page_default       = isset( $atts['per_page_default'] ) ? "per_page_default
 $show_search            = filter_var( $atts['show_search'], FILTER_VALIDATE_BOOLEAN );
 $show_filters           = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
 $show_pricing = 'show_pricing="true"'; 
+
+// Variables passed to template: $tag, $content, $atts
+
+$tg_inventory_grid_class = $show_filters 
+    ? 'col-sm-8 col-xs-12' 
+    : 'col-sm-12 col-xs-12';
 
 if (isset($atts['show_pricing']) && $atts['show_pricing'] !== '') {
     $normalized_value = str_replace(['“', '”', '"'], '', $atts['show_pricing']);
@@ -75,7 +78,7 @@ document.addEventListener("DOMContentLoaded", function() {
             event.preventDefault();
 
             const selectedCategory = this.getAttribute("data-category-id");
-            console.log("Event triggered. Selected category:", selectedCategory);
+
 
             if (!selectedCategory) {
                 console.error("Category ID is missing in the link.");

@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const savedLocation = localStorage.getItem('tg_user_location');
     if (savedLocation) {
         document.cookie = `tg_user_location=${savedLocation}; path=/;`;
-        console.log('Cookie tg_user_location set:', savedLocation);
     }
 });
 </script>

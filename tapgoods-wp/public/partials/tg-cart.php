@@ -50,7 +50,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const savedLocation = localStorage.getItem('tg_user_location');
     if (savedLocation) {
         document.cookie = `tg_user_location=${savedLocation}; path=/;`;
-        console.log('Cookie tg_user_location set:', savedLocation);
     }
 
 
@@ -67,7 +66,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 const savedLocation = localStorage.getItem('tg_user_location');
-console.log('Saved location:', savedLocation);
 
 if (savedLocation) {
         // Enviar el valor al servidor mediante AJAX

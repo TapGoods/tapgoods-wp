@@ -20,6 +20,7 @@ $per_page_default = isset($atts['per_page_default'])
 $tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], array(12, 24, 48))
     ? (int) sanitize_text_field($_GET['tg-per-page'])
     : $per_page_default;
+    
 
 $tg_page = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
@@ -184,7 +185,7 @@ $tg_pages = $query->max_num_pages;
         </div>
     <?php endwhile; ?>
     <?php do_action('tg_inventory_after_grid'); ?>
-<?php endif; ?> <!-- Cierra if ($query->have_posts()) -->
+<?php endif; ?> <!-- Close if ($query->have_posts()) -->
 </div>
 
 <?php if ($tg_pages > 1) : ?>
@@ -241,8 +242,6 @@ $tg_pages = $query->max_num_pages;
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    console.log("DOM fully loaded");
-
     const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
     const savedLocation = localStorage.getItem('tg_user_location');
     if (savedLocation) {
@@ -289,8 +288,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         if (qtyInput) {
                             qtyInput.value = "";
                         }
-
-                        console.log(`Item ${itemId} removed from cartData.`);
                     }, 10000); // Reset after 10 seconds
                 }
             });
@@ -382,16 +379,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (searchInput) {
         searchInput.addEventListener("input", function () {
             const query = searchInput.value.trim();
-            console.log("Search input changed. Query:", query);
 
             if (query) {
                 fetchResults(query); // Call a function to fetch results as user types
             } else {
-                console.log("Empty query. No search performed.");
             }
         });
     } else {
-        console.error("Search input not found.");
+
     }
 
     /**
@@ -402,7 +397,6 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
             const page = e.target.getAttribute("data-page");
             const query = searchInput ? searchInput.value.trim() : "";
-            console.log(`Pagination clicked. Page: ${page}, Query: "${query}"`);
             fetchResults(query, page); // Call a function to fetch results for the selected page
         }
     });

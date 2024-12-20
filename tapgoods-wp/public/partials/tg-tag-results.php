@@ -124,7 +124,6 @@ document.addEventListener("DOMContentLoaded", function() {
             event.preventDefault();
 
             const selectedCategory = this.getAttribute("data-category-id");
-            console.log("Event triggered. Selected category:", selectedCategory);
 
             if (!selectedCategory) {
                 console.error("Category ID is missing in the link.");

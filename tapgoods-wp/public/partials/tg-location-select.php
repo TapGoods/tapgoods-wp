@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set the select element to the determined value
     if (selectedLocation) {
         selectElement.value = selectedLocation;
-        console.log('Selected location:', selectedLocation);
     }
 
     // Save to cookie and localStorage for consistency
@@ -69,7 +68,6 @@ document.addEventListener('DOMContentLoaded', function () {
     selectElement.addEventListener('change', function () {
         const selectedLocation = selectElement.value;
         if (selectedLocation) {
-            console.log("Selected location:", selectedLocation);
 
             // Save to localStorage and cookie
             localStorage.setItem('tg_user_location', selectedLocation);

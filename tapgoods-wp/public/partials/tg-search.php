@@ -9,6 +9,13 @@ $posts_per_page_options = apply_filters(
     array('12', '24', '48') // Default options
 );
 
+// Get the 'per_page_default' attribute or set it to '12' if not present
+$tg_per_page = isset($atts['per_page_default']) 
+    ? (int) preg_replace('/[^0-9]/', '', trim($atts['per_page_default'], '“”"')) // Clean the value by removing non-numeric characters and quotes, then convert to integer
+    : 12; // Default value is 12 if the attribute is not set
+
+
+
 // Check if 'local_storage_location' is present in the URL
 $local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
 
@@ -27,21 +34,8 @@ if (isset($atts['show_pricing'])) {
     $cleaned_value = str_replace(['“', '”'], '"', $cleaned_value);
     // convert to boolean
     $show_pricing = ($cleaned_value === 'false') ? false : filter_var($cleaned_value, FILTER_VALIDATE_BOOLEAN);
-}
+};
 
-
-;
-// Get the 'tg-per-page' value from the cookie or fallback to the default option
-if (isset($atts['per_page_default'])) {
-    // extract the value
-    $tg_per_page  = str_replace('per_page_default=', '', $atts['per_page_default']);
-    
-    // vonvert to integer
-    $tg_per_page  = intval($tg_per_page );
-} else {
-    // ddefault value
-    $tg_per_page  = 12; 
-}
 
 // Get the base URL for adding items to the cart
 $base_url = tg_get_add_to_cart_url( $location_id );
@@ -88,7 +82,6 @@ do_action('tg_before_search_form');
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     window.locationId = "<?php echo esc_js($location_id); ?>";
-console.log("Selected location:", window.locationId);
     const searchInput = document.getElementById("tg-search");
     const resultsContainer = document.querySelector(".tapgoods.tapgoods-inventory.row.row-cols-lg-3.row-cols-md-2.row-cols-sm-2");
     const paginationContainer = document.querySelector(".pagination.justify-content-center.align-items-center");
@@ -97,11 +90,8 @@ console.log("Selected location:", window.locationId);
     const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
-    console.log("Selected location:", locationId);
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
-    console.log("Redirect URL:", redirectUrl);
     const baseurl = "<?php echo esc_js($base_url); ?>";
-    console.log("Base URL:", baseurl);
     const showPricing = <?php echo json_encode($show_pricing); ?>;
     window.fetchResults = function(query, page = 1, isDefault = false) {
         const params = new URLSearchParams({
@@ -132,11 +122,8 @@ console.log("Selected location:", window.locationId);
             .catch(error => console.error("Fetch error:", error));
     };
 
-    console.log("cartData in localStorage:", JSON.parse(localStorage.getItem("cartData")));
-
     // Fetch image URL using item ID
     function fetchImage(itemId) {
-        console.log(`Fetching image for item_id: ${itemId}`);
         return fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
             method: "POST",
             headers: {
@@ -150,14 +137,11 @@ console.log("Selected location:", window.locationId);
             .then((response) => response.json())
             .then((data) => {
                 if (!data.success) {
-                    console.warn(`No image found for item_id ${itemId}. Using placeholder.`);
                     return placeholderImage;
                 }
-                console.log(`Image URL for item_id ${itemId}: ${data.data.image_url}`);
                 return data.data.image_url;
             })
             .catch((error) => {
-                console.error("Error fetching image:", error);
                 return placeholderImage;
             });
     }
@@ -221,7 +205,6 @@ console.log("Selected location:", window.locationId);
 
     data.forEach((item) => {
         if (seenIds.has(item.tg_id)) {
-            console.warn(`Duplicate item detected and skipped: ${item.tg_id}`);
             return;
         }
         seenIds.add(item.tg_id);
@@ -230,7 +213,6 @@ console.log("Selected location:", window.locationId);
         const itemUrl = !showPricing ? `${item.url}?nprice=true` : item.url;
         const priceHtml = showPricing ? `<div class="price mb-2">${item.price || ''}</div>` : '';
         const addToCartUrl = `${baseurl}?itemId=${item.tg_id}&itemType=items&quantity=1&redirectUrl=${encodeURIComponent(redirectUrl)}`;
-        console.log("Generated AddToCart URL:", addToCartUrl);
         // Render the HTML with placeholder
         resultsContainer.innerHTML += `
             <div id="tg-item-${item.tg_id}" class="col item" data-tgId="${item.tg_id}">
@@ -330,9 +312,7 @@ function attachAddToCartListeners() {
         button.addEventListener("click", function () {
             const itemId = this.getAttribute("data-item-id");
             const baseUrl = this.getAttribute("data-base-url");
-            console.log("Base URL:", baseUrl);
             const redirectUrl = decodeURIComponent(this.getAttribute("data-redirect-url"));
-            console.log("Redirect URL:", redirectUrl);
             const qtyInput = document.getElementById(`qty-${itemId}`);
             const quantity = qtyInput && qtyInput.value ? qtyInput.value : 1;
 

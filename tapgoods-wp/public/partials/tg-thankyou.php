@@ -26,7 +26,6 @@
             }
         });
 
-        console.log('Cart and related data cleared from Local Storage.');
     </script>
 </body>
 </html>
