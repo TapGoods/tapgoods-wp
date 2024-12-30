@@ -21,7 +21,8 @@ class Tapgoods_Post_Types {
 		add_action( 'init', array( __CLASS__, 'register_post_types' ), 5 );
 		add_action( 'add_meta_boxes_tg_inventory', array( __CLASS__, 'add_inventory_metabox' ) );
 		add_filter( 'post_type_link', array( __CLASS__, 'tg_filter_post_type_link' ), 10, 2 );
-
+		add_action( 'admin_menu', array( __CLASS__, 'redirect_to_custom_edit_page' ) );
+		add_action( 'admin_menu', array( __CLASS__, 'register_custom_edit_page' ) );
 		// $this->loader->add_action( 'init', $this, 'tg_add_rewrites', 10, 0 );
 
 		// add_action( 'tg_tags_add_form_fields', array( __CLASS__, 'tg_tags_metaboxes' ) );
@@ -29,6 +30,83 @@ class Tapgoods_Post_Types {
 		add_action( 'tg_category_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
 		add_action( 'tg_location_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
 		add_action( 'add_meta_boxes_tg_location', array( __CLASS__, 'add_taxonomy_metabox' ) );
+	}
+	public static function redirect_to_custom_edit_page() {
+		global $pagenow;
+	
+		if ( $pagenow === 'post.php' && isset( $_GET['post'] ) && 'tg_inventory' === get_post_type( $_GET['post'] ) ) {
+			// Redirect to the custom page.
+			wp_safe_redirect( admin_url( 'admin.php?page=custom-edit-page&post=' . intval( $_GET['post'] ) ) );
+			exit;
+		}
+	}
+	
+	public static function register_custom_edit_page() {
+		add_submenu_page(
+			'options-general.php', // Valid but irrelevant parent_slug.
+			'Edit Item', // Page title.
+			'', // Menu title (empty to not display it).
+			'edit_posts', // Required capability.
+			'custom-edit-page', // Unique slug for the page.
+			array( __CLASS__, 'render_custom_edit_page' ) // Callback that renders the page.
+		);
+	}
+	
+	public static function render_custom_edit_page() {
+		if ( isset( $_GET['post'] ) && 'tg_inventory' === get_post_type( $_GET['post'] ) ) {
+			$post_id = intval( $_GET['post'] );
+			$post = get_post( $post_id );
+	
+			if ( ! $post ) {
+				echo 'Item not found.';
+				return;
+			}
+	
+			// Handle saving the custom field
+			if ( isset( $_POST['tg_custom_description'] ) && check_admin_referer( 'save_tg_custom_description', 'tg_custom_description_nonce' ) ) {
+				update_post_meta( $post_id, 'tg_custom_description', wp_kses_post( $_POST['tg_custom_description'] ) );
+				echo '<div class="notice notice-success"><p>Custom description updated.</p></div>';
+			}
+	
+			// Retrieve the current value of the custom field
+			$custom_description = get_post_meta( $post_id, 'tg_custom_description', true );
+	
+			echo '<h1>' . esc_html( $post->post_title ) . '</h1>';
+			echo '<form method="post">';
+			wp_nonce_field( 'save_tg_custom_description', 'tg_custom_description_nonce' );
+	
+			echo '<h3>Custom Description</h3>';
+			wp_editor(
+				$custom_description,
+				'tg_custom_description', // Unique ID for the editor
+				array(
+					'textarea_name' => 'tg_custom_description',
+					'media_buttons' => true, // Show buttons to add media
+					'textarea_rows' => 10,
+					'teeny'         => false, // Use a more compact editor if true
+				)
+			);
+	
+			echo '<p><input type="submit" class="button button-primary" value="Save Description"></p>';
+			echo '</form>';
+	
+			echo '<h3>General Information</h3>';
+			echo '<div>';
+			echo '<p><strong>Description:</strong> ' . esc_html( $post->post_content ) . '</p>';
+	
+			$meta = get_post_meta( $post_id );
+			if ( ! empty( $meta ) ) {
+				echo '<h3>Metadata:</h3><ul>';
+				foreach ( $meta as $key => $value ) {
+					echo '<li><strong>' . esc_html( $key ) . ':</strong> ' . esc_html( maybe_unserialize( $value[0] ) ) . '</li>';
+				}
+				echo '</ul>';
+			}
+	
+			echo '</div>';
+		} else {
+			echo '<p>Invalid or not found item.</p>';
+		}
 	}
 
 	public static function tg_get_taxonomies() {

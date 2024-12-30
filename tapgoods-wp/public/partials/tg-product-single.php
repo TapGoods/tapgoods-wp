@@ -5,9 +5,16 @@ global $post;
 // Check if `nprice=true` is present in the URL
 $hide_price = isset($_GET['nprice']) && $_GET['nprice'] === 'true';
 
+
+
 $description = apply_filters(
     'tg_item_description',
     get_post_meta($post->ID, 'tg_description', true)
+);
+
+$custom_description = apply_filters(
+    'tg_custom_description',
+    get_post_meta($post->ID, 'tg_custom_description', true)
 );
 
 $tags = get_the_terms($post, 'tg_tags');
@@ -24,7 +31,7 @@ $tg_per_page = (isset($_COOKIE['tg-per-page'])) ? sanitize_text_field(wp_unslash
 $tg_id = get_post_meta($post->ID, 'tg_id', true);
 
 // Get the location ID from the user's Local Storage
-$local_storage_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$local_storage_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field(wp_unslash($_COOKIE['tg_user_location'])) : null;
 
 // Use the default location if no value is present
 $location_id = $local_storage_location ?: tg_get_wp_location_id();
@@ -72,7 +79,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
             </section>
             <section class="details col py-4 mt-2">
                 <div class="description">
-                    <?php echo $description; ?>
+                    <?php echo esc_html($description); ?>
                 </div>
                 <?php if (false !== $tags) : ?>
                 <div class="tags">
@@ -85,12 +92,12 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                     <p>Know your event date/time? Set it now.</p>
                     <div id="tg-dates-selector" class="dates-selector">
                         <div class="date-input-wrapper order-start">
-                            <label><?php _e('Order Start', 'tapgoods-wp'); ?></label>
+                            <label><?php esc_html_e('Order Start', 'tapgoods-wp'); ?></label>
                             <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_start_date()); ?>" min="<?php echo esc_attr($today); ?>">
                             <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_start_time()); ?>">
                         </div>
                         <div class="date-input-wrapper order-end">
-                            <label><?php _e('Order End', 'tapgoods-wp'); ?></label>
+                            <label><?php esc_html_e('Order End', 'tapgoods-wp'); ?></label>
                             <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_end_date()); ?>" min="<?php echo esc_attr($today); ?>">
                             <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_end_time()); ?>">
                         </div>
@@ -106,7 +113,8 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                 </div>
             </section>
             <section class="linked-items col">
-                <!-- Additional content can go here -->
+            <?php echo wp_kses_post($custom_description); ?>
+               <!-- Additional content can go here -->
             </section>
         </section>
     </div>
