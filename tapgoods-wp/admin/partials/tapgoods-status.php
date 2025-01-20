@@ -12,9 +12,7 @@ $location_settings = maybe_unserialize(get_option('tg_location_settings'));
 $reset_done = get_option('tg_reset_done');
 ?>
 
-<div class="wrap"  id="status-content">
-    <h1>Status Overview</h1>
-    
+  
     <style>
         #status-content .wrap {
             overflow: auto;
@@ -22,7 +20,7 @@ $reset_done = get_option('tg_reset_done');
         #status-content .wrap ul {
             word-wrap: break-word; /* Break long words */
             white-space: pre-wrap; /* Maintain line breaks and wrap text */
-            background: #ffffff; /* White background */
+            background:rgb(255, 0, 0); /* White background */
             padding: 10px; /* Inner spacing */
             border: 1px solid #ddd; /* Optional: Border */
             border-radius: 5px; /* Optional: Rounded corners */
@@ -37,38 +35,63 @@ $reset_done = get_option('tg_reset_done');
         }
     </style>
     
-    <!-- Status Details -->
-    <h2>Status Information</h2>
-    <ul>
-        <li><strong>API Connected:</strong> 
-            <span class="<?php echo $api_connected ? 'status-yes' : 'status-no'; ?>">
+    
+    <div class="container">
+    <!-- Status Information -->
+    <h2 class="mb-4">Status Information</h2>
+    <ul class="list-unstyled mb-4">
+        <li class="d-flex align-items-center mb-2">
+            <strong class="me-2">API Connected:</strong>
+            <span class="<?php echo $api_connected ? 'text-success fw-bold' : 'text-danger fw-bold'; ?>">
                 <?php echo $api_connected ? 'Yes' : 'No'; ?>
             </span>
         </li>
-        <li><strong>TAPGOODS_KEY Defined:</strong> 
-            <span class="<?php echo $key_defined ? 'status-yes' : 'status-no'; ?>">
+        <li class="d-flex align-items-center mb-2">
+            <strong class="me-2">TAPGOODS_KEY Defined:</strong>
+            <span class="<?php echo $key_defined ? 'text-success fw-bold' : 'text-danger fw-bold'; ?>">
                 <?php echo $key_defined ? 'Yes' : 'No'; ?>
             </span>
         </li>
-        <li><strong>Reset Done:</strong> 
-            <span class="<?php echo $reset_done ? 'status-yes' : 'status-no'; ?>">
+        <li class="d-flex align-items-center">
+            <strong class="me-2">Reset Done:</strong>
+            <span class="<?php echo $reset_done ? 'text-success fw-bold' : 'text-danger fw-bold'; ?>">
                 <?php echo $reset_done ? 'Yes' : 'No'; ?>
             </span>
         </li>
     </ul>
 
-    <?php if (!empty($location_settings)): ?>
-        <h2>Location Settings</h2>
-        <ul>
-            <?php foreach ($location_settings as $key => $value): ?>
-                <li><strong><?php echo esc_html($key); ?>:</strong> 
-                    <?php echo esc_html(is_array($value) ? json_encode($value) : $value); ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php else: ?>
-        <p><em>No location settings found.</em></p>
-    <?php endif; ?>
+    <div class="position-absolute start-0 end-0" style="height: 16px; background-color: #f0f0f1;"></div>
+
+    <!-- Location Settings -->
+
+    <h2 class="mb-4 pt-4 mt-5">Location Settings</h2>
+    <div class="accordion" id="locationSettingsAccordion">
+        <?php foreach ($location_settings as $location_id => $settings): ?>
+            <div class="accordion-item mb-3">
+                <h2 class="accordion-header" id="heading<?php echo esc_attr($location_id); ?>">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse<?php echo esc_attr($location_id); ?>" aria-expanded="false" aria-controls="collapse<?php echo esc_attr($location_id); ?>">
+                        <?php echo esc_html($location_id); ?>
+                    </button>
+                </h2>
+                <div id="collapse<?php echo esc_attr($location_id); ?>" class="accordion-collapse collapse" aria-labelledby="heading<?php echo esc_attr($location_id); ?>" data-bs-parent="#locationSettingsAccordion">
+                    <div class="accordion-body">
+                        <ul class="list-unstyled">
+                            <?php foreach ($settings as $key => $value): ?>
+                                <li class="mb-2">
+                                    <strong><?php echo esc_html($key); ?>:</strong> 
+                                    <span>
+                                        <?php echo esc_html(is_array($value) ? json_encode($value, JSON_PRETTY_PRINT) : $value); ?>
+                                    </span>
+                                </li>
+                                
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-4">
+        <?php endforeach; ?>
+    </div>
 </div>
 
 <script>
