@@ -79,7 +79,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
             </section>
             <section class="details col py-4 mt-2">
                 <div class="description">
-                    <?php echo esc_html($description); ?>
+                    <?php echo esc_html(strip_tags($description)); ?>
                 </div>
                 <?php if (false !== $tags) : ?>
                 <div class="tags">
