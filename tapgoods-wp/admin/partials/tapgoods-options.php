@@ -41,39 +41,63 @@ if (!empty($selected_location)) {
 }
 ?>
 
-<div class="wrap">
-    <h1>Multi Location - Select Default Location</h1>
+<div class="container" style="overflow: auto; word-wrap: break-word;">
+    <h2>Default Location</h2>
     
     <!-- Form to select location -->
-    <form method="post" action="">
-        <label for="selected_location">Select Default Location:</label>
-        <select name="selected_location" id="selected_location" onchange="this.form.submit();">
-            <?php
-            foreach ($locations as $location_id) {
-                // Retrieve the location data for each ID
-                $individual_location_data = get_option("tg_location_{$location_id}");
-                $individual_location_data = maybe_unserialize($individual_location_data);
-                
-                // Get the name of the location, or use a default if not found
-                $location_name = $individual_location_data['fullName'] ?? "Location {$location_id}";
-                
-                // Display both ID and name in the option
-                echo '<option value="' . esc_attr($location_id) . '"' . selected($selected_location, $location_id, false) . '>' . esc_html("{$location_id} - {$location_name}") . '</option>';
-            }
-            ?>
-        </select>
-    </form>
+    <div class="row align-items-center">
+    <!-- First Form -->
+    <div class="col-md-6">
+        <form method="post" action="">
+            <div class="position-relative">
+                <select name="selected_location" id="selected_location" 
+                        class="form-select" 
+                        style="background-color: #E5E8E9; color: #000; border-radius: 50px; font-weight: bold; height: 2.2rem; padding: 0.35rem 2.5rem 0.35rem 1rem; border: none; appearance: none;" 
+                        onchange="this.form.submit();">
+                    <?php
+                    foreach ($locations as $location_id) {
+                        // Retrieve the location data for each ID
+                        $individual_location_data = get_option("tg_location_{$location_id}");
+                        $individual_location_data = maybe_unserialize($individual_location_data);
+                        
+                        // Get the name of the location, or use a default if not found
+                        $location_name = $individual_location_data['fullName'] ?? "Location {$location_id}";
+                        
+                        // Display both ID and name in the option
+                        echo '<option value="' . esc_attr($location_id) . '"' . selected($selected_location, $location_id, false) . '>' . esc_html("{$location_id} - {$location_name}") . '</option>';
+                    }
+                    ?>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Second Form -->
+    <div class="col col-sm-3">
+        <form method="post" action="">
+            <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
+            <button type="submit" name="set_default_location" 
+                    class="btn btn-primary w-100 round" 
+                    id="tg_api_sync">
+                SET DEFAULT
+            </button>
+        </form>
+    </div>
+</div>
+
+
+    <p>Select the inventory location that your website visitors will see.</p>
+    <p class="mb-4">You can use a shortcode to allow visitors to switch between locations: [tapgoods-location-select].</p>
+
+    <div class="position-absolute start-0 end-0" style="height: 16px; background-color: #f0f0f1;"></div>
 
     <!-- Show data for the selected location automatically if a location has been selected -->
     <?php if (!empty($selected_location) && $location_data): ?>
-        <h2>Location Details</h2>
-        <form method="post" action="">
-            <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
-            <button type="submit" name="set_default_location" class="button button-secondary">Set as Default</button>
-        </form>
+        <h2 class="mb-4 pt-4 mt-5">Location Details</h2>
+
         
         <?php if (!empty($default_location) && $default_location == $selected_location): ?>
-            <p id="default_message"><em>This is the current default location.</em></p>
+            <p id="default_message">This is the current default location.</p>
         <?php endif; ?>
 
         <ul>
