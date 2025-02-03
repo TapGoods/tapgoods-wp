@@ -17,7 +17,7 @@ $tg_ttl = get_option( 'tg_ttl', -1 );
 
 ?>
 <h2>Advanced</h2>
-<?php echo $notice; ?>
+<?php echo esc_html( $notice ); ?>
 <form name="tapgoods_advanced" method="post", action="">
 	<?php wp_nonce_field( 'save', '_tgnonce_advanced' ); ?>
 	<div class="mb-3">
