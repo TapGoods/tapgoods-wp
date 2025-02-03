@@ -29,7 +29,10 @@ $today       = wp_date( $date_format );
 		<div class="accordion-item">
 			<h2 class="accordion-header">
 				<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
-				<?php _e( apply_filters( 'tg_categories_header_text', 'Categories' ), 'tapgoods-wp' ); ?>
+                    <?php 
+                        $categories_text = apply_filters( 'tg_categories_header_text', 'Categories' ); 
+                        echo esc_html( $categories_text ); 
+                    ?>
 				</button>
 			</h2>
 			<div id="collapseOne" class="accordion-collapse collapse category-links">
