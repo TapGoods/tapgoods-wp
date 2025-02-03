@@ -66,15 +66,15 @@ if (isset($_POST['confirm_reset'])) {
     <?php wp_nonce_field( 'save', '_tgnonce_connection' ); ?>
     <div class="row">
         <div class="col col-sm-6">
-            <input type="password" id="tapgoods_api_key" name="tapgoods_api_key" value="<?php echo wp_kses( $api_key, 'strip' ); ?>" data-original="<?php echo wp_kses( $api_key, 'strip' ); ?>" size="60" class="form-control round bg-gray px-3 py-2 api-key" <?php echo $key_disabled; ?>>
+            <input type="password" id="tapgoods_api_key" name="tapgoods_api_key" value="<?php echo esc_attr( $api_key ); ?>" data-original="<?php echo esc_attr( $api_key ); ?>" size="60" class="form-control round bg-gray px-3 py-2 api-key" <?php echo esc_attr( $key_disabled ); ?>>
         </div>
         <div class="col col-sm-3">
-            <button type="submit" name="submit" id="tg_update_connection" value="tg_update_connection" class="btn btn-primary bg-blue w-100 py-2 round" data-original="<?php echo esc_attr( $button_text ); ?>" <?php echo $button_disabled; ?>>
+            <button type="submit" name="submit" id="tg_update_connection" value="tg_update_connection" class="btn btn-primary bg-blue w-100 py-2 round" data-original="<?php echo esc_attr( $button_text ); ?>" <?php echo esc_attr( $button_disabled ); ?>>
                 <?php echo esc_html( $button_text ); ?>
             </button>
         </div>
         <div class="col col-sm-3">
-            <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 py-2 round" <?php echo $sync_hidden; ?>>SYNC</button>
+            <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 py-2 round" <?php echo esc_attr( $sync_hidden ); ?>>SYNC</button>
         </div>
     </div>
 
