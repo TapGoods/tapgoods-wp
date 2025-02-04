@@ -314,14 +314,16 @@ class Tapgoods_Connection {
 	public function get_all_existing_inventory_ids() {
 		global $wpdb;
 	
-		$query = "
-			SELECT post_id, meta_value as tg_id 
-			FROM {$wpdb->postmeta}
-			WHERE meta_key = 'tg_id'
-		";
-	
-		$results = $wpdb->get_results($query, ARRAY_A);
-	
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_id, meta_value as tg_id 
+				FROM {$wpdb->postmeta}
+				WHERE meta_key = %s",
+				'tg_id' // Placeholder meta_key
+			),
+			ARRAY_A
+		);
+		
 		$existing_items = [];
 		foreach ($results as $result) {
 			$existing_items[$result['tg_id']] = $result['post_id'];
@@ -1149,23 +1151,28 @@ class Tapgoods_Connection {
 	public function remove_duplicate_items() {
 		global $wpdb;
 	
-		$duplicates_query = "
-			SELECT meta_value AS tg_id, COUNT(*) as count, MIN(post_id) as keep_id
-			FROM {$wpdb->postmeta}
-			WHERE meta_key = 'tg_id'
-			GROUP BY meta_value
-			HAVING count > 1
-		";
-	
-		$duplicates = $wpdb->get_results($duplicates_query);
+		$duplicates = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT meta_value AS tg_id, COUNT(*) as count, MIN(post_id) as keep_id
+				FROM {$wpdb->postmeta}
+				WHERE meta_key = %s
+				GROUP BY meta_value
+				HAVING COUNT(*) > 1",
+				'tg_id'
+			)
+		);
+		
+		
 	
 		foreach ($duplicates as $duplicate) {
-			$duplicate_ids_query = "
-				SELECT post_id
-				FROM {$wpdb->postmeta}
-				WHERE meta_key = 'tg_id' AND meta_value = %s AND post_id != %d
-			";
-			$duplicate_ids = $wpdb->get_col($wpdb->prepare($duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id));
+			$duplicate_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT post_id
+					FROM {$wpdb->postmeta}
+					WHERE meta_key = %s AND meta_value = %s AND post_id != %d",
+					'tg_id', $duplicate->tg_id, $duplicate->keep_id
+				)
+			);			
 	
 			foreach ($duplicate_ids as $post_id) {
 				wp_delete_post($post_id, true);
