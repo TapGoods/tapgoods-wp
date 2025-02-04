@@ -92,7 +92,7 @@ if (isset($_POST['confirm_reset'])) {
 
 <?php 
 $sync_message = $tg_api->last_sync_message();
-error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
+//error_log('Last Sync Message: ' . $sync_message); // Debug: Log sync message
  ?>
 
 
