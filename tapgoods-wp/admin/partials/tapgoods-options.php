@@ -26,8 +26,9 @@ if (isset($_POST['set_default_location']) && $selected_location) {
     echo "
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            localStorage.setItem('tg_user_location', '$default_location');
-            console.log('Default location saved to Local Storage:', '$default_location');
+            var defaultLocation = '" . esc_js( $default_location ) . "';
+            localStorage.setItem('tg_user_location', defaultLocation);
+            console.log('Default location saved to Local Storage:', defaultLocation);
         });
     </script>
     ";
