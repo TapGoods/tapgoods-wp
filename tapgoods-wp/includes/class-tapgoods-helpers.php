@@ -4,7 +4,7 @@ class Tapgoods_Helpers {
 	public static function tgdd( $data, $pre = true ) {
 		if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) {
 			echo ( $pre ) ? '<pre>' : '';
-			var_dump( $data );
+	//		var_dump( $data );
 			die();
 		}
 	}
@@ -17,7 +17,7 @@ class Tapgoods_Helpers {
 	public static function tgpp( $data, $pre = true ) {
 		if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) {
 			echo ( $pre ) ? '<pre>' : '';
-			var_dump( $data );
+	//		var_dump( $data );
 			echo ( $pre ) ? '</pre>' : '';
 		}
 	}
