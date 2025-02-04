@@ -6,7 +6,8 @@ if (!is_array($locations)) {
 }
 
 // Check if a selection exists and display its details
-$selected_location = isset($_POST['selected_location']) ? sanitize_text_field($_POST['selected_location']) : null;
+
+$selected_location = isset($_POST['selected_location']) ? sanitize_text_field( wp_unslash( $_POST['selected_location'] ) ) : null;
 
 // Get the current default location if no selection exists
 $default_location = get_option('tg_default_location');
