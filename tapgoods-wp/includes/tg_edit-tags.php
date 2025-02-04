@@ -436,12 +436,12 @@ if ( true ) {
 	<?php wp_nonce_field( 'add-tag', '_wpnonce_add-tag' ); ?>
 
 <div class="form-field form-required term-name-wrap">
-	<label for="tag-name"><?php _ex( 'Name', 'term name', 'tapgoods-wp' ); ?></label>
+	<label for="tag-name"><?php esc_html_ex( 'Name', 'term name', 'tapgoods-wp' ); ?></label>
 	<input name="tag-name" id="tag-name" type="text" value="" size="40" aria-required="true" aria-describedby="name-description" />
 	<p id="name-description"><?php echo esc_html( $tax->labels->name_field_description ); ?></p>
 </div>
 <div class="form-field term-slug-wrap">
-	<label for="tag-slug"><?php _e( 'Slug', 'tapgoods-wp' ); ?></label>
+	<label for="tag-slug"><?php esc_html_e( 'Slug', 'tapgoods-wp' ); ?></label>
 	<input name="slug" id="tag-slug" type="text" value="" size="40" aria-describedby="slug-description" />
 	<p id="slug-description"><?php echo esc_html( $tax->labels->slug_field_description ); ?></p>
 </div>
@@ -487,14 +487,14 @@ if ( true ) {
 		wp_dropdown_categories( $dropdown_args );
 		?>
 		<?php if ( 'category' === $taxonomy ) : ?>
-		<p id="parent-description"><?php _e( 'Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have children categories for Bebop and Big Band. Totally optional.', 'tapgoods-wp' ); ?></p>
+		<p id="parent-description"><?php esc_html_e( 'Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have children categories for Bebop and Big Band. Totally optional.', 'tapgoods-wp' ); ?></p>
 	<?php else : ?>
 		<p id="parent-description"><?php echo esc_html( $tax->labels->parent_field_description ); ?></p>
 	<?php endif; ?>
 </div>
 	<?php endif; // is_taxonomy_hierarchical() ?>
 <div class="form-field term-description-wrap">
-	<label for="tag-description"><?php _e( 'Description', 'tapgoods-wp' ); ?></label>
+	<label for="tag-description"><?php esc_html_e( 'Description', 'tapgoods-wp' ); ?></label>
 	<textarea name="description" id="tag-description" rows="5" cols="40" aria-describedby="description-description"></textarea>
 	<p id="description-description"><?php echo esc_html( $tax->labels->desc_field_description ); ?></p>
 </div>
