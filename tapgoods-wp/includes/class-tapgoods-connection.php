@@ -320,7 +320,7 @@ class Tapgoods_Connection {
 			WHERE meta_key = 'tg_id'
 		";
 	
-		$results = $wpdb->get_results($query, ARRAY_A);
+		$results = $wpdb->get_results( $wpdb->prepare( $query ) , ARRAY_A );
 	
 		$existing_items = [];
 		foreach ($results as $result) {
@@ -370,13 +370,13 @@ class Tapgoods_Connection {
 			$business_id = false;
 		}
 	
-		$this->console_log('Obtained location_ids: ' . print_r($location_ids, true));
-		$this->console_log('Obtained business_id: ' . print_r($business_id, true));
+	//	$this->console_log('Obtained location_ids: ' . print_r($location_ids, true));
+	//	$this->console_log('Obtained business_id: ' . print_r($business_id, true));
 	
 		if (empty($location_ids) || empty($business_id)) {
 			$this->console_log('location_ids or business_id are empty. Trying to obtain the business.');
 			$business = $this->get_business();
-			$this->console_log('Result of get_business: ' . print_r($business, true));
+	//		$this->console_log('Result of get_business: ' . print_r($business, true));
 	
 			if (false === $business) {
 				$this->console_log('No business found. Exiting the function.');
@@ -385,8 +385,8 @@ class Tapgoods_Connection {
 	
 			$location_ids = get_option('tg_locationIds', false);
 			$business_id = get_option('tg_businessId', false);
-			$this->console_log('After get_business, location_ids: ' . print_r($location_ids, true));
-			$this->console_log('After get_business, business_id: ' . print_r($business_id, true));
+	//		$this->console_log('After get_business, location_ids: ' . print_r($location_ids, true));
+	//		$this->console_log('After get_business, business_id: ' . print_r($business_id, true));
 		}
 	
 		if (false === $location_ids || false === $business_id) {
@@ -413,7 +413,7 @@ class Tapgoods_Connection {
 			if (false === $location_details || empty($location_details)) {
 				$this->console_log('No location_info found in transient. Trying to get it from the API for location_id: ' . $location_id);
 				$location_details = $client->get_location_details_from_graph($location_id);
-				$this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
+	//			$this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
 	
 				if (false === $location_details) {
 					$this->console_log('Error fetching location details for location_id: ' . $location_id);
@@ -1112,11 +1112,11 @@ class Tapgoods_Connection {
 	
 		// Sync categories and tags
 		$categories_result = $this->sync_categories_from_api();
-		$this->console_log('Categories sync result: ' . print_r($categories_result, true));
+	//	$this->console_log('Categories sync result: ' . print_r($categories_result, true));
 	
 		// Sync inventory
 		$inventory_result = $this->sync_inventory_in_batches(false);
-		$this->console_log('Inventory sync result: ' . print_r($inventory_result, true));
+	//	$this->console_log('Inventory sync result: ' . print_r($inventory_result, true));
 	
 		return array(
 			'success' => true,
@@ -1157,7 +1157,7 @@ class Tapgoods_Connection {
 			HAVING count > 1
 		";
 	
-		$duplicates = $wpdb->get_results($duplicates_query);
+		$duplicates = $wpdb->get_results( $wpdb->prepare( $duplicates_query ) );
 	
 		foreach ($duplicates as $duplicate) {
 			$duplicate_ids_query = "
@@ -1165,7 +1165,7 @@ class Tapgoods_Connection {
 				FROM {$wpdb->postmeta}
 				WHERE meta_key = 'tg_id' AND meta_value = %s AND post_id != %d
 			";
-			$duplicate_ids = $wpdb->get_col($wpdb->prepare($duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id));
+			$duplicate_ids = $wpdb->get_col( $wpdb->prepare( $duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id ) );
 	
 			foreach ($duplicate_ids as $post_id) {
 				wp_delete_post($post_id, true);
@@ -1295,7 +1295,7 @@ public function update_inventory_item($post_id, $item) {
 	public function manual_sync_trigger() {
 		$this->console_log('Manual sync:1205'); 
 		$location_info = $this->sync_location_settings(true);
-		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
+//		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
 	
 		if (current_user_can('manage_options')) {
 			$result = $this->sync_inventory_in_batches(true);
@@ -1307,7 +1307,7 @@ public function update_inventory_item($post_id, $item) {
 	
 
 	public function console_log($message) {
-		error_log($message); // Log to PHP error log
+//		error_log($message); // Log to PHP error log
 	}
 
 	
