@@ -462,7 +462,7 @@ add_action('wp_head', 'tg_output_location_styles');
 function tg_output_location_styles() {
     if (!defined('DOING_AJAX') || !DOING_AJAX) {
         echo '<style>';
-        echo tg_location_styles();
+        echo wp_kses_post( tg_location_styles() );
         echo '</style>';
     }
 }
@@ -787,7 +787,7 @@ function tg_clean_duplicate_items() {
 
         // Add a script to display the completion status in the browser console
         add_action('admin_footer', function() use ($deleted_count) {
-            echo "<script>console.log('Duplicate items cleanup completed. Total deleted: {$deleted_count}');</script>";
+            echo "<script>console.log('Duplicate items cleanup completed. Total deleted: " . esc_js( $deleted_count ) . "');</script>";
         });
     }
 }
@@ -993,7 +993,7 @@ add_action('wp_ajax_load_status_tab_content', function () {
 
     <?
 
-    echo ob_get_clean();
+    echo wp_kses_post( ob_get_clean() );
     wp_die();
 });
 
