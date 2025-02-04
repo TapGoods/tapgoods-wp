@@ -320,7 +320,7 @@ class Tapgoods_Connection {
 			WHERE meta_key = 'tg_id'
 		";
 	
-		$results = $wpdb->get_results( $wpdb->prepare( $query ) , ARRAY_A );
+		$results = $wpdb->get_results($query, ARRAY_A);
 	
 		$existing_items = [];
 		foreach ($results as $result) {
@@ -1157,7 +1157,7 @@ class Tapgoods_Connection {
 			HAVING count > 1
 		";
 	
-		$duplicates = $wpdb->get_results( $wpdb->prepare( $duplicates_query ) );
+		$duplicates = $wpdb->get_results($duplicates_query);
 	
 		foreach ($duplicates as $duplicate) {
 			$duplicate_ids_query = "
@@ -1165,7 +1165,7 @@ class Tapgoods_Connection {
 				FROM {$wpdb->postmeta}
 				WHERE meta_key = 'tg_id' AND meta_value = %s AND post_id != %d
 			";
-			$duplicate_ids = $wpdb->get_col( $wpdb->prepare( $duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id ) );
+			$duplicate_ids = $wpdb->get_col($wpdb->prepare($duplicate_ids_query, $duplicate->tg_id, $duplicate->keep_id));
 	
 			foreach ($duplicate_ids as $post_id) {
 				wp_delete_post($post_id, true);

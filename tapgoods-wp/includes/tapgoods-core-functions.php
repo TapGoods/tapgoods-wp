@@ -199,12 +199,12 @@ function tg_get_product_weight( $product_id ) {
 function tg_write_log( $data ) {
 	if ( true === WP_DEBUG && true === WP_DEBUG_LOG ) {
 		if ( is_array( $data ) || is_object( $data ) ) {
-			error_log( 'tgwpdev: ' . print_r( $data, true ) );
+//			error_log( 'tgwpdev: ' . print_r( $data, true ) );
 		} else {
 			ob_start();
-			var_dump( $data );
+//			var_dump( $data );
 			$data = ob_get_clean();
-			error_log( 'tgwpdev: ' . $data );
+//			error_log( 'tgwpdev: ' . $data );
 		}
 	}
 }
@@ -565,7 +565,7 @@ function tg_get_cart_url($wp_location_id) {
     $location_data = get_option('tg_location_' . $wp_location_id);
 
     if (empty($location_data) || !isset($location_data['cart_url'])) {
-        error_log("tg_cart_url not found for location_id: " . $wp_location_id);
+   //     error_log("tg_cart_url not found for location_id: " . $wp_location_id);
         return '#'; // Fallback value if no URL
     }
 
@@ -598,7 +598,7 @@ function tg_get_add_to_cart_url($wp_location_id) {
     $url = isset($location_data['add_to_cart']) ? $location_data['add_to_cart'] : '#';
     
     // Log to verify the URL value
-    error_log("Add to Cart URL: " . $url);
+//    error_log("Add to Cart URL: " . $url);
     
     return $url;
 }
@@ -612,7 +612,7 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
     if ( ! is_array( $location ) || empty( $location ) ) {
         $default_location_id = get_option('tg_default_location');
         if ( !$default_location_id ) {
-            error_log("Location not found for product_id: $product_id and no default location set.");
+//            error_log("Location not found for product_id: $product_id and no default location set.");
             return '#';
         }
         $base_url = tg_get_add_to_cart_url( $default_location_id );
@@ -625,7 +625,7 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
 
     // Verify that `base_url` and `cart_url` are valid
     if ( $base_url === '#' || !$cart_url ) {
-        error_log("Add to Cart URL or Cart URL not found for location_id: " . ( $location->term_id ?? 'Default' ));
+//        error_log("Add to Cart URL or Cart URL not found for location_id: " . ( $location->term_id ?? 'Default' ));
         return '#';
     }
 
@@ -647,7 +647,7 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
     // Add parameters to the base URL
     $url = add_query_arg( $params, $base_url );
 
-    error_log("Final Add to Cart URL: " . $url); // Log for verification
+//    error_log("Final Add to Cart URL: " . $url); // Log for verification
 
     return $url;
 }
@@ -837,7 +837,7 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
  
 
  function handle_tg_search() {
-    error_log("AJAX Request Received: " . print_r($_POST, true));
+   // error_log("AJAX Request Received: " . print_r($_POST, true));
 
     $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field($_POST['s']) : null;
     $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field($_POST['tg_location_id']) : '';
@@ -911,7 +911,7 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
             ];
         }
     } else {
-        error_log("No posts found.");
+//        error_log("No posts found.");
     }
 
     wp_reset_postdata();
@@ -1045,34 +1045,34 @@ add_action('wp_ajax_get_item_image', 'get_item_image');
 add_action('wp_ajax_nopriv_get_item_image', 'get_item_image'); // For non-logged-in users
 
 function get_item_image() {
-    error_log('AJAX call received in get_item_image');
-    error_log('POST Data: ' . print_r($_POST, true));
+//    error_log('AJAX call received in get_item_image');
+//    error_log('POST Data: ' . print_r($_POST, true));
 
     if (!isset($_POST['item_id']) || empty($_POST['item_id'])) {
-        error_log('Item ID is missing or invalid.');
+//        error_log('Item ID is missing or invalid.');
         wp_send_json_error(['message' => 'Item ID is missing or invalid.']);
         return;
     }
 
     $item_id = intval($_POST['item_id']);
-    error_log('Item ID: ' . $item_id);
+//    error_log('Item ID: ' . $item_id);
 
     if ($item_id <= 0) {
-        error_log('Invalid Item ID.');
+//        error_log('Invalid Item ID.');
         wp_send_json_error(['message' => 'Invalid Item ID.']);
         return;
     }
 
     $pictures = get_post_meta($item_id, 'tg_pictures', true);
-    error_log('Pictures Meta: ' . print_r($pictures, true));
+//    error_log('Pictures Meta: ' . print_r($pictures, true));
 
     if (!empty($pictures) && isset($pictures[0]['imgixUrl'])) {
         $img_url = $pictures[0]['imgixUrl'];
-        error_log("Image found for Item ID $item_id: $img_url");
+//        error_log("Image found for Item ID $item_id: $img_url");
         wp_send_json_success(['img_url' => $img_url]);
     } else {
         $placeholder_url = 'https://your-placeholder-url.com/placeholder.png';
-        error_log("No image found for Item ID $item_id. Using placeholder: $placeholder_url");
+//        error_log("No image found for Item ID $item_id. Using placeholder: $placeholder_url");
         wp_send_json_success(['img_url' => $placeholder_url]);
     }
 }
@@ -1120,15 +1120,15 @@ function get_image_by_item_id() {
 function tg_update_inventory_grid() {
     if (isset($_POST['category'])) {
         $category = sanitize_text_field($_POST['category']);
-        error_log("AJAX received category: " . $category);
+//        error_log("AJAX received category: " . $category);
 
         // Generate the shortcode dynamically
         $shortcode = "[tapgoods-inventory-grid category=\"$category\"]";
-        error_log("Shortcode generated dynamically: " . $shortcode);
+//        error_log("Shortcode generated dynamically: " . $shortcode);
 
         echo do_shortcode($shortcode);
     } else {
-        error_log("AJAX missing category parameter.");
+ //       error_log("AJAX missing category parameter.");
         echo "Error: Missing category.";
     }
     wp_die();
@@ -1144,14 +1144,14 @@ function tg_custom_tax_template($template) {
         $custom_template = WP_PLUGIN_DIR . '/tapgoods-wp/public/partials/tg-tag-results.php';
 
         // Log to debug
-        error_log('Custom taxonomy template being checked: ' . $custom_template);
+//        error_log('Custom taxonomy template being checked: ' . $custom_template);
 
         // Check if the custom template file exists
         if (file_exists($custom_template)) {
-            error_log('Custom taxonomy template found and used.');
+//            error_log('Custom taxonomy template found and used.');
             return $custom_template; // Return the custom template
         } else {
-            error_log('Custom taxonomy template NOT found.');
+//            error_log('Custom taxonomy template NOT found.');
         }
     }
 
