@@ -1,77 +1,135 @@
-=== Plugin Name ===
-Contributors: 
-Tags: 
+=== TapGoods Rental Inventory ===
+Contributors: Aaron Valiente
+Tags: tapgoods, rental, inventory
 Requires at least: 
-Tested up to: 
-Stable tag: 
+Tested up to: 6.7.1
+Stable tag: 0.1.71
 License: MIT
 
-Here is a short description of the plugin.  This should be no more than 150 characters.  No markup here.
+Plugin in development that will add TapGoods integration to WordPress websites
 
 == Description ==
 
-This is the long description.  No limit, and you can use Markdown (as well as in the following sections).
+# TapGoods WordPress Plugin
 
-For backwards compatibility, if this section is missing, the full length of the short description will be used, and
-Markdown parsed.
+Plugin in development that will add TapGoods integration to WordPress websites
 
-A few notes about the sections above:
+## Setup
 
-*   "Contributors" is a comma separated list of wp.org/wp-plugins.org usernames
-*   "Tags" is a comma separated list of tags that apply to the plugin
-*   "Requires at least" is the lowest version that the plugin will work on
-*   "Tested up to" is the highest version that you've *successfully used to test the plugin*. Note that it might work on
-higher versions... this is just the highest one you've verified.
-*   Stable tag should indicate the Subversion "tag" of the latest stable version, or "trunk," if you use `/trunk/` for
-stable.
+This project is using docker-compose to run a WordPress locally with mkcert for HTTPS
 
-    Note that the `readme.txt` of the stable tag is the one that is considered the defining one for the plugin, so
-if the `/trunk/readme.txt` file says that the stable tag is `4.3`, then it is `/tags/4.3/readme.txt` that'll be used
-for displaying information about the plugin.  In this situation, the only thing considered from the trunk `readme.txt`
-is the stable tag pointer.  Thus, if you develop in trunk, you can update the trunk `readme.txt` to reflect changes in
-your in-development version, without having that information incorrectly disclosed about the current stable version
-that lacks those changes -- as long as the trunk's `readme.txt` points to the correct stable tag.
+### Prerequisites:
+- Docker
+- git
+- mkcert (for SSL)
+- sass
+- node
 
-    If no stable tag is provided, it is assumed that trunk is stable, but you should specify "trunk" if that's where
-you put the stable version, in order to eliminate any doubt.
+### Installation
+#### 1. Clone this repo into a folder on your machine and cd into your new folder
 
-== Installation ==
+#### 2. Install Certificates
 
-1. Upload `plugin-name.php` to the `/wp-content/plugins/` directory
-1. Activate the plugin through the 'Plugins' menu in WordPress
+Generate and install SSL certificates. This is a one-time process.
 
-== Frequently Asked Questions ==
+Visit https://github.com/FiloSottile/mkcert?tab=readme-ov-file#installation and install it on your machine.
 
-= A question that someone might have =
+After installing mkcert, run the following commands to generate and install the SSL certificates.
 
-An answer to that question.
+```bash
+mkcert -install
+cd dev/certs
+mkcert -key-file /ws/certs/wordpress.local-key.pem -cert-file /ws/certs/wordpress.local.pem wordpress.local
+```
 
-= What about foo bar? =
+##### Note for WSL users:
 
-Answer to foo bar dilemma.
+If you're using WSL2 on windows you can install mkcert in WSL like this:
+1. Install mkcert in WSL2 as usual
+1. Run command: mkcert -install from WSL2
+1. Copy the root CA certificate from /usr/local/share/ca-certificates to any directory on Windows, for example I will copy to the D: drive on Windows:
+1. cp /usr/local/share/ca-certificates/mkcert_development_CA_257563636493456315191321627148517461377.crt /mnt/d/
+1. Double click to open the cert in the D:\mkcert_development_CA_257563636493456315191321627148517461377.crt. Install it to Trusted Root Certification Authorities
+1. Open RUN with command Windows + R and paste certmgr.msc and verify it's in the list
+1. From now, you can use mkcert in the WSL2 environment to create certificates for your site and the cert will be trusted by windows and browser environment.
 
-== Screenshots ==
+#### 3. Edit Hosts
 
-1. This screen shot description corresponds to screenshot-1.(png|jpg|jpeg|gif). Note that the screenshot is taken from
-the /assets directory or the directory that contains the stable readme.txt (tags or trunk). Screenshots in the /assets
-directory take precedence. For example, `/assets/screenshot-1.png` would win over `/tags/4.3/screenshot-1.png`
-(or jpg, jpeg, gif).
-2. This is the second screen shot
+ Add an entry to /etc/hosts (Mac/Linux) or C:\Windows\System32\drivers\etc\hosts (Windows)
 
-== Changelog ==
+Instructions: https://www.hostinger.com/tutorials/how-to-edit-hosts-file
 
-= 1.0 =
-* A change since the previous version.
-* Another change.
+```bash
+127.0.0.1 wordpress.local
+```
 
-= 0.5 =
-* List versions from most recent at top to oldest at bottom.
+#### 4. Configure localdev.env file
 
-== Upgrade Notice ==
+Create a localdev.env file with the data you find in example.env
 
-= 1.0 =
-Upgrade notices describe the reason a user should upgrade.  No more than 300 characters.
+```bash
+cp example.env localdev.env
+```
 
-= 0.5 =
-This version fixes a security related bug.  Upgrade immediately.
+#### 5. Start the WordPress server
 
+```bash
+docker compose up
+```
+
+##### Get access to the wordpress docker shell
+
+```bash
+docker compose exec wordpress /bin/bash
+```
+
+
+## Access the WordPress site
+
+Visit https://wordpress.local in your browser.
+
+On your first visit you will need to confirm the install and setup an admin user.
+
+Once you're in the admin navigate to plugins and activate the TapGoods Plugin.
+
+or run to activate it
+```bash
+docker compose run --rm wpcli plugin activate tapgoods-wp
+```
+
+## WP-CLI
+
+To use WP-CLI, run the following command:
+
+```bash
+docker compose run --rm wpcli [command]
+```
+
+example to set a password
+```bash
+docker compose run --rm wpcli user list
+docker compose run --rm wpcli user update 1 --user_pass=password
+```
+
+example to enable debug
+```bash
+docker compose run --rm wpcli config set --raw WP_DEBUG true
+docker compose run --rm wpcli config set --raw WP_DEBUG_LOG true
+docker compose run --rm wpcli config list WP_DEBUG
+```
+
+example to copy a file out of the container to the host
+```bash
+docker cp wordpress:/var/www/html/wp-content/debug.log debug.log
+```
+
+### Compiling SASS files
+
+Currently we're just using SASS to customize bootstrap for the WP-Admin. If you need to make changes to the custom boostrap file run the following command:
+```
+sass --watch ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css
+```
+## Questions
+
+**Q:** I'm a TapGoods customer, can I use this now?
+- **A:** No, when the plugin is ready it will be released on WordPress.org
