@@ -3,7 +3,7 @@
 // get id location and url cart
 global $post;
 // Capture the location ID from the URL if present
-$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+$local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_text_field( wp_unslash( $_GET['local_storage_location'] ) ) : null;
 
 // Retrieve the current location ID
 $location_id = $local_storage_location ?: tg_get_wp_location_id();
@@ -11,10 +11,10 @@ $location_id = $local_storage_location ?: tg_get_wp_location_id();
 
 
 // Check if 'local_storage_location' is present in the URL
-$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+$local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_text_field( wp_unslash( $_GET['local_storage_location'] ) ) : null;
 
 // Check the cookie 'tg_user_location'
-$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
 $location = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
 
 

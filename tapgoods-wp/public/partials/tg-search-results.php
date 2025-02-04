@@ -4,8 +4,22 @@ $wp_load_paths = [
     dirname(__DIR__, 3) . '/wp-load.php',
     dirname(__DIR__, 4) . '/wp-load.php',
     dirname(__DIR__, 5) . '/wp-load.php',
-    dirname($_SERVER['SCRIPT_FILENAME'], 5) . '/wp-load.php',
-    dirname($_SERVER['SCRIPT_FILENAME'], 6) . '/wp-load.php'
+    $script_filename = isset( $_SERVER['SCRIPT_FILENAME'] ) 
+    ? realpath( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) 
+    : '';
+
+    if ( $script_filename ) {
+        $wp_load_path = dirname( $script_filename, 5 ) . '/wp-load.php';
+    }
+
+    $script_filename = isset( $_SERVER['SCRIPT_FILENAME'] ) 
+    ? realpath( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) 
+    : '';
+
+    if ( $script_filename ) {
+        $wp_load_path = dirname( $script_filename, 6 ) . '/wp-load.php';
+    }
+
 ];
 
 $wp_load_found = false;
@@ -42,8 +56,8 @@ $event_end_formatted = $event_end->format('Y-m-d\TH:i');
 // Retrieve query parameters
 $paged = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
 $posts_per_page = isset($_GET['per-page']) ? intval($_GET['per-page']) : 12;
-$search_query = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
-$location_id = isset($_GET['tg_location_id']) ? sanitize_text_field($_GET['tg_location_id']) : get_option('tg_default_location');
+$search_query = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+$location_id = isset( $_GET['tg_location_id'] ) ? sanitize_text_field( wp_unslash( $_GET['tg_location_id'] ) ) : get_option( 'tg_default_location' );
 
 // Retrieve location data based on location_id
 $location_option = get_option("tg_location_{$location_id}");

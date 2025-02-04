@@ -17,18 +17,18 @@ $per_page_default = isset($atts['per_page_default'])
     ? (int) preg_replace('/[^0-9]/', '', trim($atts['per_page_default'], '“”"')) // Clean the value by removing non-numeric characters and quotes, then convert to integer
     : 12; // Default value is 12 if the attribute is not set
 
-$tg_per_page = isset($_GET['tg-per-page']) && in_array($_GET['tg-per-page'], array(12, 24, 48))
-    ? (int) sanitize_text_field($_GET['tg-per-page'])
-    : $per_page_default;
-    
+$tg_per_page = isset( $_GET['tg-per-page'] ) ? absint( wp_unslash( $_GET['tg-per-page'] ) ) : 0;
+
+$tg_per_page = in_array( $tg_per_page, array( 12, 24, 48 ), true ) ? (int) sanitize_text_field( $tg_per_page ) : $per_page_default;
+
 
 $tg_page = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
 // Check if 'local_storage_location' is present in the URL
-$local_storage_location = isset($_GET['local_storage_location']) ? sanitize_text_field($_GET['local_storage_location']) : null;
+$local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_text_field( wp_unslash( $_GET['local_storage_location'] ) ) : null;
 
 // Check the cookie 'tg_user_location'
-$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field($_COOKIE['tg_user_location']) : null;
+$cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
 $location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
 
 

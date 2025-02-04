@@ -2,7 +2,7 @@
 
 
 // Priority the value from the URL over $atts['category']
-$category = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : (! empty( $atts['category'] ) ? $atts['category'] : '');
+$category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : ( ! empty( $atts['category'] ) ? sanitize_text_field( $atts['category'] ) : '' );
 $category_attribute = $category ? "category=\"{$category}\"" : '';
 
 $tags                   = ! empty( $atts['tags'] ) ? "tags=\"{$atts['tags']}\"" : '';

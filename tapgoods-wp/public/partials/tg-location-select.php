@@ -89,7 +89,8 @@ if (!function_exists('tg_set_default_location')) {
     function tg_set_default_location() {
 //        error_log("AJAX action 'set_default_location' triggered.");
         if (isset($_POST['location_id'])) {
-            $location_id = sanitize_text_field($_POST['location_id']);
+            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : '';
+
 //            error_log("Received location_id: $location_id");
             wp_send_json_success("Location set to $location_id");
         } else {

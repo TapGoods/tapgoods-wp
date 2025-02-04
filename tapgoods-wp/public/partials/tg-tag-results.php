@@ -49,7 +49,7 @@ if (!isset($atts)) {
 $tags = $current_tag_name ? "tag=\"{$current_tag_name}\"" : '';
 
 // Priority the value from the URL over $atts['category']
-$category = isset($_GET['category']) ? sanitize_text_field($_GET['category']) : (!empty($atts['category']) ? $atts['category'] : '');
+$category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : ( ! empty( $atts['category'] ) ? sanitize_text_field( $atts['category'] ) : '' );
 $category_attribute = $category ? "category=\"{$category}\"" : '';
 
 $per_page_default = isset($atts['per_page_default']) ? "per_page_default=\"{$atts['per_page_default']}\"" : '';
