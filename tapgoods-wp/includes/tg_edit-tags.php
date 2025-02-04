@@ -14,23 +14,23 @@ require_once ABSPATH . '/wp-admin/admin.php';
 
 global $taxnow;
 if ( ! $taxnow ) {
-	wp_die( __( 'Invalid taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods-wp' ) );
 }
 
 $tax = get_taxonomy( $taxnow );
 
 if ( ! $tax ) {
-	wp_die( __( 'Invalid taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods-wp' ) );
 }
 
 if ( ! in_array( $tax->name, get_taxonomies( array( 'show_ui' => true ) ), true ) ) {
-	wp_die( __( 'Sorry, you are not allowed to edit terms in this taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Sorry, you are not allowed to edit terms in this taxonomy.', 'tapgoods-wp' ) );
 }
 
 if ( ! current_user_can( $tax->cap->manage_terms ) ) {
 	wp_die(
-		'<h1>' . __( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-		'<p>' . __( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+		'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
+		'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
 		403
 	);
 }
@@ -85,8 +85,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( $tax->cap->edit_terms ) ) {
 			wp_die(
-				'<h1>' . __( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . __( 'Sorry, you are not allowed to create terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
 				403
 			);
 		}
@@ -116,8 +116,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( 'delete_term', $tag_ID ) ) {
 			wp_die(
-				'<h1>' . __( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . __( 'Sorry, you are not allowed to delete this item.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
 				403
 			);
 		}
@@ -136,8 +136,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( $tax->cap->delete_terms ) ) {
 			wp_die(
-				'<h1>' . __( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . __( 'Sorry, you are not allowed to delete these items.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
 				403
 			);
 		}
@@ -160,7 +160,7 @@ switch ( $wp_list_table->current_action() ) {
 		$term    = get_term( $term_id );
 
 		if ( ! $term instanceof WP_Term ) {
-			wp_die( __( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
+			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
 		}
 
 		wp_redirect( sanitize_url( get_edit_term_link( $term_id, $taxonomy, $post_type ) ) );
@@ -172,15 +172,15 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( 'edit_term', $tag_ID ) ) {
 			wp_die(
-				'<h1>' . __( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . __( 'Sorry, you are not allowed to edit this item.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
 				403
 			);
 		}
 
 		$tag = get_term( $tag_ID, $taxonomy );
 		if ( ! $tag ) {
-			wp_die( __( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
+			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
 		}
 
 		$ret = wp_update_term( $tag_ID, $taxonomy, $_POST );
@@ -342,7 +342,7 @@ if ( isset( $_REQUEST['s'] ) && strlen( $_REQUEST['s'] ) ) {
 	echo '<span class="subtitle">';
 	printf(
 		/* translators: %s: Search query. */
-		__( 'Search results for: %s', 'tapgoods-wp' ),
+		esc_html__( 'Search results for: %s', 'tapgoods-wp' ),
 		'<strong>' . esc_html( wp_unslash( $_REQUEST['s'] ) ) . '</strong>'
 	);
 	echo '</span>';
@@ -411,7 +411,7 @@ if ( true ) {
 <p>Use TapGoods to edit, add, and remove categories and tags</p>
 	<?php if ( false ) : ?>
 <div class="form-wrap">
-<h2><?php echo $tax->labels->add_new_item; ?></h2>
+<h2><?php echo esc_html( $tax->labels->add_new_item ); ?></h2>
 <form id="addtag" method="post" action="edit-tags.php" class="validate"
 	<?php
 	/**
@@ -438,12 +438,12 @@ if ( true ) {
 <div class="form-field form-required term-name-wrap">
 	<label for="tag-name"><?php _ex( 'Name', 'term name', 'tapgoods-wp' ); ?></label>
 	<input name="tag-name" id="tag-name" type="text" value="" size="40" aria-required="true" aria-describedby="name-description" />
-	<p id="name-description"><?php echo $tax->labels->name_field_description; ?></p>
+	<p id="name-description"><?php echo esc_html( $tax->labels->name_field_description ); ?></p>
 </div>
 <div class="form-field term-slug-wrap">
 	<label for="tag-slug"><?php _e( 'Slug', 'tapgoods-wp' ); ?></label>
 	<input name="slug" id="tag-slug" type="text" value="" size="40" aria-describedby="slug-description" />
-	<p id="slug-description"><?php echo $tax->labels->slug_field_description; ?></p>
+	<p id="slug-description"><?php echo esc_html( $tax->labels->slug_field_description ); ?></p>
 </div>
 	<?php if ( 'tg_tags' === $taxonomy ) : ?>
 <div class="form-field term-parent-wrap">
@@ -489,14 +489,14 @@ if ( true ) {
 		<?php if ( 'category' === $taxonomy ) : ?>
 		<p id="parent-description"><?php _e( 'Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have children categories for Bebop and Big Band. Totally optional.', 'tapgoods-wp' ); ?></p>
 	<?php else : ?>
-		<p id="parent-description"><?php echo $tax->labels->parent_field_description; ?></p>
+		<p id="parent-description"><?php echo esc_html( $tax->labels->parent_field_description ); ?></p>
 	<?php endif; ?>
 </div>
 	<?php endif; // is_taxonomy_hierarchical() ?>
 <div class="form-field term-description-wrap">
 	<label for="tag-description"><?php _e( 'Description', 'tapgoods-wp' ); ?></label>
 	<textarea name="description" id="tag-description" rows="5" cols="40" aria-describedby="description-description"></textarea>
-	<p id="description-description"><?php echo $tax->labels->desc_field_description; ?></p>
+	<p id="description-description"><?php echo esc_html( $tax->labels->desc_field_description ); ?></p>
 </div>
 
 	<?php
@@ -572,10 +572,11 @@ if ( true ) {
 <p>
 	<?php
 	printf(
-		/* translators: %s: Default category. */
-		__( 'Deleting a category does not delete the posts in that category. Instead, posts that were only assigned to the deleted category are set to the default category %s. The default category cannot be deleted.', 'tapgoods-wp' ),
-		/** This filter is documented in wp-includes/category-template.php */
-		'<strong>' . apply_filters( 'the_category', get_cat_name( get_option( 'default_category' ) ), '', '' ) . '</strong>'
+		wp_kses(
+			'Deleting a category does not delete the posts in that category. Instead, posts that were only assigned to the deleted category are set to the default category %s. The default category cannot be deleted.',
+			'tapgoods-wp'
+		),
+		'<strong>' . esc_html( apply_filters( 'the_category', get_cat_name( get_option( 'default_category' ) ), '', '' ) ) . '</strong>'
 	);
 	?>
 </p>
@@ -583,8 +584,11 @@ if ( true ) {
 	<p>
 		<?php
 		printf(
-			/* translators: %s: URL to Categories to Tags Converter tool. */
-			__( 'Categories can be selectively converted to tags using the <a href="%s">category to tag converter</a>.', 'tapgoods-wp' ),
+			wp_kses(
+				/* translators: %s: URL to Categories to Tags Converter tool. */
+				__( 'Categories can be selectively converted to tags using the <a href="%s">category to tag converter</a>.', 'tapgoods-wp' ),
+				array( 'a' => array( 'href' => array() ) ) // Permitir solo <a> con atributo href
+			),
 			esc_url( $import_link )
 		);
 		?>
@@ -596,8 +600,11 @@ if ( true ) {
 <p>
 	<?php
 	printf(
-		/* translators: %s: URL to Categories to Tags Converter tool. */
-		__( 'Tags can be selectively converted to categories using the <a href="%s">tag to category converter</a>.', 'tapgoods-wp' ),
+		wp_kses(
+			/* translators: %s: URL to Tag to Category Converter tool. */
+			__( 'Tags can be selectively converted to categories using the <a href="%s">tag to category converter</a>.', 'tapgoods-wp' ),
+			array( 'a' => array( 'href' => array() ) ) // Permitir solo <a> con atributo href
+		),
 		esc_url( $import_link )
 	);
 	?>
