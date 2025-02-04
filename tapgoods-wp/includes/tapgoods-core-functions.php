@@ -408,7 +408,7 @@ function tg_get_locations() {
 
 function tg_location_styles() {
     // Obtener el location_id dinámicamente, por ejemplo, desde una cookie o configuración
-    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field($_COOKIE['tg_location_id']) : get_option('tg_default_location');
+    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_location_id'] ) ) : get_option('tg_default_location');
 
     // Registrar un log si no se encontró el location_id
     if ( !$location_id ) {
@@ -511,7 +511,7 @@ function tg_get_tg_location_id( $post_id = false ) {
     function tg_get_wp_location_id() {
         // Check if the value is provided via a cookie (set by JavaScript)
         if (isset($_COOKIE['tg_user_location']) && !empty($_COOKIE['tg_user_location'])) {
-            return sanitize_text_field($_COOKIE['tg_user_location']);
+            return sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) );
         }
     
         // Check session value (optional)
@@ -669,7 +669,7 @@ function tg_get_page_id( $page ) {
 
 function tg_get_start_date() {
     // Get the start date of the cookie, if it exists
-    $start_date = isset($_COOKIE['tg-eventStart']) ? sanitize_text_field($_COOKIE['tg-eventStart']) : '';
+    $start_date = isset($_COOKIE['tg-eventStart']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) : '';
 
     // If the cookie date is invalid or older than today, set the start date to today
     $today = wp_date('Y-m-d');
@@ -694,7 +694,7 @@ function tg_get_end_date() {
     $start_date = tg_get_start_date();
 
     // Get the cookie expiration date, if any
-    $end_date = isset($_COOKIE['tg-eventEnd']) ? sanitize_text_field($_COOKIE['tg-eventEnd']) : '';
+    $end_date = isset($_COOKIE['tg-eventEnd']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) : '';
 
     // If the cookie date is invalid or older than three days after the start date, set to three days after the start
     $min_end_date = wp_date('Y-m-d', strtotime($start_date . ' +3 days'));
@@ -801,7 +801,7 @@ add_action('pre_get_posts', function($query) {
         
         // Make sure `tg_location_id` is in the request
         if (!empty($_GET['tg_location_id'])) {
-            $location_id = sanitize_text_field($_GET['tg_location_id']);
+            $location_id = sanitize_text_field( wp_unslash( $_GET['tg_location_id'] ) );
             
             // Add a meta_query relation to filter by `location_id`
             $query->set('meta_query', array(
@@ -839,12 +839,12 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
  function handle_tg_search() {
    // error_log("AJAX Request Received: " . print_r($_POST, true));
 
-    $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field($_POST['s']) : null;
-    $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field($_POST['tg_location_id']) : '';
-    $tags        = isset($_POST['tg_tags']) && !empty($_POST['tg_tags']) ? explode(',', sanitize_text_field($_POST['tg_tags'])) : [];
-    $categories  = isset($_POST['tg_categories']) && !empty($_POST['tg_categories']) ? explode(',', sanitize_text_field($_POST['tg_categories'])) : [];
-    $per_page    = isset($_POST['per_page_default']) ? (int) sanitize_text_field($_POST['per_page_default']) : 12;
-    $paged       = isset($_POST['paged']) ? (int) sanitize_text_field($_POST['paged']) : 1;
+    $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field( wp_unslash( $_POST['s'] ) ) : null;
+    $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field( wp_unslash( $_POST['tg_location_id'] ) ) : '';
+    $tags = isset($_POST['tg_tags']) && !empty($_POST['tg_tags']) ? explode(',', sanitize_text_field( wp_unslash( $_POST['tg_tags'] ) ) ) : [];
+    $categories = isset($_POST['tg_categories']) && !empty($_POST['tg_categories']) ? explode(',', sanitize_text_field( wp_unslash( $_POST['tg_categories'] ) ) ) : [];
+    $per_page = isset($_POST['per_page_default']) ? (int) sanitize_text_field( wp_unslash( $_POST['per_page_default'] ) ) : 12;
+    $paged = isset($_POST['paged']) ? (int) sanitize_text_field( wp_unslash( $_POST['paged'] ) ) : 1;
     $is_default  = isset($_POST['default']) && $_POST['default'] === 'true';
 
     $categories = array_map(function($category) {
@@ -991,7 +991,7 @@ add_action('wp_ajax_load_status_tab_content', function () {
     </div>
 </div>
 
-    <?
+    <?php
 
     echo wp_kses_post( ob_get_clean() );
     wp_die();
@@ -1002,7 +1002,7 @@ function tg_get_default_location() {
     // Check if the value is provided via AJAX
     if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
         // Sanitize and return the value from localStorage
-        return sanitize_text_field($_POST['local_storage_location']);
+        return sanitize_text_field( wp_unslash( $_POST['local_storage_location'] ) );
     }
 
     // Otherwise, return the value from the WordPress options
@@ -1028,9 +1028,8 @@ add_action('wp_ajax_nopriv_tg_set_local_storage_location', 'tg_set_local_storage
 function tg_set_local_storage_location() {
     if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
         // Optionally store in a session or other server-side variable
-        $_SESSION['tg_default_location'] = sanitize_text_field($_POST['local_storage_location']);
-        
-        wp_send_json_success($_SESSION['tg_default_location']);
+        $_SESSION['tg_default_location'] = isset($_POST['local_storage_location']) ? sanitize_text_field( wp_unslash( $_POST['local_storage_location'] ) ) : '';
+        wp_send_json_success( isset($_SESSION['tg_default_location']) ? sanitize_text_field( wp_unslash( $_SESSION['tg_default_location'] ) ) : '' );
     } else {
         wp_send_json_error('No location provided');
     }
@@ -1085,7 +1084,7 @@ function get_image_by_item_id() {
         wp_send_json_error(['message' => 'Invalid item_id provided.']);
     }
 
-    $item_id = sanitize_text_field($_POST['item_id']);
+    $item_id = isset($_POST['item_id']) ? sanitize_text_field( wp_unslash( $_POST['item_id'] ) ) : '';
 
     global $wpdb;
 
@@ -1119,7 +1118,7 @@ function get_image_by_item_id() {
 
 function tg_update_inventory_grid() {
     if (isset($_POST['category'])) {
-        $category = sanitize_text_field($_POST['category']);
+        $category = isset($_POST['category']) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';
 //        error_log("AJAX received category: " . $category);
 
         // Generate the shortcode dynamically
