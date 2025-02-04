@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (statusTab) {
         statusTab.addEventListener('click', function () {
             // reload the content when the tab is clicked
-            fetch("<?php echo admin_url('admin-ajax.php'); ?>", {
+            fetch("<?php echo esc_url( admin_url('admin-ajax.php') ); ?>", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
