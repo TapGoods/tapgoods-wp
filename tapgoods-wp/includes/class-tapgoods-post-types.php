@@ -505,7 +505,7 @@ class Tapgoods_Post_Types {
 		$output = '';
 		$skip   = false;
 		ob_start();
-		echo( "<p><strong>{$k}: </strong>" );
+		echo "<p><strong>" . esc_html( $k ) . ": </strong></p>";
 		foreach ( $values as $v ) {
 			$value = maybe_unserialize( $v );
 			if ( is_array( $value ) && empty( $value ) ) {
@@ -566,8 +566,8 @@ class Tapgoods_Post_Types {
 
 	public static function tg_print_image_preview( $images ) {
 		foreach ( $images as $img ) {
-			echo "<li><a href=\"{$img['url']}\" target=\"_blank\"><img src=\"{$img['url']}\" height=\"200\"></a>";
-			echo "<p>URL: {$img['url']}</p></li>";
+			echo '<li><a href="' . esc_url( $img['url'] ) . '" target="_blank"><img src="' . esc_url( $img['url'] ) . '" height="200"></a></li>';
+			echo '<p>URL: ' . esc_url( $img['url'] ) . '</p></li>';
 		}
 	}
 
@@ -585,7 +585,7 @@ class Tapgoods_Post_Types {
 			<?php // Tapgoods_Helpers::tgpp( $meta ); ?>
 			<ul>
 			<?php foreach ( $meta as $k => $v ) : ?>
-				<?php echo self::tg_handle_postmeta( $k, $v ); ?>
+				<?php echo esc_html( self::tg_handle_postmeta( $k, $v ) ); ?>
 			<?php endforeach; ?>
 			</ul>
 		</div>
@@ -715,7 +715,7 @@ function fill_location_column_in_inventory($column, $post_id) {
             $location_name = isset($location_data['fullName']) ? $location_data['fullName'] : "Location {$location_id}";
             echo esc_html("{$location_id} - {$location_name}");
         } else {
-            echo __('Location details not found', 'tapgoods-wp');
+            echo esc_html__( 'Location details not found', 'tapgoods-wp' );
         }
     }
 }
