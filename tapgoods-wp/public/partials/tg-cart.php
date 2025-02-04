@@ -69,7 +69,7 @@ const savedLocation = localStorage.getItem('tg_user_location');
 
 if (savedLocation) {
         // Enviar el valor al servidor mediante AJAX
-        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+        fetch('<?php echo esc_url( admin_url("admin-ajax.php") ); ?>', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
