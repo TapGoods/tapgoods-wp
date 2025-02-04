@@ -702,13 +702,13 @@ function fill_location_column_in_inventory($column, $post_id) {
         }
 
         // Debugging log
-        error_log("Post ID: {$post_id}, Location ID retrieved: " . print_r($location_id, true));
+       // error_log("Post ID: {$post_id}, Location ID retrieved: " . print_r($location_id, true));
 
         // Get location details from 'tg_location_ID'
         $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
 
         // Log para verificar datos de la ubicación
-        error_log("Location Data for ID {$location_id}: " . print_r($location_data, true));
+        //error_log("Location Data for ID {$location_id}: " . print_r($location_data, true));
 
         // Verify that the information has been obtained correctly
         if (!empty($location_data)) {
