@@ -75,7 +75,7 @@ get_current_screen()->set_screen_reader_content(
 $location = false;
 $referer  = wp_get_referer();
 if ( ! $referer ) { // For POST requests.
-	$referer = wp_unslash( $_SERVER['REQUEST_URI'] );
+	$referer = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 }
 $referer = remove_query_arg( array( '_wp_http_referer', '_wpnonce', 'error', 'message', 'paged' ), $referer );
 switch ( $wp_list_table->current_action() ) {
@@ -91,7 +91,13 @@ switch ( $wp_list_table->current_action() ) {
 			);
 		}
 
-		$ret = wp_insert_term( $_POST['tag-name'], $taxonomy, $_POST );
+		if ( isset( $_POST['tag-name'], $taxonomy ) ) {
+			$tag_name = sanitize_text_field( wp_unslash( $_POST['tag-name'] ) ); // Sanitize the tag name
+			$post_data = wp_unslash( $_POST ); // Unslash all POST data
+		
+			$ret = wp_insert_term( $tag_name, sanitize_key( $taxonomy ), $post_data );
+		}
+		
 		if ( $ret && ! is_wp_error( $ret ) ) {
 			$location = add_query_arg( 'message', 1, $referer );
 		} else {
@@ -142,7 +148,7 @@ switch ( $wp_list_table->current_action() ) {
 			);
 		}
 
-		$tags = (array) $_REQUEST['delete_tags'];
+		$tags = isset( $_REQUEST['delete_tags'] ) ? array_map( 'absint', wp_unslash( (array) $_REQUEST['delete_tags'] ) ) : [];
 		foreach ( $tags as $tag_ID ) {
 			wp_delete_term( $tag_ID, $taxonomy );
 		}
@@ -167,7 +173,7 @@ switch ( $wp_list_table->current_action() ) {
 		exit;
 
 	case 'editedtag':
-		$tag_ID = (int) $_POST['tag_ID'];
+		$tag_ID = isset( $_POST['tag_ID'] ) ? absint( wp_unslash( $_POST['tag_ID'] ) ) : 0;
 		check_admin_referer( 'update-tag_' . $tag_ID );
 
 		if ( ! current_user_can( 'edit_term', $tag_ID ) ) {
@@ -204,7 +210,7 @@ switch ( $wp_list_table->current_action() ) {
 		check_admin_referer( 'bulk-tags' );
 
 		$screen = get_current_screen()->id;
-		$tags   = (array) $_REQUEST['delete_tags'];
+		$tags = isset( $_REQUEST['delete_tags'] ) ? array_map( 'absint', wp_unslash( (array) $_REQUEST['delete_tags'] ) ) : [];
 
 		/** This action is documented in wp-admin/edit.php */
 		$location = apply_filters( "handle_bulk_actions-{$screen}", $location, $wp_list_table->current_action(), $tags ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores
@@ -212,7 +218,13 @@ switch ( $wp_list_table->current_action() ) {
 }
 
 if ( ! $location && ! empty( $_REQUEST['_wp_http_referer'] ) ) {
-	$location = remove_query_arg( array( '_wp_http_referer', '_wpnonce' ), wp_unslash( $_SERVER['REQUEST_URI'] ) );
+	if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ); // Sanitize input
+		
+		$location = esc_url_raw( remove_query_arg( array( '_wp_http_referer', '_wpnonce' ), $request_uri ) );
+	} else {
+		$location = '';
+	}	
 }
 
 if ( $location ) {
@@ -338,14 +350,18 @@ if ( is_plugin_active( 'wpcat2tag-importer/wpcat2tag-importer.php' ) ) {
 <h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
 
 <?php
-if ( isset( $_REQUEST['s'] ) && strlen( $_REQUEST['s'] ) ) {
-	echo '<span class="subtitle">';
-	printf(
-		/* translators: %s: Search query. */
-		esc_html__( 'Search results for: %s', 'tapgoods-wp' ),
-		'<strong>' . esc_html( wp_unslash( $_REQUEST['s'] ) ) . '</strong>'
-	);
-	echo '</span>';
+if ( isset( $_REQUEST['s'] ) ) {
+    $search_query = sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ); // Properly sanitize input
+
+    if ( strlen( trim( $search_query ) ) ) {
+        echo '<span class="subtitle">';
+        printf(
+            /* translators: %s: Search query. */
+            esc_html__( 'Search results for: %s', 'tapgoods-wp' ),
+            '<strong>' . esc_html( $search_query ) . '</strong>'
+        );
+        echo '</span>';
+    }
 }
 ?>
 
@@ -361,7 +377,12 @@ if ( $message ) :
 			'dismissible'        => true,
 		)
 	);
-	$_SERVER['REQUEST_URI'] = remove_query_arg( array( 'message', 'error' ), $_SERVER['REQUEST_URI'] );
+	if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ); // Sanitize input
+	
+		$_SERVER['REQUEST_URI'] = esc_url_raw( remove_query_arg( array( 'message', 'error' ), $request_uri ) );
+	}
+	
 endif;
 ?>
 <div id="ajax-response"></div>
