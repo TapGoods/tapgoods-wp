@@ -98,7 +98,7 @@ if (count($tax_args) > 1) {
 $query = new WP_Query($args);
 
 // Log the number of results
-error_log('Total number of results: ' . $query->found_posts);
+// error_log('Total number of results: ' . $query->found_posts);
 
 
 $tg_pages = $query->max_num_pages;

@@ -91,7 +91,7 @@ ob_start();
                 <div id="tg-inventory-grid">
                     <?php 
                     $dynamic_shortcode = "[tapgoods-inventory-grid {$category_attribute} {$tags} {$show_pricing} {$per_page_default} paged=\"{$paged}\"]";
-                    error_log("Shortcode generated dynamically: " . $dynamic_shortcode);
+//                    error_log("Shortcode generated dynamically: " . $dynamic_shortcode);
                     echo do_shortcode($dynamic_shortcode);
                     ?>
                 </div>

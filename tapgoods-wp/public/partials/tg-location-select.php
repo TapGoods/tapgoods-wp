@@ -1,12 +1,12 @@
 <?php
 // Log before generating CSS
 if (!defined('DOING_AJAX') || !DOING_AJAX) {
-    error_log("tg_location_styles(): Generating CSS as this is not an AJAX request.");
+ //   error_log("tg_location_styles(): Generating CSS as this is not an AJAX request.");
     echo '<style>';
     echo wp_kses_post( tg_location_styles() );
     echo '</style>';
 } else {
-    error_log("tg_location_styles(): Skipping CSS generation due to AJAX request.");
+//    error_log("tg_location_styles(): Skipping CSS generation due to AJAX request.");
 }
 
 // Retrieve location IDs and default location
@@ -87,13 +87,13 @@ add_action('wp_ajax_nopriv_set_default_location', 'tg_set_default_location');
 
 if (!function_exists('tg_set_default_location')) {
     function tg_set_default_location() {
-        error_log("AJAX action 'set_default_location' triggered.");
+//        error_log("AJAX action 'set_default_location' triggered.");
         if (isset($_POST['location_id'])) {
             $location_id = sanitize_text_field($_POST['location_id']);
-            error_log("Received location_id: $location_id");
+//            error_log("Received location_id: $location_id");
             wp_send_json_success("Location set to $location_id");
         } else {
-            error_log("No location_id provided.");
+//            error_log("No location_id provided.");
             wp_send_json_error('Location ID not provided.');
         }
         wp_die();
