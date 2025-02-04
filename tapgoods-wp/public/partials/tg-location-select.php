@@ -3,7 +3,7 @@
 if (!defined('DOING_AJAX') || !DOING_AJAX) {
     error_log("tg_location_styles(): Generating CSS as this is not an AJAX request.");
     echo '<style>';
-    echo tg_location_styles(); // Call the function only when not an AJAX request
+    echo wp_kses_post( tg_location_styles() );
     echo '</style>';
 } else {
     error_log("tg_location_styles(): Skipping CSS generation due to AJAX request.");
