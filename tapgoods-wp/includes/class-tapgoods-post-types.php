@@ -34,11 +34,16 @@ class Tapgoods_Post_Types {
 	public static function redirect_to_custom_edit_page() {
 		global $pagenow;
 	
-		if ( $pagenow === 'post.php' && isset( $_GET['post'] ) && 'tg_inventory' === get_post_type( $_GET['post'] ) ) {
-			// Redirect to the custom page.
-			wp_safe_redirect( admin_url( 'admin.php?page=custom-edit-page&post=' . intval( $_GET['post'] ) ) );
-			exit;
+		if ( $pagenow === 'post.php' && isset( $_GET['post'] ) ) {
+			$post_id = absint( $_GET['post'] ); 
+		
+			if ( 'tg_inventory' === get_post_type( $post_id ) ) {
+				// Redireccionar to custom page
+				wp_safe_redirect( admin_url( 'admin.php?page=custom-edit-page&post=' . $post_id ) );
+				exit;
+			}
 		}
+		
 	}
 	
 	public static function register_custom_edit_page() {
@@ -53,60 +58,70 @@ class Tapgoods_Post_Types {
 	}
 	
 	public static function render_custom_edit_page() {
-		if ( isset( $_GET['post'] ) && 'tg_inventory' === get_post_type( $_GET['post'] ) ) {
-			$post_id = intval( $_GET['post'] );
-			$post = get_post( $post_id );
-	
-			if ( ! $post ) {
-				echo 'Item not found.';
-				return;
-			}
-	
-			// Handle saving the custom field
-			if ( isset( $_POST['tg_custom_description'] ) && check_admin_referer( 'save_tg_custom_description', 'tg_custom_description_nonce' ) ) {
-				update_post_meta( $post_id, 'tg_custom_description', wp_kses_post( $_POST['tg_custom_description'] ) );
-				echo '<div class="notice notice-success"><p>Custom description updated.</p></div>';
-			}
-	
-			// Retrieve the current value of the custom field
-			$custom_description = get_post_meta( $post_id, 'tg_custom_description', true );
-	
-			echo '<h1>' . esc_html( $post->post_title ) . '</h1>';
-			echo '<form method="post">';
-			wp_nonce_field( 'save_tg_custom_description', 'tg_custom_description_nonce' );
-	
-			echo '<h3>Custom Description</h3>';
-			wp_editor(
-				$custom_description,
-				'tg_custom_description', // Unique ID for the editor
-				array(
-					'textarea_name' => 'tg_custom_description',
-					'media_buttons' => true, // Show buttons to add media
-					'textarea_rows' => 10,
-					'teeny'         => false, // Use a more compact editor if true
-				)
-			);
-	
-			echo '<p><input type="submit" class="button button-primary" value="Save Description"></p>';
-			echo '</form>';
-	
-			echo '<h3>General Information</h3>';
-			echo '<div>';
-			echo '<p><strong>Description:</strong> ' . esc_html( $post->post_content ) . '</p>';
-	
-			$meta = get_post_meta( $post_id );
-			if ( ! empty( $meta ) ) {
-				echo '<h3>Metadata:</h3><ul>';
-				foreach ( $meta as $key => $value ) {
-					echo '<li><strong>' . esc_html( $key ) . ':</strong> ' . esc_html( maybe_unserialize( $value[0] ) ) . '</li>';
+		if ( isset( $_GET['post'] ) ) {
+			$post_id = absint( $_GET['post'] ); // Sanitize input by ensuring it's a positive integer
+		
+			if ( 'tg_inventory' === get_post_type( $post_id ) ) {
+				$post = get_post( $post_id );
+		
+				if ( ! $post ) {
+					echo '<p>' . esc_html__( 'Item not found.', 'tapgoods-wp' ) . '</p>';
+					return;
 				}
-				echo '</ul>';
+		
+				// Handle saving the custom field
+				if ( isset( $_POST['tg_custom_description'] ) && check_admin_referer( 'save_tg_custom_description', 'tg_custom_description_nonce' ) ) {
+					update_post_meta( 
+						$post_id, 
+						'tg_custom_description', 
+						wp_kses_post( wp_unslash( $_POST['tg_custom_description'] ) ) // Proper sanitization for saving post meta
+					);
+		
+					echo '<div class="notice notice-success"><p>' . esc_html__( 'Custom description updated.', 'tapgoods-wp' ) . '</p></div>';
+				}
+		
+				// Retrieve the current value of the custom field
+				$custom_description = get_post_meta( $post_id, 'tg_custom_description', true );
+		
+				echo '<h1>' . esc_html( $post->post_title ) . '</h1>';
+				echo '<form method="post">';
+				wp_nonce_field( 'save_tg_custom_description', 'tg_custom_description_nonce' );
+		
+				echo '<h3>' . esc_html__( 'Custom Description', 'tapgoods-wp' ) . '</h3>';
+				wp_editor(
+					esc_textarea( $custom_description ), // Escape output to prevent XSS
+					'tg_custom_description', // Unique ID for the editor
+					array(
+						'textarea_name' => 'tg_custom_description',
+						'media_buttons' => true, // Enable media buttons
+						'textarea_rows' => 10,
+						'teeny'         => false, // Use a full editor instead of a minimal one
+					)
+				);
+		
+				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__( 'Save Description', 'tapgoods-wp' ) . '"></p>';
+				echo '</form>';
+		
+				echo '<h3>' . esc_html__( 'General Information', 'tapgoods-wp' ) . '</h3>';
+				echo '<div>';
+				echo '<p><strong>' . esc_html__( 'Description:', 'tapgoods-wp' ) . '</strong> ' . esc_html( $post->post_content ) . '</p>';
+		
+				// Retrieve and display metadata
+				$meta = get_post_meta( $post_id );
+				if ( ! empty( $meta ) ) {
+					echo '<h3>' . esc_html__( 'Metadata:', 'tapgoods-wp' ) . '</h3><ul>';
+					foreach ( $meta as $key => $value ) {
+						echo '<li><strong>' . esc_html( $key ) . ':</strong> ' . esc_html( maybe_unserialize( $value[0] ) ) . '</li>';
+					}
+					echo '</ul>';
+				}
+		
+				echo '</div>';
+			} else {
+				echo '<p>' . esc_html__( 'Invalid or not found item.', 'tapgoods-wp' ) . '</p>';
 			}
-	
-			echo '</div>';
-		} else {
-			echo '<p>Invalid or not found item.</p>';
 		}
+		
 	}
 
 	public static function tg_get_taxonomies() {
