@@ -141,15 +141,15 @@ class Tapgoods_API_Request {
 
 				switch ( $error ) {
 					case 'http_request_failed':
-						throw new TG_Http_Request_Failed_Exception( $url );
+						throw new TG_Http_Request_Failed_Exception( esc_url_raw( $url ) );
 					default:
 						// WordPress had some error that I do not know about
-						throw new TG_Unknown_Error_Exception( $response );
+						throw new TG_Unknown_Error_Exception( esc_html( $response ) );
 				}
 				echo '1 error';
 			} else {
 				// WordPress had another error
-				throw new TG_Unknown_Error_Exception( $response );
+				throw new TG_Unknown_Error_Exception( esc_html( $response ) );
 			}
 			die();
 		}
