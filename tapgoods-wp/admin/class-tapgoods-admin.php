@@ -45,8 +45,21 @@ class Tapgoods_Admin {
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-			wp_enqueue_style( $this->plugin_name . '-bootstrap', TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', null, false );
-			wp_enqueue_style( $this->plugin_name . '-font-heebo', 'https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap', null, false );
+			wp_enqueue_style( 
+				$this->plugin_name . '-bootstrap', 
+				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', 
+				array(), 
+				filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
+			);
+			
+			wp_enqueue_style( 
+				$this->plugin_name . '-font-heebo', 
+				'https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap', 
+				array(), 
+				'1.0'
+			);
+			
+			
 			wp_enqueue_style( 'wp-codemirror' );
 		}
 	}
@@ -68,7 +81,14 @@ class Tapgoods_Admin {
 				)
 			);
 
-			wp_enqueue_script( $this->plugin_name . '-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js', array( 'jquery' ), false );
+			wp_enqueue_script( 
+				$this->plugin_name . '-bootstrap', 
+				TAPGOODS_PLUGIN_URL . 'assets/js/bootstrap.bundle.min.js', 
+				array( 'jquery' ), 
+				'5.3.2', 
+				true 
+			);
+			
 
 			// codemirror for custom css
 			wp_enqueue_script( 'wp-theme-plugin-editor' );
