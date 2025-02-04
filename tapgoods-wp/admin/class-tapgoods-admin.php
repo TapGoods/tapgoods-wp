@@ -45,21 +45,24 @@ class Tapgoods_Admin {
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-			wp_enqueue_style( 
+			$bootstrap_version = file_exists( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
+				? filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
+				: '1.0';
+
+				wp_enqueue_style( 
 				$this->plugin_name . '-bootstrap', 
 				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', 
 				array(), 
-				filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
+				$bootstrap_version 
 			);
-			
+
 			wp_enqueue_style( 
 				$this->plugin_name . '-font-heebo', 
 				'https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap', 
 				array(), 
-				'1.0'
+				gmdate( 'YmdHis' )
 			);
-			
-			
+						
 			wp_enqueue_style( 'wp-codemirror' );
 		}
 	}

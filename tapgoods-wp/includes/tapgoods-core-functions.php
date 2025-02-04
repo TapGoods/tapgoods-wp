@@ -726,11 +726,12 @@ function tapgoods_disable_gutenberg_editing() {
     if ( isset( $post->post_type ) && $post->post_type === 'tg_inventory' && is_admin() && get_current_screen()->is_block_editor() ) {
         wp_enqueue_script(
             'disable-gutenberg-editing',
-            plugin_dir_url( __FILE__ ) . '../public/js/disable-gutenberg-editing.js', // Correct URL
+            plugins_url( 'public/js/disable-gutenberg-editing.js', dirname( __FILE__ ) ), // Mejor manejo de la URL
             array( 'wp-blocks', 'wp-dom' ),
-            false,
+            filemtime( plugin_dir_path( __FILE__ ) . '../public/js/disable-gutenberg-editing.js' ), // Usa el timestamp del archivo como versión
             true
         );
+        
     }
 }
 add_action( 'admin_enqueue_scripts', 'tapgoods_disable_gutenberg_editing' );
