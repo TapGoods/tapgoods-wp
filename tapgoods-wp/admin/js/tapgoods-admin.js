@@ -1,80 +1,104 @@
 "use strict";
 
 (function ($, window, document, undefined) {
-    $(document).ready(function () {
-        // Show the current tab based on the hash fragment
-        show_hash_tab(get_hash());
-
-        // Enable updating the URL on tab navigation for each tab, refresh editors when shown
-        const tabList = document.querySelectorAll('button[data-bs-toggle="tab"]');
-        tabList.forEach((tab) => {
-            enable_tab_nav(tab);
-            if ("#styling" == tab.dataset.bsTarget) {
-                tab.addEventListener('shown.bs.tab', () => refresh_editors(editorList));
-            }
-        });
-
-        // Initialize the CSS editors with debugging
-        const editorList = [];
-        const tgCustomCss = $('#tg-custom-css');
-        const tgCss = $('#tg-css');
-
-        console.log('tg-custom-css element:', tgCustomCss);
-        console.log('tg-css element:', tgCss);
-
-        if (tgCustomCss.length) {
-            try {
-                editorList.push(wp.codeEditor.initialize(tgCustomCss, tg_editor_settings));
-                console.log('tg-custom-css editor initialized successfully.');
-            } catch (error) {
-                console.error('Error initializing tg-custom-css editor:', error);
-            }
-        } else {
-            console.error('tg-custom-css element not found!');
+    function loadBootstrap(callback) {
+        if (typeof bootstrap !== "undefined") {
+            console.log("Bootstrap ya está cargado.");
+            callback();
+            return;
         }
 
-        if (tgCss.length) {
-            try {
-                editorList.push(wp.codeEditor.initialize(tgCss, tg_viewer_settings));
-                console.log('tg-css editor initialized successfully.');
-            } catch (error) {
-                console.error('Error initializing tg-css editor:', error);
-            }
-        } else {
-            console.error('tg-css element not found!');
-        }
+        console.log("Cargando Bootstrap...");
 
-        // Setup the inputs for the connection form
-        const connectButton = $('#tg_update_connection');
-        const connectInput = $('#tapgoods_api_key');
-        const syncButton = $('#tg_api_sync');
+        let script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js";
+        script.onload = function () {
+            console.log("Bootstrap cargado correctamente.");
+            callback();
+        };
+        script.onerror = function () {
+            console.error("Error al cargar Bootstrap.");
+        };
 
-        console.log('Captured Input Element:', connectInput); // Debugging log
+        document.head.appendChild(script);
+    }
 
-        // Show the correct tab if the URL changes
-        window.addEventListener("hashchange", () => {
+    function initTapGoods() {
+        $(document).ready(function () {
+            // Show the current tab based on the hash fragment
             show_hash_tab(get_hash());
-        }, false);
 
-        init_tooltips();
-
-        // Handle input changes for the API key
-        connectInput.on('change input', function (e) {
-            if (e.target.value === e.target.dataset.original) {
-                connectButton.prop('disabled', true).text(connectButton.data('original'));
-                if ('' !== e.target.value) {
-                    syncButton.show();
+            // Enable updating the URL on tab navigation for each tab, refresh editors when shown
+            const tabList = document.querySelectorAll('button[data-bs-toggle="tab"]');
+            tabList.forEach((tab) => {
+                enable_tab_nav(tab);
+                if ("#styling" == tab.dataset.bsTarget) {
+                    tab.addEventListener('shown.bs.tab', () => refresh_editors(editorList));
                 }
-                return;
-            }
-            connectButton.removeAttr('disabled').text('CONNECT');
-            syncButton.hide();
-        });
+            });
 
-        // Form submission event
-        $('#tg_connection_form').on('submit', { btn: connectButton, input: connectInput }, tg_connect);
-        syncButton.on('click', tg_sync);
-    });
+            // Initialize the CSS editors with debugging
+            const editorList = [];
+            const tgCustomCss = $('#tg-custom-css');
+            const tgCss = $('#tg-css');
+
+            console.log('tg-custom-css element:', tgCustomCss);
+            console.log('tg-css element:', tgCss);
+
+            if (tgCustomCss.length) {
+                try {
+                    editorList.push(wp.codeEditor.initialize(tgCustomCss, tg_editor_settings));
+                    console.log('tg-custom-css editor initialized successfully.');
+                } catch (error) {
+                    console.error('Error initializing tg-custom-css editor:', error);
+                }
+            } else {
+                console.error('tg-custom-css element not found!');
+            }
+
+            if (tgCss.length) {
+                try {
+                    editorList.push(wp.codeEditor.initialize(tgCss, tg_viewer_settings));
+                    console.log('tg-css editor initialized successfully.');
+                } catch (error) {
+                    console.error('Error initializing tg-css editor:', error);
+                }
+            } else {
+                console.error('tg-css element not found!');
+            }
+
+            // Setup the inputs for the connection form
+            const connectButton = $('#tg_update_connection');
+            const connectInput = $('#tapgoods_api_key');
+            const syncButton = $('#tg_api_sync');
+
+            console.log('Captured Input Element:', connectInput); // Debugging log
+
+            // Show the correct tab if the URL changes
+            window.addEventListener("hashchange", () => {
+                show_hash_tab(get_hash());
+            }, false);
+
+            init_tooltips();
+
+            // Handle input changes for the API key
+            connectInput.on('change input', function (e) {
+                if (e.target.value === e.target.dataset.original) {
+                    connectButton.prop('disabled', true).text(connectButton.data('original'));
+                    if ('' !== e.target.value) {
+                        syncButton.show();
+                    }
+                    return;
+                }
+                connectButton.removeAttr('disabled').text('CONNECT');
+                syncButton.hide();
+            });
+
+            // Form submission event
+            $('#tg_connection_form').on('submit', { btn: connectButton, input: connectInput }, tg_connect);
+            syncButton.on('click', tg_sync);
+        });
+    }
 
     function tg_connect(event) {
         event.preventDefault();
@@ -163,6 +187,10 @@
         el.innerHTML = notice;
         $(el).removeAttr('hidden');
     }
+
+    // Cargar Bootstrap antes de ejecutar TapGoods
+    loadBootstrap(initTapGoods);
+
 })(jQuery, window, document);
 
 function tg_dismiss_notice(notice) {
