@@ -1,7 +1,8 @@
 <?php
 
 global $wp;
-$current_url = home_url(add_query_arg(array(), $wp->request)); // Get the current URL
+
+$current_url = trailingslashit(home_url($wp->request, 'raw')) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''); // Current page URL
 $tg_inventory_pagination_class = 'foo';
 
 // Get the value of show_pricing from the shortcode attributes

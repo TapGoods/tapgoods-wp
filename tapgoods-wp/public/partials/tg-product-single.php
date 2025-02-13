@@ -40,7 +40,7 @@ $date_format = tg_date_format();
 $today       = wp_date($date_format);
 
 global $wp;
-$current_page = home_url(add_query_arg(array(), $wp->request)); // Current page URL
+$current_page = trailingslashit(home_url($wp->request, 'raw')) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''); // Current page URL
 
 // Get the base URL without adding the redirectUrl parameter
 $base_cart_url = tg_get_product_add_to_cart_url($post->ID);

@@ -44,7 +44,8 @@ $base_url = tg_get_add_to_cart_url( $location_id );
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
 
 // Get the current URL
-$current_url = home_url(add_query_arg(array(), $wp->request)); 
+$current_url = trailingslashit(home_url($wp->request, 'raw')) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
+
 
 // Action hook before rendering the search form
 do_action('tg_before_search_form');
