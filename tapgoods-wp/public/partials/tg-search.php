@@ -28,13 +28,9 @@ $location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_locatio
 $show_pricing = true; // default value
 
 if (isset($atts['show_pricing'])) {
-    // delete the prefix
-    $cleaned_value = preg_replace('/^show_pricing=/', '', trim($atts['show_pricing']));
-    // normalize the value
-    $cleaned_value = str_replace(['“', '”'], '"', $cleaned_value);
-    // convert to boolean
-    $show_pricing = ($cleaned_value === 'false') ? false : filter_var($cleaned_value, FILTER_VALIDATE_BOOLEAN);
-};
+    $cleaned_value = strtolower($atts['show_pricing']); // Convertir a minúsculas
+    $show_pricing = (strpos($cleaned_value, 'false') !== false) ? false : true;
+}
 
 
 // Get the base URL for adding items to the cart
@@ -79,8 +75,10 @@ do_action('tg_before_search_form');
     <div id="tg-pagination-container" class="pagination-container mt-4"></div>
 </div>
 
-
 <script>
+    
+const showPricing = <?php echo json_encode((bool) $show_pricing); ?>;
+
 document.addEventListener("DOMContentLoaded", function () {
     window.locationId = "<?php echo esc_js($location_id); ?>";
     const searchInput = document.getElementById("tg-search");
@@ -93,7 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const locationId = "<?php echo esc_js($location_id); ?>";
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
     const baseurl = "<?php echo esc_js($base_url); ?>";
-    const showPricing = <?php echo json_encode($show_pricing); ?>;
+
     window.fetchResults = function(query, page = 1, isDefault = false) {
         const params = new URLSearchParams({
             action: "tg_search",
@@ -209,10 +207,19 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         seenIds.add(item.tg_id);
+        const showPricing = <?php echo json_encode((bool) $show_pricing); ?>;
+        console.log(showPricing);
+        let priceHtml = '';
+        if (showPricing==true){
+            priceHtml = `<div class="price mb-2">${item.price || ''}</div>`;
+            
+        }
 
         const placeholder = placeholderImage; // Default placeholder image
-        const itemUrl = !showPricing ? `${item.url}?nprice=true` : item.url;
-        const priceHtml = showPricing ? `<div class="price mb-2">${item.price || ''}</div>` : '';
+        const itemUrl = !showPricing 
+        ? `${item.url}${item.url.includes('?') ? '&' : '?'}nprice=true` 
+        : item.url;
+
         const addToCartUrl = `${baseurl}?itemId=${item.tg_id}&itemType=items&quantity=1&redirectUrl=${encodeURIComponent(redirectUrl)}`;
         // Render the HTML with placeholder
         resultsContainer.innerHTML += `
