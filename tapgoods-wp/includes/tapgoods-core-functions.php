@@ -1159,3 +1159,35 @@ function tg_custom_tax_template($template) {
     return $template; // Return the default template if conditions are not met
 }
 
+
+// Ensure Yoast SEO metabox is added to tg_inventory
+function enable_yoast_seo_for_tg_inventory() {
+    add_post_type_support('tg_inventory', 'wpseo-meta'); // Enable Yoast SEO support
+}
+add_action('init', 'enable_yoast_seo_for_tg_inventory', 20);
+
+// Ensure Yoast metabox is added to the post edit screen
+function force_yoast_seo_metabox_on_tg_inventory() {
+    add_meta_box('wpseo_meta', __('Yoast SEO', 'wordpress-seo'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
+}
+add_action('add_meta_boxes', 'force_yoast_seo_metabox_on_tg_inventory');
+
+// Ensure Yoast SEO scripts are properly enqueued
+function enqueue_yoast_seo_assets($hook) {
+    global $post;
+
+    if ('post.php' === $hook && isset($post) && 'tg_inventory' === get_post_type($post)) {
+        wp_enqueue_script('yoast-seo-post-edit', plugins_url('wordpress-seo/js/dist/wp-seo-metabox.js'), array('jquery'), null, true);
+    }
+}
+add_action('admin_enqueue_scripts', 'enqueue_yoast_seo_assets');
+
+// Ensure REST API compatibility for Yoast SEO
+function enable_rest_api_for_tg_inventory($args, $post_type) {
+    if ('tg_inventory' === $post_type) {
+        $args['show_in_rest'] = true; // Ensure the post type supports REST API
+    }
+    return $args;
+}
+add_filter('register_post_type_args', 'enable_rest_api_for_tg_inventory', 10, 2);
+

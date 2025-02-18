@@ -58,72 +58,169 @@ class Tapgoods_Post_Types {
 	}
 	
 	public static function render_custom_edit_page() {
-		if ( isset( $_GET['post'] ) ) {
-			$post_id = absint( $_GET['post'] ); // Sanitize input by ensuring it's a positive integer
-		
-			if ( 'tg_inventory' === get_post_type( $post_id ) ) {
-				$post = get_post( $post_id );
-		
-				if ( ! $post ) {
-					echo '<p>' . esc_html__( 'Item not found.', 'tapgoods-wp' ) . '</p>';
+		if (isset($_GET['post'])) {
+			$post_id = absint($_GET['post']);
+	
+			if ('tg_inventory' === get_post_type($post_id)) {
+				$post = get_post($post_id);
+	
+				if (!$post) {
+					echo '<p>' . esc_html__('Item not found.', 'tapgoods-wp') . '</p>';
 					return;
 				}
-		
+	
+				// Check if Yoast SEO is active
+				$yoast_active = defined('WPSEO_VERSION');
+	
 				// Handle saving the custom field
-				if ( isset( $_POST['tg_custom_description'] ) && check_admin_referer( 'save_tg_custom_description', 'tg_custom_description_nonce' ) ) {
-					update_post_meta( 
-						$post_id, 
-						'tg_custom_description', 
-						wp_kses_post( wp_unslash( $_POST['tg_custom_description'] ) ) // Proper sanitization for saving post meta
+				if (isset($_POST['tg_custom_description']) && check_admin_referer('save_tg_custom_description', 'tg_custom_description_nonce')) {
+					update_post_meta(
+						$post_id,
+						'tg_custom_description',
+						wp_kses_post(wp_unslash($_POST['tg_custom_description']))
 					);
-		
-					echo '<div class="notice notice-success"><p>' . esc_html__( 'Custom description updated.', 'tapgoods-wp' ) . '</p></div>';
+	
+					echo '<div class="notice notice-success"><p>' . esc_html__('Custom description updated.', 'tapgoods-wp') . '</p></div>';
 				}
-		
-				// Retrieve the current value of the custom field
-				$custom_description = get_post_meta( $post_id, 'tg_custom_description', true );
-		
-				echo '<h1>' . esc_html( $post->post_title ) . '</h1>';
+	
+				// Handle saving Yoast SEO metadata manually
+				if ($yoast_active && isset($_POST['yoast_wpseo_title'], $_POST['yoast_wpseo_metadesc'], $_POST['yoast_wpseo_focuskw']) &&
+					check_admin_referer('save_yoast_seo_meta', 'yoast_seo_nonce')) {
+	
+					update_post_meta($post_id, '_yoast_wpseo_title', sanitize_text_field($_POST['yoast_wpseo_title']));
+					update_post_meta($post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field($_POST['yoast_wpseo_metadesc']));
+					update_post_meta($post_id, '_yoast_wpseo_focuskw', sanitize_text_field($_POST['yoast_wpseo_focuskw']));
+	
+					echo '<div class="notice notice-success"><p>' . esc_html__('SEO settings updated.', 'tapgoods-wp') . '</p></div>';
+				}
+	
+				// Retrieve values
+				$custom_description = get_post_meta($post_id, 'tg_custom_description', true);
+				$yoast_title = get_post_meta($post_id, '_yoast_wpseo_title', true);
+				$yoast_description = get_post_meta($post_id, '_yoast_wpseo_metadesc', true);
+				$yoast_focus_keyword = get_post_meta($post_id, '_yoast_wpseo_focuskw', true);
+	
+				echo '<div class="wrap">';
+				echo '<h1 style="margin-left: 15px;">' . esc_html($post->post_title) . '</h1>';
+	
+				// Custom Description Section (Fixed, not collapsible)
+				echo '<div class="postbox" style="padding: 15px;">';
+				echo '<h2 class="hndle" style="margin-left: 10px;"><span>' . esc_html__('Custom Description', 'tapgoods-wp') . '</span></h2>';
+				echo '<div class="inside">';
 				echo '<form method="post">';
-				wp_nonce_field( 'save_tg_custom_description', 'tg_custom_description_nonce' );
-		
-				echo '<h3>' . esc_html__( 'Custom Description', 'tapgoods-wp' ) . '</h3>';
+				wp_nonce_field('save_tg_custom_description', 'tg_custom_description_nonce');
+	
 				wp_editor(
-					esc_textarea( $custom_description ), // Escape output to prevent XSS
-					'tg_custom_description', // Unique ID for the editor
+					esc_textarea($custom_description),
+					'tg_custom_description',
 					array(
 						'textarea_name' => 'tg_custom_description',
-						'media_buttons' => true, // Enable media buttons
-						'textarea_rows' => 10,
-						'teeny'         => false, // Use a full editor instead of a minimal one
+						'media_buttons' => true,
+						'textarea_rows' => 6,
+						'teeny' => false,
 					)
 				);
-		
-				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__( 'Save Description', 'tapgoods-wp' ) . '"></p>';
+	
+				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save Description', 'tapgoods-wp') . '"></p>';
 				echo '</form>';
-		
-				echo '<h3>' . esc_html__( 'General Information', 'tapgoods-wp' ) . '</h3>';
-				echo '<div>';
-				echo '<p><strong>' . esc_html__( 'Description:', 'tapgoods-wp' ) . '</strong> ' . esc_html( $post->post_content ) . '</p>';
-		
+				echo '</div>'; // Close .inside
+				echo '</div>'; // Close .postbox
+	
+				// Inventory Information (Collapsible with Arrow)
+				echo '<div class="postbox open">';
+				echo '<h2 class="hndle collapsible"><span>' . esc_html__('Inventory Information', 'tapgoods-wp') . '</span> <span class="toggle-icon">▼</span></h2>';
+				echo '<div class="inside">';
+				
+				echo '<h3>' . esc_html__('General Information', 'tapgoods-wp') . '</h3>';
+				echo '<p><strong>' . esc_html__('Description:', 'tapgoods-wp') . '</strong> ' . esc_html($post->post_content) . '</p>';
+	
 				// Retrieve and display metadata
-				$meta = get_post_meta( $post_id );
-				if ( ! empty( $meta ) ) {
-					echo '<h3>' . esc_html__( 'Metadata:', 'tapgoods-wp' ) . '</h3><ul>';
-					foreach ( $meta as $key => $value ) {
-						echo '<li><strong>' . esc_html( $key ) . ':</strong> ' . esc_html( maybe_unserialize( $value[0] ) ) . '</li>';
+				$meta = get_post_meta($post_id);
+				if (!empty($meta)) {
+					echo '<h3>' . esc_html__('Metadata:', 'tapgoods-wp') . '</h3><ul>';
+					foreach ($meta as $key => $value) {
+						echo '<li><strong>' . esc_html($key) . ':</strong> ' . esc_html(maybe_unserialize($value[0])) . '</li>';
 					}
 					echo '</ul>';
 				}
-		
-				echo '</div>';
+	
+				echo '</div>'; // Close .inside
+				echo '</div>'; // Close .postbox
+	
+				// Show SEO settings only if Yoast SEO is active
+				if ($yoast_active) {
+					echo '<div class="postbox open">';
+					echo '<h2 class="hndle collapsible"><span>' . esc_html__('SEO Settings', 'tapgoods-wp') . '</span> <span class="toggle-icon">▼</span></h2>';
+					echo '<div class="inside">';
+					echo '<form method="post">';
+					wp_nonce_field('save_yoast_seo_meta', 'yoast_seo_nonce');
+	
+					echo '<p><label>' . esc_html__('SEO Title:', 'tapgoods-wp') . '</label>';
+					echo '<input type="text" name="yoast_wpseo_title" value="' . esc_attr($yoast_title) . '" class="widefat"></p>';
+	
+					echo '<p><label>' . esc_html__('SEO Description:', 'tapgoods-wp') . '</label>';
+					echo '<textarea name="yoast_wpseo_metadesc" class="widefat">' . esc_textarea($yoast_description) . '</textarea></p>';
+	
+					echo '<p><label>' . esc_html__('Focus Keyword:', 'tapgoods-wp') . '</label>';
+					echo '<input type="text" name="yoast_wpseo_focuskw" value="' . esc_attr($yoast_focus_keyword) . '" class="widefat"></p>';
+	
+					echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save SEO Settings', 'tapgoods-wp') . '"></p>';
+					echo '</form>';
+					echo '</div>'; // Close .inside
+					echo '</div>'; // Close .postbox
+				}
+	
+				echo '</div>'; // Close .wrap
+	
+				// JavaScript for collapsible boxes
+				echo '<script>
+					jQuery(document).ready(function($) {
+						$(".collapsible").click(function() {
+							$(this).next(".inside").slideToggle();
+							var icon = $(this).find(".toggle-icon");
+							if (icon.text() === "▼") {
+								icon.text("▲");
+							} else {
+								icon.text("▼");
+							}
+						});
+					});
+				</script>';
+	
+				// CSS for margin and better UI spacing
+				echo '<style>
+					.postbox {
+						margin: 20px 0;
+						border: 1px solid #ccc;
+						background: #fff;
+						padding: 10px;
+						border-radius: 4px;
+					}
+					.hndle {
+						cursor: pointer;
+						display: flex;
+						align-items: center;
+						justify-content: space-between;
+						padding: 10px;
+						font-size: 16px;
+						font-weight: bold;
+					}
+					.toggle-icon {
+						font-size: 14px;
+						margin-left: 10px;
+					}
+					.inside {
+						padding: 10px;
+						background: #f9f9f9;
+						border-top: 1px solid #ddd;
+					}
+				</style>';
 			} else {
-				echo '<p>' . esc_html__( 'Invalid or not found item.', 'tapgoods-wp' ) . '</p>';
+				echo '<p>' . esc_html__('Invalid or not found item.', 'tapgoods-wp') . '</p>';
 			}
 		}
-		
 	}
-
+	
 	public static function tg_get_taxonomies() {
 		$tg_taxonomies = array(
 			'tg_category',
@@ -396,6 +493,7 @@ class Tapgoods_Post_Types {
 					'public'              => true,
 					'show_ui'             => true,
 					'show_in_menu'        => true,
+					'show_in_rest' 		  => true,
 					'menu_position'       => 65,
 					'menu_icon'           => 'dashicons-screenoptions',
 					'show_in_admin_bar'   => true,
