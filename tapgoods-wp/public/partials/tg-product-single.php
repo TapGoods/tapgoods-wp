@@ -40,7 +40,13 @@ $date_format = tg_date_format();
 $today       = wp_date($date_format);
 
 global $wp;
-$current_page = trailingslashit(home_url($wp->request, 'raw')) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''); // Current page URL
+$current_page = trailingslashit(home_url($wp->request, 'raw'));
+
+if (!empty($_SERVER['QUERY_STRING'])) {
+    $query_string = isset($_SERVER['QUERY_STRING']) ? sanitize_text_field(wp_unslash($_SERVER['QUERY_STRING'])) : '';
+    $query_string = sanitize_text_field($query_string); // 
+    $current_page .= '?' . $query_string;
+}
 
 // Get the base URL without adding the redirectUrl parameter
 $base_cart_url = tg_get_product_add_to_cart_url($post->ID);

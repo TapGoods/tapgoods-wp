@@ -2,7 +2,14 @@
 
 global $wp;
 
-$current_url = trailingslashit(home_url($wp->request, 'raw')) . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''); // Current page URL
+$current_url = trailingslashit(home_url($wp->request, 'raw'));
+
+if (!empty($_SERVER['QUERY_STRING'])) {
+    $query_string = isset($_SERVER['QUERY_STRING']) ? sanitize_text_field(wp_unslash($_SERVER['QUERY_STRING'])) : '';
+    $query_string = sanitize_text_field($query_string); // 
+    $current_url .= '?' . $query_string;
+}
+ // Current page URL
 $tg_inventory_pagination_class = 'foo';
 
 // Get the value of show_pricing from the shortcode attributes
