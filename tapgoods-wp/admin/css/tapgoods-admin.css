@@ -114,3 +114,14 @@
 .btn.btn-primary:hover {
     background-color: var(--tg-blue);
 }
+
+.tapgoods-inventory-preview {
+    width: 200px;
+    max-width: 200px;
+    height: 193px;
+    background-image: url('../../assets/img/tapgoods-inventory.png');
+    background-size: cover;
+    background-position: center;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}

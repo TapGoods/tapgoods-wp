@@ -679,10 +679,15 @@ class Tapgoods_Post_Types {
 
 	public static function tg_print_image_preview( $images ) {
 		foreach ( $images as $img ) {
-			echo '<li><a href="' . esc_url( $img['url'] ) . '" target="_blank"><img src="' . esc_url( $img['url'] ) . '" height="200"></a></li>';
-			echo '<p>URL: ' . esc_url( $img['url'] ) . '</p></li>';
+			if ( isset( $img['id'] ) ) {
+				echo '<li><a href="' . esc_url( $img['url'] ) . '" target="_blank">';
+				echo wp_get_attachment_image( $img['id'], 'medium', false, ['height' => '200'] );
+				echo '</a></li>';
+				echo '<p>URL: ' . esc_url( $img['url'] ) . '</p>';
+			}
 		}
 	}
+	
 
 	public function tg_add_rewrites() {
 		global $wp_rewrite;

@@ -80,7 +80,7 @@ if (!empty($selected_location)) {
             <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
             <button type="submit" name="set_default_location" 
                     class="btn btn-primary w-100 round" 
-                    id="tg_api_sync">
+                    id="tg_api_sync2">
                 SET DEFAULT
             </button>
         </form>

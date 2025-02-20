@@ -48,7 +48,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			
 			<!-- Preview -->
 			<div class="col-md-4 text-center">
-			<img src="<?php echo esc_url(plugin_dir_url(dirname(__FILE__, 2)) . 'assets/img/tapgoods-inventory.png'); ?>" alt="Preview" class="img-fluid border rounded">
+			<div class="tapgoods-inventory-preview"></div>
 			</div>
 		</div>
 	</div>
