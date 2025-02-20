@@ -87,9 +87,9 @@ class Tapgoods_Post_Types {
 				if ($yoast_active && isset($_POST['yoast_wpseo_title'], $_POST['yoast_wpseo_metadesc'], $_POST['yoast_wpseo_focuskw']) &&
 					check_admin_referer('save_yoast_seo_meta', 'yoast_seo_nonce')) {
 	
-					update_post_meta($post_id, '_yoast_wpseo_title', sanitize_text_field($_POST['yoast_wpseo_title']));
-					update_post_meta($post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field($_POST['yoast_wpseo_metadesc']));
-					update_post_meta($post_id, '_yoast_wpseo_focuskw', sanitize_text_field($_POST['yoast_wpseo_focuskw']));
+						update_post_meta($post_id, '_yoast_wpseo_title', sanitize_text_field(wp_unslash($_POST['yoast_wpseo_title'])));
+						update_post_meta($post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field(wp_unslash($_POST['yoast_wpseo_metadesc'])));
+						update_post_meta($post_id, '_yoast_wpseo_focuskw', sanitize_text_field(wp_unslash($_POST['yoast_wpseo_focuskw'])));				
 	
 					echo '<div class="notice notice-success"><p>' . esc_html__('SEO settings updated.', 'tapgoods-wp') . '</p></div>';
 				}
