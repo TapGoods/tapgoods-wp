@@ -3,6 +3,18 @@
 
     $(document).ready(function() {
 
+        // Ensure Bootstrap is loaded
+        if (typeof bootstrap === 'undefined') {
+            let script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js";
+            script.onload = function() {
+                setTimeout(() => {
+                }, 100);
+            };
+            document.head.appendChild(script);
+        } 
+        
+
         // Setup the search form interactivity
         if ($('#tg-search-form').length > 0) {
             const searchForm = $('#tg-search-form');
@@ -110,11 +122,7 @@
                     console.error('Cart URL is invalid:', url);
                 }
             });
-        } else {
-            console.error('#tg_cart button not found in DOM');
-        }
-        
-        
+        }        
 
         if ($('input.qty-input').length > 0) {
             $('input.qty-input').keyup(
@@ -163,9 +171,16 @@
         }
 
         if ($('#tg-carousel').length > 0) {
-            const myCarouselElement = document.querySelector('#tg-carousel');
-            const carousel = new bootstrap.Carousel(myCarouselElement);
 
+            if (typeof bootstrap !== 'undefined') {
+                const myCarouselElement = document.querySelector('#tg-carousel');
+                const carousel = new bootstrap.Carousel(myCarouselElement);
+            } else {
+                let script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js";
+            }
+
+            
             $('.thumbnail-btn').each(function() {
                 $(this).on('click', function(e) {
                     carousel.to($(this).data('cindex'));
