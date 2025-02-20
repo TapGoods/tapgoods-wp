@@ -1072,7 +1072,7 @@ function get_item_image() {
 //        error_log("Image found for Item ID $item_id: $img_url");
         wp_send_json_success(['img_url' => $img_url]);
     } else {
-        $placeholder_url = 'https://your-placeholder-url.com/placeholder.png';
+        $placeholder_url = esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.png');
 //        error_log("No image found for Item ID $item_id. Using placeholder: $placeholder_url");
         wp_send_json_success(['img_url' => $placeholder_url]);
     }
@@ -1177,8 +1177,14 @@ function enqueue_yoast_seo_assets($hook) {
     global $post;
 
     if ('post.php' === $hook && isset($post) && 'tg_inventory' === get_post_type($post)) {
-        wp_enqueue_script('yoast-seo-post-edit', plugins_url('wordpress-seo/js/dist/wp-seo-metabox.js'), array('jquery'), null, true);
-    }
+        wp_enqueue_script(
+            'yoast-seo-post-edit',
+            plugins_url('wordpress-seo/js/dist/wp-seo-metabox.js'),
+            array('jquery'),
+            filemtime(plugin_dir_path(__FILE__) . 'wordpress-seo/js/dist/wp-seo-metabox.js'), // version based in time
+            true
+        );
+            }
 }
 add_action('admin_enqueue_scripts', 'enqueue_yoast_seo_assets');
 
