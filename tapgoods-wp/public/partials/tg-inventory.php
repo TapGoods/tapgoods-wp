@@ -71,29 +71,30 @@ echo do_shortcode( ob_get_clean() );
 document.addEventListener("DOMContentLoaded", function() {
     const categoryLinks = document.querySelectorAll(".category-link");
     const paginationLinks = document.querySelectorAll(".pagination a");
+    const searchForm = document.querySelector(".tapgoods-search-form"); 
+    const searchInput = document.querySelector("#tg-search");
 
-    // Manejo de las categorías
+    // Handle category selection
     categoryLinks.forEach(link => {
         link.addEventListener("click", function(event) {
             event.preventDefault();
 
             const selectedCategory = this.getAttribute("data-category-id");
-
-
             if (!selectedCategory) {
                 console.error("Category ID is missing in the link.");
                 return;
             }
 
-            // Reload the current page
+            // Preserve other URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             urlParams.set('category', selectedCategory);
             urlParams.delete('paged'); // Reset pagination
+
             window.location.search = urlParams.toString();
         });
     });
 
-    // Manage the pagination links
+    // Handle pagination
     paginationLinks.forEach(link => {
         link.addEventListener("click", function(event) {
             event.preventDefault();
@@ -106,13 +107,41 @@ document.addEventListener("DOMContentLoaded", function() {
                 urlParams.set('paged', paged);
             }
 
+            // Preserve category and tags in pagination
             const currentCategory = urlParams.get('category');
-            if (currentCategory) {
-                urlParams.set('category', currentCategory);
-            }
+            const currentTags = urlParams.get('tg_tags');
+            if (currentCategory) urlParams.set('category', currentCategory);
+            if (currentTags) urlParams.set('tg_tags', currentTags);
 
             window.location.search = urlParams.toString();
         });
     });
+
+    // Handle search form submission
+    if (searchForm && searchInput) {
+        searchForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // Get the search query from the input field
+            const searchQuery = searchInput.value.trim();
+            if (searchQuery !== '') {
+                urlParams.set('s', searchQuery);
+            } else {
+                urlParams.delete('s');
+            }
+
+            // Preserve existing parameters (category and tags)
+            const currentCategory = urlParams.get('category');
+            const currentTags = urlParams.get('tg_tags');
+            if (currentCategory) urlParams.set('category', currentCategory);
+            if (currentTags) urlParams.set('tg_tags', currentTags);
+
+            window.location.search = urlParams.toString();
+        });
+    }
 });
+
+
 </script>

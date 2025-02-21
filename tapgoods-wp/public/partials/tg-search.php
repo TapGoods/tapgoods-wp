@@ -28,7 +28,7 @@ $location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_locatio
 $show_pricing = true; // default value
 
 if (isset($atts['show_pricing'])) {
-    $cleaned_value = strtolower($atts['show_pricing']); // Convertir a minúsculas
+    $cleaned_value = strtolower($atts['show_pricing']);
     $show_pricing = (strpos($cleaned_value, 'false') !== false) ? false : true;
 }
 
@@ -38,6 +38,13 @@ $base_url = tg_get_add_to_cart_url( $location_id );
 
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
+
+$tags_from_url = isset($_GET['tg_tags']) ? sanitize_text_field(wp_unslash($_GET['tg_tags'])) : '';
+$tags_from_atts = isset($atts['tags']) ? sanitize_text_field($atts['tags']) : '';
+
+
+$tags = !empty($tags_from_url) ? $tags_from_url : $tags_from_atts;
+
 
 // Get the current URL
 $current_url = trailingslashit(home_url($wp->request, 'raw'));
@@ -92,7 +99,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const paginationContainer = document.querySelector(".pagination.justify-content-center.align-items-center");
     const placeholderImage = "<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/img/placeholder.png'); ?>";
     const categories = "<?php echo esc_js($category); ?>";
-    const tags = "<?php echo esc_js($atts['tags'] ?? ''); ?>";
+    const tags = "<?php echo esc_js($tags); ?>";
     const perPage = "<?php echo esc_js($tg_per_page); ?>";
     const locationId = "<?php echo esc_js($location_id); ?>";
     const redirectUrl = "<?php echo esc_js($current_url); ?>";

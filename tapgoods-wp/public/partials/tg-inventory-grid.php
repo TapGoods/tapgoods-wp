@@ -280,23 +280,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     // Reset button and remove item from localStorage after 10 seconds
                     setTimeout(() => {
-                        // Remove the item from cartData
                         delete cartData[locationId][itemId];
                         if (Object.keys(cartData[locationId]).length === 0) {
-                            delete cartData[locationId]; // Remove the location if empty
+                            delete cartData[locationId];
                         }
-                        localStorage.setItem("cartData", JSON.stringify(cartData)); // Save updated cartData
+                        localStorage.setItem("cartData", JSON.stringify(cartData));
 
-                        // Reset button appearance
                         button.textContent = "Add";
                         button.style.removeProperty("background-color");
                         button.disabled = false;
 
-                        // Clear quantity input
                         if (qtyInput) {
                             qtyInput.value = "";
                         }
-                    }, 10000); // Reset after 10 seconds
+                    }, 10000);
                 }
             });
         }
@@ -333,8 +330,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         cartData[locationId][itemId] = quantity;
         localStorage.setItem("cartData", JSON.stringify(cartData));
-    // Set cart status to active
-    localStorage.setItem("cart", "1"); // Mark the cart as active
+
+        // Set cart status to active
+        localStorage.setItem("cart", "1");
 
         // Update button to "Added" with green color
         button.textContent = "Added";
@@ -356,7 +354,7 @@ document.addEventListener("DOMContentLoaded", function () {
             qtyInput.value = "";
         }, 10000);
 
-        // Optional: Send a request to the server to process the addition
+        // Optional: Send a request to the server
         const url = button.getAttribute("data-target");
         const addToCartUrl = `${url}&quantity=${quantity}`;
         fetch(addToCartUrl, { method: "GET", credentials: "include" })
@@ -381,34 +379,102 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     /**
-     * Search input handling
+     * Handling search, categories, and pagination
      */
+    const searchForm = document.querySelector(".tapgoods-search-form");
+    const categoryLinks = document.querySelectorAll(".category-link");
+    const paginationLinks = document.querySelectorAll(".pagination a");
+
+    // Handle category clicks
+    categoryLinks.forEach(link => {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const selectedCategory = this.getAttribute("data-category-id");
+            if (!selectedCategory) {
+                console.error("Category ID is missing.");
+                return;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('category', selectedCategory);
+            urlParams.delete('paged'); // Reset pagination
+
+            window.location.search = urlParams.toString();
+        });
+    });
+
+    // Handle pagination clicks
+    paginationLinks.forEach(link => {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const url = new URL(this.href);
+            const paged = url.searchParams.get('paged');
+
+            const urlParams = new URLSearchParams(window.location.search);
+            if (paged) {
+                urlParams.set('paged', paged);
+            }
+
+            // Keep category and tags in pagination
+            const currentCategory = urlParams.get('category');
+            const currentTags = urlParams.get('tg_tags');
+            if (currentCategory) urlParams.set('category', currentCategory);
+            if (currentTags) urlParams.set('tg_tags', currentTags);
+
+            window.location.search = urlParams.toString();
+        });
+    });
+
+    // Handle search submission
+    if (searchForm) {
+        searchForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // Get search input value
+            const searchInput = searchForm.querySelector("input[name='s']");
+            if (searchInput && searchInput.value.trim() !== '') {
+                urlParams.set('s', searchInput.value.trim());
+            } else {
+                urlParams.delete('s');
+            }
+
+            // Keep category and tags
+            const currentCategory = urlParams.get('category');
+            const currentTags = urlParams.get('tg_tags');
+            if (currentCategory) urlParams.set('category', currentCategory);
+            if (currentTags) urlParams.set('tg_tags', currentTags);
+
+            window.location.search = urlParams.toString();
+        });
+    }
+
+    // Handle search input changes
     const searchInput = document.querySelector("#tg-search");
     if (searchInput) {
         searchInput.addEventListener("input", function () {
             const query = searchInput.value.trim();
-
             if (query) {
-                fetchResults(query); // Call a function to fetch results as user types
-            } else {
+                fetchResults(query);
             }
         });
-    } else {
-
     }
 
-    /**
-     * Pagination click handling
-     */
+    // Handle pagination click events
     document.addEventListener("click", function (e) {
         if (e.target.matches(".pagination a")) {
             e.preventDefault();
             const page = e.target.getAttribute("data-page");
             const query = searchInput ? searchInput.value.trim() : "";
-            fetchResults(query, page); // Call a function to fetch results for the selected page
+            fetchResults(query, page);
         }
     });
+
 });
+
 
 
 
