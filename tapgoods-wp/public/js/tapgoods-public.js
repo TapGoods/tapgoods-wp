@@ -113,7 +113,7 @@
                 console.log('Cart button clicked');
                 e.preventDefault();
                 
-                const url = $(this).data('target'); // Obtener la URL desde el data-target en el momento del clic
+                const url = $(this).data('target'); 
                 console.log('Cart URL on click:', url);
     
                 if (url && url !== '#') {
@@ -171,22 +171,37 @@
         }
 
         if ($('#tg-carousel').length > 0) {
-
+            let carousel; // Declare carousel variable in a broader scope
+        
+            // Ensure Bootstrap is loaded before initializing the carousel
             if (typeof bootstrap !== 'undefined') {
                 const myCarouselElement = document.querySelector('#tg-carousel');
-                const carousel = new bootstrap.Carousel(myCarouselElement);
+                carousel = new bootstrap.Carousel(myCarouselElement);
             } else {
                 let script = document.createElement('script');
                 script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js";
+                script.onload = function () {
+                    const myCarouselElement = document.querySelector('#tg-carousel');
+                    carousel = new bootstrap.Carousel(myCarouselElement);
+                };
+                document.head.appendChild(script);
             }
-
-            
+        
+            // Handle click on thumbnail buttons
             $('.thumbnail-btn').each(function() {
                 $(this).on('click', function(e) {
-                    carousel.to($(this).data('cindex'));
+                    e.preventDefault(); // Prevent default behavior
+                    let index = $(this).data('cindex');
+                    if (carousel && typeof index !== 'undefined' && !isNaN(index)) {
+                        carousel.to(index);
+                    } else {
+                        console.error("Carousel is not initialized or invalid thumbnail index:", index);
+                    }
                 });
             });
         }
+        
+        
 
         function update_cart_url() {
             if ($('#tg_cart').length > 0) {
