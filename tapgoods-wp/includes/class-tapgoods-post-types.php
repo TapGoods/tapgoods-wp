@@ -111,7 +111,7 @@ class Tapgoods_Post_Types {
 				wp_nonce_field('save_tg_custom_description', 'tg_custom_description_nonce');
 	
 				wp_editor(
-					esc_textarea($custom_description),
+					htmlspecialchars_decode($custom_description),
 					'tg_custom_description',
 					array(
 						'textarea_name' => 'tg_custom_description',
