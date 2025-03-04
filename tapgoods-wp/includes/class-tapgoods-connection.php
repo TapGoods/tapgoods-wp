@@ -1202,25 +1202,37 @@ class Tapgoods_Connection {
 		}
 	}
 	
-public function update_inventory_item($post_id, $item) {
-    $post_arr = array(
-        'ID' => $post_id,
-        'post_title' => $item['name'],
-        'meta_input' => $this->prepare_meta_input($item),
-    );
-    
-    $this->console_log('Updating post ID: ' . $post_id . ' with item name: ' . $item['name']);
-    
-    $update = wp_update_post($post_arr);
-    
-    if (is_wp_error($update)) {
-        $this->console_log('Error updating item: ' . $item['id'] . ' - ' . $update->get_error_message());
-    } else {
-        $this->console_log('Post updated successfully with ID: ' . $post_id);
-        // We call tg_assign_terms after updating the post
-        $this->tg_assign_terms($post_id);
-    }
-}
+	public function update_inventory_item($post_id, $item) {
+		$existing_meta = get_post_meta($post_id); // Get all existing meta fields
+		$new_meta = $this->prepare_meta_input($item); // Get updated meta fields from the API
+	
+		// Detect and remove meta fields that are no longer present in the API response
+		foreach ($existing_meta as $meta_key => $value) {
+			if (!array_key_exists($meta_key, $new_meta)) {
+				delete_post_meta($post_id, $meta_key); // Delete meta field if it no longer exists in the API
+				$this->console_log('Deleted meta_key: ' . $meta_key . ' from post ID: ' . $post_id);
+			}
+		}
+	
+		// Prepare the array for updating the post
+		$post_arr = array(
+			'ID' => $post_id,
+			'post_title' => $item['name'],
+			'meta_input' => $new_meta, // Insert/update meta fields
+		);
+	
+		$this->console_log('Updating post ID: ' . $post_id . ' with item name: ' . $item['name']);
+	
+		$update = wp_update_post($post_arr);
+	
+		if (is_wp_error($update)) {
+			$this->console_log('Error updating item: ' . $item['id'] . ' - ' . $update->get_error_message());
+		} else {
+			$this->console_log('Post updated successfully with ID: ' . $post_id);
+			$this->tg_assign_terms($post_id); // Assign categories and tags after updating the post
+		}
+	}
+	
 
 	
 	public function get_existing_inventory_item_by_tg_id($tg_id) {
