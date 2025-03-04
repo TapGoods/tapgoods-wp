@@ -3,7 +3,7 @@ Contributors: Aaron Valiente
 Tags: tapgoods, rental, inventory
 Requires at least: 
 Tested up to: 6.7.1
-Stable tag: 0.1.86
+Stable tag: 0.1.87
 License: MIT
 
 Plugin in development that will add TapGoods integration to WordPress websites
