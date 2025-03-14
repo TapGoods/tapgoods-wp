@@ -1197,3 +1197,72 @@ function enable_rest_api_for_tg_inventory($args, $post_type) {
 }
 add_filter('register_post_type_args', 'enable_rest_api_for_tg_inventory', 10, 2);
 
+
+// Register the cron event if it does not exist
+function register_sync_cron() {
+    if (!wp_next_scheduled('tg_auto_sync_event')) {
+        wp_schedule_event(time(), 'daily', 'tg_auto_sync_event'); // Now runs every 24 hours
+    }
+}
+add_action('wp', 'register_sync_cron');
+
+// Add a custom interval of 24 hours
+function add_custom_sync_interval($schedules) {
+    $schedules['daily'] = array(
+        'interval' => DAY_IN_SECONDS, // 24 hours
+        'display'  => __('Every 24 Hours')
+    );
+    return $schedules;
+}
+add_filter('cron_schedules', 'add_custom_sync_interval');
+
+// Hook to execute synchronization automatically when the event is triggered
+add_action('tg_auto_sync_event', 'execute_auto_sync');
+
+/**
+ * Executes the automatic synchronization process.
+ */
+function execute_auto_sync() {
+    $tg_api = Tapgoods_Connection::get_instance();
+
+    if (method_exists($tg_api, 'sync_inventory_in_batches')) {
+        $tg_api->sync_inventory_in_batches();
+        error_log('Auto-sync executed.');
+    } else {
+        error_log('Error: No valid sync function found in Tapgoods_Connection.');
+    }
+}
+
+// AJAX action to manually execute synchronization when clicking the SYNC button
+function execute_manual_sync() {
+    $tg_api = Tapgoods_Connection::get_instance();
+
+    if (method_exists($tg_api, 'sync_inventory_in_batches')) {
+        $tg_api->sync_inventory_in_batches();
+        wp_send_json_success('Sync executed successfully.');
+    } else {
+        error_log('Error: No valid sync function found in Tapgoods_Connection.');
+        wp_send_json_error('Sync function not found.');
+    }
+}
+
+// Hook to allow manual synchronization via AJAX (without nonce validation)
+add_action('wp_ajax_execute_manual_sync', 'execute_manual_sync');
+add_action('wp_ajax_nopriv_execute_manual_sync', 'execute_manual_sync'); // Allows execution without authentication
+
+// Ensure the sync cron is scheduled and trigger it on frontend visits
+add_action('init', function() {
+    if (!wp_next_scheduled('tg_auto_sync_event')) {
+        wp_schedule_event(time(), 'daily', 'tg_auto_sync_event');
+    }
+
+    // Check if the last sync was more than 24 hours ago and execute it if necessary
+    if (!is_admin()) { // Execute only on frontend visits
+        $last_run = get_option('tg_last_sync_time', 0);
+        if (time() - $last_run >= DAY_IN_SECONDS) { // 86400 seconds = 24 hours
+            update_option('tg_last_sync_time', time());
+            do_action('tg_auto_sync_event'); // Manually trigger the sync process
+        }
+    }
+});
+
