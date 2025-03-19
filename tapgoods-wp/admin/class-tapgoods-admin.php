@@ -148,9 +148,9 @@ class Tapgoods_Admin {
 	
 		// Connection to the API
 		$api_key = '';
-		if ( isset( $_REQUEST['tapgoods_api_key'] ) ) {
+		if ( isset( $_POST['tapgoods_api_key'] ) ) {
 			$encryption        = new Tapgoods_Encryption();
-			$submitted_api_key = sanitize_text_field( wp_unslash( $_REQUEST['tapgoods_api_key'] ) );
+			$submitted_api_key = sanitize_text_field( wp_unslash( $_POST['tapgoods_api_key'] ) );
 
 		//	error_log('Captured API Key: ' . $submitted_api_key);
 			$api_key           = $encryption->tg_encrypt( $submitted_api_key );
@@ -220,16 +220,16 @@ class Tapgoods_Admin {
 			return false;
 		}
 
-		if ( ! isset( $_REQUEST['_tgnonce_advanced'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['_tgnonce_advanced'] ) ), 'save' ) ) {
+		if ( ! isset( $_POST['_tgnonce_advanced'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_tgnonce_advanced'] ) ), 'save' ) ) {
 			return false;
 		}
 
-		Tapgoods_Helpers::tgqm( 'tg_save_advanced' );
-		Tapgoods_Helpers::tgqm( '$_REQUEST:' );
-		Tapgoods_Helpers::tgqm( $_REQUEST );
+		//Tapgoods_Helpers::tgqm( 'tg_save_advanced' );
+		//Tapgoods_Helpers::tgqm( '$_REQUEST:' );
+		//Tapgoods_Helpers::tgqm( $_REQUEST );
 
-		Tapgoods_Helpers::tgqm( '$_POST:' );
-		Tapgoods_Helpers::tgqm( $_POST );
+		//Tapgoods_Helpers::tgqm( '$_POST:' );
+		//Tapgoods_Helpers::tgqm( $_POST );
 	}
 
 	public function tg_save_dev() {
@@ -238,16 +238,16 @@ class Tapgoods_Admin {
 			return false;
 		}
 
-		if ( ! isset( $_REQUEST['_tgnonce_dev'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['_tgnonce_dev'] ) ), 'save' ) ) {
+		if ( ! isset( $_POST['_tgnonce_dev'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_tgnonce_dev'] ) ), 'save' ) ) {
 			return false;
 		}
 
-		Tapgoods_Helpers::tgqm( 'tg_save_dev' );
-		Tapgoods_Helpers::tgqm( '$_REQUEST:' );
-		Tapgoods_Helpers::tgqm( $_REQUEST );
+		//Tapgoods_Helpers::tgqm( 'tg_save_dev' );
+		//Tapgoods_Helpers::tgqm( '$_REQUEST:' );
+		//Tapgoods_Helpers::tgqm( $_REQUEST );
 
-		Tapgoods_Helpers::tgqm( '$_POST:' );
-		Tapgoods_Helpers::tgqm( $_POST );
+		//Tapgoods_Helpers::tgqm( '$_POST:' );
+		//Tapgoods_Helpers::tgqm( $_POST );
 	}
 
 	public function tg_save_styles( $input_submit ) {
