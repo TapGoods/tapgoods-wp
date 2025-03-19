@@ -4,23 +4,17 @@ $wp_load_paths = [
     dirname(__DIR__, 3) . '/wp-load.php',
     dirname(__DIR__, 4) . '/wp-load.php',
     dirname(__DIR__, 5) . '/wp-load.php',
-    $script_filename = isset( $_SERVER['SCRIPT_FILENAME'] ) 
-    ? realpath( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) 
-    : '';
-
-    if ( $script_filename ) {
-        $wp_load_path = dirname( $script_filename, 5 ) . '/wp-load.php';
-    }
-
-    $script_filename = isset( $_SERVER['SCRIPT_FILENAME'] ) 
-    ? realpath( sanitize_text_field( wp_unslash( $_SERVER['SCRIPT_FILENAME'] ) ) ) 
-    : '';
-
-    if ( $script_filename ) {
-        $wp_load_path = dirname( $script_filename, 6 ) . '/wp-load.php';
-    }
-
 ];
+
+// Get the script filename dynamically
+$script_filename = isset($_SERVER['SCRIPT_FILENAME']) 
+    ? realpath(sanitize_text_field(wp_unslash($_SERVER['SCRIPT_FILENAME']))) 
+    : '';
+
+if ($script_filename) {
+    $wp_load_paths[] = dirname($script_filename, 5) . '/wp-load.php';
+    $wp_load_paths[] = dirname($script_filename, 6) . '/wp-load.php';
+}
 
 $wp_load_found = false;
 
