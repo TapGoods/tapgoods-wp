@@ -65,7 +65,7 @@ class Tapgoods_Post_Types {
 				$post = get_post($post_id);
 	
 				if (!$post) {
-					echo '<p>' . esc_html__('Item not found.', 'tapgoods-wp') . '</p>';
+					echo '<p>' . esc_html__('Item not found.', 'tapgoods') . '</p>';
 					return;
 				}
 	
@@ -80,7 +80,7 @@ class Tapgoods_Post_Types {
 						wp_kses_post(wp_unslash($_POST['tg_custom_description']))
 					);
 	
-					echo '<div class="notice notice-success"><p>' . esc_html__('Custom description updated.', 'tapgoods-wp') . '</p></div>';
+					echo '<div class="notice notice-success"><p>' . esc_html__('Custom description updated.', 'tapgoods') . '</p></div>';
 				}
 	
 				// Handle saving Yoast SEO metadata manually
@@ -91,7 +91,7 @@ class Tapgoods_Post_Types {
 						update_post_meta($post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field(wp_unslash($_POST['yoast_wpseo_metadesc'])));
 						update_post_meta($post_id, '_yoast_wpseo_focuskw', sanitize_text_field(wp_unslash($_POST['yoast_wpseo_focuskw'])));				
 	
-					echo '<div class="notice notice-success"><p>' . esc_html__('SEO settings updated.', 'tapgoods-wp') . '</p></div>';
+					echo '<div class="notice notice-success"><p>' . esc_html__('SEO settings updated.', 'tapgoods') . '</p></div>';
 				}
 	
 				// Retrieve values
@@ -105,7 +105,7 @@ class Tapgoods_Post_Types {
 	
 				// Custom Description Section (Fixed, not collapsible)
 				echo '<div class="postbox" style="padding: 15px;">';
-				echo '<h2 class="hndle" style="margin-left: 10px;"><span>' . esc_html__('Custom Description', 'tapgoods-wp') . '</span></h2>';
+				echo '<h2 class="hndle" style="margin-left: 10px;"><span>' . esc_html__('Custom Description', 'tapgoods') . '</span></h2>';
 				echo '<div class="inside">';
 				echo '<form method="post">';
 				wp_nonce_field('save_tg_custom_description', 'tg_custom_description_nonce');
@@ -121,23 +121,23 @@ class Tapgoods_Post_Types {
 					)
 				);
 	
-				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save Description', 'tapgoods-wp') . '"></p>';
+				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save Description', 'tapgoods') . '"></p>';
 				echo '</form>';
 				echo '</div>'; // Close .inside
 				echo '</div>'; // Close .postbox
 	
 				// Inventory Information (Collapsible with Arrow)
 				echo '<div class="postbox open">';
-				echo '<h2 class="hndle collapsible"><span>' . esc_html__('Inventory Information', 'tapgoods-wp') . '</span> <span class="toggle-icon">▼</span></h2>';
+				echo '<h2 class="hndle collapsible"><span>' . esc_html__('Inventory Information', 'tapgoods') . '</span> <span class="toggle-icon">▼</span></h2>';
 				echo '<div class="inside">';
 				
-				echo '<h3>' . esc_html__('General Information', 'tapgoods-wp') . '</h3>';
-				echo '<p><strong>' . esc_html__('Description:', 'tapgoods-wp') . '</strong> ' . esc_html($post->post_content) . '</p>';
+				echo '<h3>' . esc_html__('General Information', 'tapgoods') . '</h3>';
+				echo '<p><strong>' . esc_html__('Description:', 'tapgoods') . '</strong> ' . esc_html($post->post_content) . '</p>';
 	
 				// Retrieve and display metadata
 				$meta = get_post_meta($post_id);
 				if (!empty($meta)) {
-					echo '<h3>' . esc_html__('Metadata:', 'tapgoods-wp') . '</h3><ul>';
+					echo '<h3>' . esc_html__('Metadata:', 'tapgoods') . '</h3><ul>';
 					foreach ($meta as $key => $value) {
 						echo '<li><strong>' . esc_html($key) . ':</strong> ' . esc_html(maybe_unserialize($value[0])) . '</li>';
 					}
@@ -150,21 +150,21 @@ class Tapgoods_Post_Types {
 				// Show SEO settings only if Yoast SEO is active
 				if ($yoast_active) {
 					echo '<div class="postbox open">';
-					echo '<h2 class="hndle collapsible"><span>' . esc_html__('SEO Settings', 'tapgoods-wp') . '</span> <span class="toggle-icon">▼</span></h2>';
+					echo '<h2 class="hndle collapsible"><span>' . esc_html__('SEO Settings', 'tapgoods') . '</span> <span class="toggle-icon">▼</span></h2>';
 					echo '<div class="inside">';
 					echo '<form method="post">';
 					wp_nonce_field('save_yoast_seo_meta', 'yoast_seo_nonce');
 	
-					echo '<p><label>' . esc_html__('SEO Title:', 'tapgoods-wp') . '</label>';
+					echo '<p><label>' . esc_html__('SEO Title:', 'tapgoods') . '</label>';
 					echo '<input type="text" name="yoast_wpseo_title" value="' . esc_attr($yoast_title) . '" class="widefat"></p>';
 	
-					echo '<p><label>' . esc_html__('SEO Description:', 'tapgoods-wp') . '</label>';
+					echo '<p><label>' . esc_html__('SEO Description:', 'tapgoods') . '</label>';
 					echo '<textarea name="yoast_wpseo_metadesc" class="widefat">' . esc_textarea($yoast_description) . '</textarea></p>';
 	
-					echo '<p><label>' . esc_html__('Focus Keyword:', 'tapgoods-wp') . '</label>';
+					echo '<p><label>' . esc_html__('Focus Keyword:', 'tapgoods') . '</label>';
 					echo '<input type="text" name="yoast_wpseo_focuskw" value="' . esc_attr($yoast_focus_keyword) . '" class="widefat"></p>';
 	
-					echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save SEO Settings', 'tapgoods-wp') . '"></p>';
+					echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save SEO Settings', 'tapgoods') . '"></p>';
 					echo '</form>';
 					echo '</div>'; // Close .inside
 					echo '</div>'; // Close .postbox
@@ -216,7 +216,7 @@ class Tapgoods_Post_Types {
 					}
 				</style>';
 			} else {
-				echo '<p>' . esc_html__('Invalid or not found item.', 'tapgoods-wp') . '</p>';
+				echo '<p>' . esc_html__('Invalid or not found item.', 'tapgoods') . '</p>';
 			}
 		}
 	}
@@ -255,26 +255,26 @@ class Tapgoods_Post_Types {
 				array(
 					'label'                 => 'categories',
 					'labels'                => array(
-						'name'                       => _x( 'Categories', 'Taxonomy General Name', 'tapgoods-wp' ),
-						'singular_name'              => _x( 'Category', 'Taxonomy Singular Name', 'tapgoods-wp' ),
-						'menu_name'                  => __( 'Categories', 'tapgoods-wp' ),
-						'all_items'                  => __( 'All Categories', 'tapgoods-wp' ),
-						'parent_item'                => __( 'Parent Category', 'tapgoods-wp' ),
-						'parent_item_colon'          => __( 'Parent Category:', 'tapgoods-wp' ),
-						'new_item_name'              => __( 'New Category Name', 'tapgoods-wp' ),
-						'add_new_item'               => __( 'Add New Category', 'tapgoods-wp' ),
-						'edit_item'                  => __( 'Edit Category', 'tapgoods-wp' ),
-						'update_item'                => __( 'Update Category', 'tapgoods-wp' ),
-						'view_item'                  => __( 'View Category', 'tapgoods-wp' ),
-						'separate_items_with_commas' => __( 'Separate categories with commas', 'tapgoods-wp' ),
-						'add_or_remove_items'        => __( 'Add or remove categories', 'tapgoods-wp' ),
-						'choose_from_most_used'      => __( 'Choose from the most used', 'tapgoods-wp' ),
-						'popular_items'              => __( 'Popular Categories', 'tapgoods-wp' ),
-						'search_items'               => __( 'Search Categories', 'tapgoods-wp' ),
-						'not_found'                  => __( 'Not Found', 'tapgoods-wp' ),
-						'no_terms'                   => __( 'No items', 'tapgoods-wp' ),
-						'items_list'                 => __( 'Categories list', 'tapgoods-wp' ),
-						'items_list_navigation'      => __( 'Categories list navigation', 'tapgoods-wp' ),
+						'name'                       => _x( 'Categories', 'Taxonomy General Name', 'tapgoods' ),
+						'singular_name'              => _x( 'Category', 'Taxonomy Singular Name', 'tapgoods' ),
+						'menu_name'                  => __( 'Categories', 'tapgoods' ),
+						'all_items'                  => __( 'All Categories', 'tapgoods' ),
+						'parent_item'                => __( 'Parent Category', 'tapgoods' ),
+						'parent_item_colon'          => __( 'Parent Category:', 'tapgoods' ),
+						'new_item_name'              => __( 'New Category Name', 'tapgoods' ),
+						'add_new_item'               => __( 'Add New Category', 'tapgoods' ),
+						'edit_item'                  => __( 'Edit Category', 'tapgoods' ),
+						'update_item'                => __( 'Update Category', 'tapgoods' ),
+						'view_item'                  => __( 'View Category', 'tapgoods' ),
+						'separate_items_with_commas' => __( 'Separate categories with commas', 'tapgoods' ),
+						'add_or_remove_items'        => __( 'Add or remove categories', 'tapgoods' ),
+						'choose_from_most_used'      => __( 'Choose from the most used', 'tapgoods' ),
+						'popular_items'              => __( 'Popular Categories', 'tapgoods' ),
+						'search_items'               => __( 'Search Categories', 'tapgoods' ),
+						'not_found'                  => __( 'Not Found', 'tapgoods' ),
+						'no_terms'                   => __( 'No items', 'tapgoods' ),
+						'items_list'                 => __( 'Categories list', 'tapgoods' ),
+						'items_list_navigation'      => __( 'Categories list navigation', 'tapgoods' ),
 					),
 					'hierarchical'          => true,
 					'public'                => true,
@@ -308,26 +308,26 @@ class Tapgoods_Post_Types {
 				'tapgoods_taxonomy_args_tg_tags',
 				array(
 					'labels'                => array(
-						'name'                       => _x( 'Tags', 'Taxonomy General Name', 'tapgoods-wp' ),
-						'singular_name'              => _x( 'Tag', 'Taxonomy Singular Name', 'tapgoods-wp' ),
-						'menu_name'                  => __( 'Tags', 'tapgoods-wp' ),
-						'all_items'                  => __( 'All Tags', 'tapgoods-wp' ),
-						'parent_item'                => __( 'Parent Category', 'tapgoods-wp' ),
-						'parent_item_colon'          => __( 'Parent Category:', 'tapgoods-wp' ),
-						'new_item_name'              => __( 'New Tag Name', 'tapgoods-wp' ),
-						'add_new_item'               => __( 'Add New Tag', 'tapgoods-wp' ),
-						'edit_item'                  => __( 'Edit Tag', 'tapgoods-wp' ),
-						'update_item'                => __( 'Update Tag', 'tapgoods-wp' ),
-						'view_item'                  => __( 'View Tag', 'tapgoods-wp' ),
-						'separate_items_with_commas' => __( 'Separate tags with commas', 'tapgoods-wp' ),
-						'add_or_remove_items'        => __( 'Add or remove tags', 'tapgoods-wp' ),
-						'choose_from_most_used'      => __( 'Choose from the most used tags', 'tapgoods-wp' ),
-						'popular_items'              => __( 'Popular Tags', 'tapgoods-wp' ),
-						'search_items'               => __( 'Search Tags', 'tapgoods-wp' ),
-						'not_found'                  => __( 'Not Found', 'tapgoods-wp' ),
-						'no_terms'                   => __( 'No items', 'tapgoods-wp' ),
-						'items_list'                 => __( 'Tags list', 'tapgoods-wp' ),
-						'items_list_navigation'      => __( 'Tags list navigation', 'tapgoods-wp' ),
+						'name'                       => _x( 'Tags', 'Taxonomy General Name', 'tapgoods' ),
+						'singular_name'              => _x( 'Tag', 'Taxonomy Singular Name', 'tapgoods' ),
+						'menu_name'                  => __( 'Tags', 'tapgoods' ),
+						'all_items'                  => __( 'All Tags', 'tapgoods' ),
+						'parent_item'                => __( 'Parent Category', 'tapgoods' ),
+						'parent_item_colon'          => __( 'Parent Category:', 'tapgoods' ),
+						'new_item_name'              => __( 'New Tag Name', 'tapgoods' ),
+						'add_new_item'               => __( 'Add New Tag', 'tapgoods' ),
+						'edit_item'                  => __( 'Edit Tag', 'tapgoods' ),
+						'update_item'                => __( 'Update Tag', 'tapgoods' ),
+						'view_item'                  => __( 'View Tag', 'tapgoods' ),
+						'separate_items_with_commas' => __( 'Separate tags with commas', 'tapgoods' ),
+						'add_or_remove_items'        => __( 'Add or remove tags', 'tapgoods' ),
+						'choose_from_most_used'      => __( 'Choose from the most used tags', 'tapgoods' ),
+						'popular_items'              => __( 'Popular Tags', 'tapgoods' ),
+						'search_items'               => __( 'Search Tags', 'tapgoods' ),
+						'not_found'                  => __( 'Not Found', 'tapgoods' ),
+						'no_terms'                   => __( 'No items', 'tapgoods' ),
+						'items_list'                 => __( 'Tags list', 'tapgoods' ),
+						'items_list_navigation'      => __( 'Tags list navigation', 'tapgoods' ),
 					),
 					'hierarchical'          => false,
 					'public'                => true,
@@ -367,28 +367,28 @@ class Tapgoods_Post_Types {
 					'query_var'         => is_admin(),
 					'rewrite'           => false,
 					'public'            => false,
-					'label'             => _x( 'Locations', 'Taxonomy name', 'tapgoods-wp' ),
+					'label'             => _x( 'Locations', 'Taxonomy name', 'tapgoods' ),
 					'labels'            => array(
-						'name'                       => _x( 'TG Locations', 'Taxonomy General Name', 'tapgoods-wp' ),
-						'singular_name'              => _x( 'Location', 'Taxonomy Singular Name', 'tapgoods-wp' ),
-						'menu_name'                  => __( 'Locations', 'tapgoods-wp' ),
-						'all_items'                  => __( 'All Locations', 'tapgoods-wp' ),
-						'parent_item'                => __( 'Parent Location', 'tapgoods-wp' ),
-						'parent_item_colon'          => __( 'Parent Location:', 'tapgoods-wp' ),
-						'new_item_name'              => __( 'New Location Name', 'tapgoods-wp' ),
-						'add_new_item'               => __( 'Add New Location', 'tapgoods-wp' ),
-						'edit_item'                  => __( 'Edit Location', 'tapgoods-wp' ),
-						'update_item'                => __( 'Update Location', 'tapgoods-wp' ),
-						'view_item'                  => __( 'View Location', 'tapgoods-wp' ),
-						'separate_items_with_commas' => __( 'Separate Locations with commas', 'tapgoods-wp' ),
-						'add_or_remove_items'        => __( 'Add or remove Locations', 'tapgoods-wp' ),
-						'choose_from_most_used'      => __( 'Choose from the most used Locations', 'tapgoods-wp' ),
-						'popular_items'              => __( 'Popular Locations', 'tapgoods-wp' ),
-						'search_items'               => __( 'Search Locations', 'tapgoods-wp' ),
-						'not_found'                  => __( 'Not Found', 'tapgoods-wp' ),
-						'no_terms'                   => __( 'No Locations', 'tapgoods-wp' ),
-						'items_list'                 => __( 'Locations list', 'tapgoods-wp' ),
-						'items_list_navigation'      => __( 'Locations list navigation', 'tapgoods-wp' ),
+						'name'                       => _x( 'TG Locations', 'Taxonomy General Name', 'tapgoods' ),
+						'singular_name'              => _x( 'Location', 'Taxonomy Singular Name', 'tapgoods' ),
+						'menu_name'                  => __( 'Locations', 'tapgoods' ),
+						'all_items'                  => __( 'All Locations', 'tapgoods' ),
+						'parent_item'                => __( 'Parent Location', 'tapgoods' ),
+						'parent_item_colon'          => __( 'Parent Location:', 'tapgoods' ),
+						'new_item_name'              => __( 'New Location Name', 'tapgoods' ),
+						'add_new_item'               => __( 'Add New Location', 'tapgoods' ),
+						'edit_item'                  => __( 'Edit Location', 'tapgoods' ),
+						'update_item'                => __( 'Update Location', 'tapgoods' ),
+						'view_item'                  => __( 'View Location', 'tapgoods' ),
+						'separate_items_with_commas' => __( 'Separate Locations with commas', 'tapgoods' ),
+						'add_or_remove_items'        => __( 'Add or remove Locations', 'tapgoods' ),
+						'choose_from_most_used'      => __( 'Choose from the most used Locations', 'tapgoods' ),
+						'popular_items'              => __( 'Popular Locations', 'tapgoods' ),
+						'search_items'               => __( 'Search Locations', 'tapgoods' ),
+						'not_found'                  => __( 'Not Found', 'tapgoods' ),
+						'no_terms'                   => __( 'No Locations', 'tapgoods' ),
+						'items_list'                 => __( 'Locations list', 'tapgoods' ),
+						'items_list_navigation'      => __( 'Locations list navigation', 'tapgoods' ),
 					),
 					'capabilities'          => array(
 						'manage_terms' => 'manage_categories',
@@ -412,7 +412,7 @@ class Tapgoods_Post_Types {
 					'query_var'         => is_admin(),
 					'rewrite'           => false,
 					'public'            => false,
-					'label'             => _x( 'Product type', 'Taxonomy name', 'tapgoods-wp' ),
+					'label'             => _x( 'Product type', 'Taxonomy name', 'tapgoods' ),
 				)
 			)
 		);
@@ -431,7 +431,7 @@ class Tapgoods_Post_Types {
 					'query_var'         => is_admin(),
 					'rewrite'           => false,
 					'public'            => false,
-					'label'             => _x( 'Product colors', 'Taxonomy name', 'tapgoods-wp' ),
+					'label'             => _x( 'Product colors', 'Taxonomy name', 'tapgoods' ),
 				)
 			)
 		);
@@ -456,37 +456,37 @@ class Tapgoods_Post_Types {
 			apply_filters(
 				'tapgoods_register_post_type_inventory',
 				array(
-					'label'               => __( 'Item', 'tapgoods-wp' ),
+					'label'               => __( 'Item', 'tapgoods' ),
 					'labels'              => array(
-						'name'                  => _x( 'Items', 'Post Type General Name', 'tapgoods-wp' ),
-						'singular_name'         => _x( 'Item', 'Post Type Singular Name', 'tapgoods-wp' ),
-						'menu_name'             => __( 'Items', 'tapgoods-wp' ),
-						'name_admin_bar'        => __( 'Inventory', 'tapgoods-wp' ),
-						'archives'              => __( 'Item Archives', 'tapgoods-wp' ),
-						'attributes'            => __( 'Item Attributes', 'tapgoods-wp' ),
-						'parent_item_colon'     => __( 'Parent Item:', 'tapgoods-wp' ),
-						'all_items'             => __( 'All Items', 'tapgoods-wp' ),
-						'add_new_item'          => __( 'Add New Item', 'tapgoods-wp' ),
-						'add_new'               => __( 'Add New', 'tapgoods-wp' ),
-						'new_item'              => __( 'New Item', 'tapgoods-wp' ),
-						'edit_item'             => __( 'Edit Item', 'tapgoods-wp' ),
-						'update_item'           => __( 'Update Item', 'tapgoods-wp' ),
-						'view_item'             => __( 'View Item', 'tapgoods-wp' ),
-						'view_items'            => __( 'View Items', 'tapgoods-wp' ),
-						'search_items'          => __( 'Search Item', 'tapgoods-wp' ),
-						'not_found'             => __( 'Not found', 'tapgoods-wp' ),
-						'not_found_in_trash'    => __( 'Not found in Trash', 'tapgoods-wp' ),
-						'featured_image'        => __( 'Featured Image', 'tapgoods-wp' ),
-						'set_featured_image'    => __( 'Set featured image', 'tapgoods-wp' ),
-						'remove_featured_image' => __( 'Remove featured image', 'tapgoods-wp' ),
-						'use_featured_image'    => __( 'Use as featured image', 'tapgoods-wp' ),
-						'insert_into_item'      => __( 'Insert into item', 'tapgoods-wp' ),
-						'uploaded_to_this_item' => __( 'Uploaded to this item', 'tapgoods-wp' ),
-						'items_list'            => __( 'Items list', 'tapgoods-wp' ),
-						'items_list_navigation' => __( 'Items list navigation', 'tapgoods-wp' ),
-						'filter_items_list'     => __( 'Filter items list', 'tapgoods-wp' ),
+						'name'                  => _x( 'Items', 'Post Type General Name', 'tapgoods' ),
+						'singular_name'         => _x( 'Item', 'Post Type Singular Name', 'tapgoods' ),
+						'menu_name'             => __( 'Items', 'tapgoods' ),
+						'name_admin_bar'        => __( 'Inventory', 'tapgoods' ),
+						'archives'              => __( 'Item Archives', 'tapgoods' ),
+						'attributes'            => __( 'Item Attributes', 'tapgoods' ),
+						'parent_item_colon'     => __( 'Parent Item:', 'tapgoods' ),
+						'all_items'             => __( 'All Items', 'tapgoods' ),
+						'add_new_item'          => __( 'Add New Item', 'tapgoods' ),
+						'add_new'               => __( 'Add New', 'tapgoods' ),
+						'new_item'              => __( 'New Item', 'tapgoods' ),
+						'edit_item'             => __( 'Edit Item', 'tapgoods' ),
+						'update_item'           => __( 'Update Item', 'tapgoods' ),
+						'view_item'             => __( 'View Item', 'tapgoods' ),
+						'view_items'            => __( 'View Items', 'tapgoods' ),
+						'search_items'          => __( 'Search Item', 'tapgoods' ),
+						'not_found'             => __( 'Not found', 'tapgoods' ),
+						'not_found_in_trash'    => __( 'Not found in Trash', 'tapgoods' ),
+						'featured_image'        => __( 'Featured Image', 'tapgoods' ),
+						'set_featured_image'    => __( 'Set featured image', 'tapgoods' ),
+						'remove_featured_image' => __( 'Remove featured image', 'tapgoods' ),
+						'use_featured_image'    => __( 'Use as featured image', 'tapgoods' ),
+						'insert_into_item'      => __( 'Insert into item', 'tapgoods' ),
+						'uploaded_to_this_item' => __( 'Uploaded to this item', 'tapgoods' ),
+						'items_list'            => __( 'Items list', 'tapgoods' ),
+						'items_list_navigation' => __( 'Items list navigation', 'tapgoods' ),
+						'filter_items_list'     => __( 'Filter items list', 'tapgoods' ),
 					),
-					'description'         => __( 'TapGoods Inventory', 'tapgoods-wp' ),
+					'description'         => __( 'TapGoods Inventory', 'tapgoods' ),
 					'supports'            => $supports,
 					'taxonomies'          => array( 'tg_category', 'tg_tags' ),
 					'hierarchical'        => false,
@@ -720,32 +720,32 @@ class Tapgoods_Post_Types {
 	public static function updated_term_messages( $messages ) {
 		$messages['tg_category'] = array(
 			0 => '',
-			1 => __( 'Category added.', 'tapgoods-wp' ),
-			2 => __( 'Category deleted.', 'tapgoods-wp' ),
-			3 => __( 'Category updated.', 'tapgoods-wp' ),
-			4 => __( 'Category not added.', 'tapgoods-wp' ),
-			5 => __( 'Category not updated.', 'tapgoods-wp' ),
-			6 => __( 'Categories deleted.', 'tapgoods-wp' ),
+			1 => __( 'Category added.', 'tapgoods' ),
+			2 => __( 'Category deleted.', 'tapgoods' ),
+			3 => __( 'Category updated.', 'tapgoods' ),
+			4 => __( 'Category not added.', 'tapgoods' ),
+			5 => __( 'Category not updated.', 'tapgoods' ),
+			6 => __( 'Categories deleted.', 'tapgoods' ),
 		);
 
 		$messages['tg_tags'] = array(
 			0 => '',
-			1 => __( 'Tag added.', 'tapgoods-wp' ),
-			2 => __( 'Tag deleted.', 'tapgoods-wp' ),
-			3 => __( 'Tag updated.', 'tapgoods-wp' ),
-			4 => __( 'Tag not added.', 'tapgoods-wp' ),
-			5 => __( 'Tag not updated.', 'tapgoods-wp' ),
-			6 => __( 'Tags deleted.', 'tapgoods-wp' ),
+			1 => __( 'Tag added.', 'tapgoods' ),
+			2 => __( 'Tag deleted.', 'tapgoods' ),
+			3 => __( 'Tag updated.', 'tapgoods' ),
+			4 => __( 'Tag not added.', 'tapgoods' ),
+			5 => __( 'Tag not updated.', 'tapgoods' ),
+			6 => __( 'Tags deleted.', 'tapgoods' ),
 		);
 
 		$messages['tg_location'] = array(
 			0 => '',
-			1 => __( 'Location added.', 'tapgoods-wp' ),
-			2 => __( 'Location deleted.', 'tapgoods-wp' ),
-			3 => __( 'Location updated.', 'tapgoods-wp' ),
-			4 => __( 'Location not added.', 'tapgoods-wp' ),
-			5 => __( 'Location not updated.', 'tapgoods-wp' ),
-			6 => __( 'Locations deleted.', 'tapgoods-wp' ),
+			1 => __( 'Location added.', 'tapgoods' ),
+			2 => __( 'Location deleted.', 'tapgoods' ),
+			3 => __( 'Location updated.', 'tapgoods' ),
+			4 => __( 'Location not added.', 'tapgoods' ),
+			5 => __( 'Location not updated.', 'tapgoods' ),
+			6 => __( 'Locations deleted.', 'tapgoods' ),
 		);
 	}
 
@@ -798,7 +798,7 @@ function add_location_column_to_inventory($columns) {
     // Rearrange columns and insert 'Location' before 'Date'
     foreach ($columns as $key => $value) {
         if ($key === 'date') {
-            $new_columns['location'] = __('Location', 'tapgoods-wp');
+            $new_columns['location'] = __('Location', 'tapgoods');
         }
         $new_columns[$key] = $value;
     }
@@ -833,7 +833,7 @@ function fill_location_column_in_inventory($column, $post_id) {
             $location_name = isset($location_data['fullName']) ? $location_data['fullName'] : "Location {$location_id}";
             echo esc_html("{$location_id} - {$location_name}");
         } else {
-            echo esc_html__( 'Location details not found', 'tapgoods-wp' );
+            echo esc_html__( 'Location details not found', 'tapgoods' );
         }
     }
 }

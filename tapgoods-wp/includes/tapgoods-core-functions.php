@@ -46,9 +46,9 @@ function tg_get_permalink_structure() {
 	$permalinks = wp_parse_args(
 		array_filter( $tg_permalinks ),
 		array(
-			'tg_inventory_base'      => _x( 'products', 'permalink', 'tapgoods-wp' ),
-			'tg_category_base'       => _x( 'categories', 'permalink', 'tapgoods-wp' ),
-			'tg_tag_base'            => _x( 'tags', 'permalink', 'tapgoods-wp' ),
+			'tg_inventory_base'      => _x( 'products', 'permalink', 'tapgoods' ),
+			'tg_category_base'       => _x( 'categories', 'permalink', 'tapgoods' ),
+			'tg_tag_base'            => _x( 'tags', 'permalink', 'tapgoods' ),
 			'use_verbose_page_rules' => 0,
 		)
 	);
@@ -1168,7 +1168,7 @@ add_action('init', 'enable_yoast_seo_for_tg_inventory', 20);
 
 // Ensure Yoast metabox is added to the post edit screen
 function force_yoast_seo_metabox_on_tg_inventory() {
-    add_meta_box('wpseo_meta', __('Yoast SEO', 'tapgoods-wp'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
+    add_meta_box('wpseo_meta', __('Yoast SEO', 'tapgoods'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
 }
 add_action('add_meta_boxes', 'force_yoast_seo_metabox_on_tg_inventory');
 

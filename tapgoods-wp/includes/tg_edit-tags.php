@@ -12,23 +12,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 /** WordPress Administration Bootstrap */
 global $taxnow;
 if ( ! $taxnow ) {
-	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods' ) );
 }
 
 $tax = get_taxonomy( $taxnow );
 
 if ( ! $tax ) {
-	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods' ) );
 }
 
 if ( ! in_array( $tax->name, get_taxonomies( array( 'show_ui' => true ) ), true ) ) {
-	wp_die( esc_html__( 'Sorry, you are not allowed to edit terms in this taxonomy.', 'tapgoods-wp' ) );
+	wp_die( esc_html__( 'Sorry, you are not allowed to edit terms in this taxonomy.', 'tapgoods' ) );
 }
 
 if ( ! current_user_can( $tax->cap->manage_terms ) ) {
 	wp_die(
-		'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-		'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+		'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods' ) . '</h1>' .
+		'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods' ) . '</p>',
 		403
 	);
 }
@@ -83,8 +83,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( $tax->cap->edit_terms ) ) {
 			wp_die(
-				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods' ) . '</p>',
 				403
 			);
 		}
@@ -120,8 +120,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( 'delete_term', $tag_ID ) ) {
 			wp_die(
-				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods' ) . '</p>',
 				403
 			);
 		}
@@ -140,8 +140,8 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( $tax->cap->delete_terms ) ) {
 			wp_die(
-				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods' ) . '</p>',
 				403
 			);
 		}
@@ -164,7 +164,7 @@ switch ( $wp_list_table->current_action() ) {
 		$term    = get_term( $term_id );
 
 		if ( ! $term instanceof WP_Term ) {
-			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
+			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods' ) );
 		}
 
 		wp_redirect( sanitize_url( get_edit_term_link( $term_id, $taxonomy, $post_type ) ) );
@@ -176,15 +176,15 @@ switch ( $wp_list_table->current_action() ) {
 
 		if ( ! current_user_can( 'edit_term', $tag_ID ) ) {
 			wp_die(
-				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods-wp' ) . '</h1>' .
-				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods-wp' ) . '</p>',
+				'<h1>' . esc_html__( 'You need a higher level of permission.', 'tapgoods' ) . '</h1>' .
+				'<p>' . esc_html__( 'Sorry, you are not allowed to manage terms in this taxonomy.', 'tapgoods' ) . '</p>',
 				403
 			);
 		}
 
 		$tag = get_term( $tag_ID, $taxonomy );
 		if ( ! $tag ) {
-			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods-wp' ) );
+			wp_die( esc_html__( 'You attempted to edit an item that does not exist. Perhaps it was deleted?', 'tapgoods' ) );
 		}
 
 		$ret = wp_update_term( $tag_ID, $taxonomy, $_POST );
@@ -260,69 +260,69 @@ if ( 'category' === $taxonomy || 'link_category' === $taxonomy || 'post_tag' ===
 	if ( 'category' === $taxonomy ) {
 		$help = '<p>' . sprintf(
 			/* translators: %s: URL to Writing Settings screen. */
-			__( 'You can use categories to define sections of your site and group related posts. The default category is &#8220;Uncategorized&#8221; until you change it in your <a href="%s">writing settings</a>.', 'tapgoods-wp' ),
+			__( 'You can use categories to define sections of your site and group related posts. The default category is &#8220;Uncategorized&#8221; until you change it in your <a href="%s">writing settings</a>.', 'tapgoods' ),
 			'options-writing.php'
 		) . '</p>';
 	} elseif ( 'link_category' === $taxonomy ) {
-		$help = '<p>' . __( 'You can create groups of links by using Link Categories. Link Category names must be unique and Link Categories are separate from the categories you use for posts.', 'tapgoods-wp' ) . '</p>';
+		$help = '<p>' . __( 'You can create groups of links by using Link Categories. Link Category names must be unique and Link Categories are separate from the categories you use for posts.', 'tapgoods' ) . '</p>';
 	} else {
-		$help = '<p>' . __( 'You can assign keywords to your posts using <strong>tags</strong>. Unlike categories, tags have no hierarchy, meaning there is no relationship from one tag to another.', 'tapgoods-wp' ) . '</p>';
+		$help = '<p>' . __( 'You can assign keywords to your posts using <strong>tags</strong>. Unlike categories, tags have no hierarchy, meaning there is no relationship from one tag to another.', 'tapgoods' ) . '</p>';
 	}
 
 	if ( 'link_category' === $taxonomy ) {
-		$help .= '<p>' . __( 'You can delete Link Categories in the Bulk Action pull-down, but that action does not delete the links within the category. Instead, it moves them to the default Link Category.', 'tapgoods-wp' ) . '</p>';
+		$help .= '<p>' . __( 'You can delete Link Categories in the Bulk Action pull-down, but that action does not delete the links within the category. Instead, it moves them to the default Link Category.', 'tapgoods' ) . '</p>';
 	} else {
-		$help .= '<p>' . __( 'What&#8217;s the difference between categories and tags? Normally, tags are ad-hoc keywords that identify important information in your post (names, subjects, etc) that may or may not recur in other posts, while categories are pre-determined sections. If you think of your site like a book, the categories are like the Table of Contents and the tags are like the terms in the index.', 'tapgoods-wp' ) . '</p>';
+		$help .= '<p>' . __( 'What&#8217;s the difference between categories and tags? Normally, tags are ad-hoc keywords that identify important information in your post (names, subjects, etc) that may or may not recur in other posts, while categories are pre-determined sections. If you think of your site like a book, the categories are like the Table of Contents and the tags are like the terms in the index.', 'tapgoods' ) . '</p>';
 	}
 
 	get_current_screen()->add_help_tab(
 		array(
 			'id'      => 'overview',
-			'title'   => __( 'Overview', 'tapgoods-wp' ),
+			'title'   => __( 'Overview', 'tapgoods' ),
 			'content' => $help,
 		)
 	);
 
 	if ( 'category' === $taxonomy || 'post_tag' === $taxonomy ) {
 		if ( 'category' === $taxonomy ) {
-			$help = '<p>' . __( 'When adding a new category on this screen, you&#8217;ll fill in the following fields:', 'tapgoods-wp' ) . '</p>';
+			$help = '<p>' . __( 'When adding a new category on this screen, you&#8217;ll fill in the following fields:', 'tapgoods' ) . '</p>';
 		} else {
-			$help = '<p>' . __( 'When adding a new tag on this screen, you&#8217;ll fill in the following fields:', 'tapgoods-wp' ) . '</p>';
+			$help = '<p>' . __( 'When adding a new tag on this screen, you&#8217;ll fill in the following fields:', 'tapgoods' ) . '</p>';
 		}
 
 		$help .= '<ul>' .
-		'<li>' . __( '<strong>Name</strong> &mdash; The name is how it appears on your site.', 'tapgoods-wp' ) . '</li>';
+		'<li>' . __( '<strong>Name</strong> &mdash; The name is how it appears on your site.', 'tapgoods' ) . '</li>';
 
-		$help .= '<li>' . __( '<strong>Slug</strong> &mdash; The &#8220;slug&#8221; is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.', 'tapgoods-wp' ) . '</li>';
+		$help .= '<li>' . __( '<strong>Slug</strong> &mdash; The &#8220;slug&#8221; is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.', 'tapgoods' ) . '</li>';
 
 		if ( 'category' === $taxonomy ) {
-			$help .= '<li>' . __( '<strong>Parent</strong> &mdash; Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have child categories for Bebop and Big Band. Totally optional. To create a subcategory, just choose another category from the Parent dropdown.', 'tapgoods-wp' ) . '</li>';
+			$help .= '<li>' . __( '<strong>Parent</strong> &mdash; Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have child categories for Bebop and Big Band. Totally optional. To create a subcategory, just choose another category from the Parent dropdown.', 'tapgoods' ) . '</li>';
 		}
 
-		$help .= '<li>' . __( '<strong>Description</strong> &mdash; The description is not prominent by default; however, some themes may display it.', 'tapgoods-wp' ) . '</li>' .
+		$help .= '<li>' . __( '<strong>Description</strong> &mdash; The description is not prominent by default; however, some themes may display it.', 'tapgoods' ) . '</li>' .
 		'</ul>' .
-		'<p>' . __( 'You can change the display of this screen using the Screen Options tab to set how many items are displayed per screen and to display/hide columns in the table.', 'tapgoods-wp' ) . '</p>';
+		'<p>' . __( 'You can change the display of this screen using the Screen Options tab to set how many items are displayed per screen and to display/hide columns in the table.', 'tapgoods' ) . '</p>';
 
 		get_current_screen()->add_help_tab(
 			array(
 				'id'      => 'adding-terms',
-				'title'   => 'category' === $taxonomy ? __( 'Adding Categories', 'tapgoods-wp' ) : __( 'Adding Tags', 'tapgoods-wp' ),
+				'title'   => 'category' === $taxonomy ? __( 'Adding Categories', 'tapgoods' ) : __( 'Adding Tags', 'tapgoods' ),
 				'content' => $help,
 			)
 		);
 	}
 
-	$help = '<p><strong>' . __( 'For more information:', 'tapgoods-wp' ) . '</strong></p>';
+	$help = '<p><strong>' . __( 'For more information:', 'tapgoods' ) . '</strong></p>';
 
 	if ( 'category' === $taxonomy ) {
-		$help .= '<p>' . __( '<a href="https://wordpress.org/documentation/article/posts-categories-screen/">Documentation on Categories</a>', 'tapgoods-wp' ) . '</p>';
+		$help .= '<p>' . __( '<a href="https://wordpress.org/documentation/article/posts-categories-screen/">Documentation on Categories</a>', 'tapgoods' ) . '</p>';
 	} elseif ( 'link_category' === $taxonomy ) {
-		$help .= '<p>' . __( '<a href="https://codex.wordpress.org/Links_Link_Categories_Screen">Documentation on Link Categories</a>', 'tapgoods-wp' ) . '</p>';
+		$help .= '<p>' . __( '<a href="https://codex.wordpress.org/Links_Link_Categories_Screen">Documentation on Link Categories</a>', 'tapgoods' ) . '</p>';
 	} else {
-		$help .= '<p>' . __( '<a href="https://wordpress.org/documentation/article/posts-tags-screen/">Documentation on Tags</a>', 'tapgoods-wp' ) . '</p>';
+		$help .= '<p>' . __( '<a href="https://wordpress.org/documentation/article/posts-tags-screen/">Documentation on Tags</a>', 'tapgoods' ) . '</p>';
 	}
 
-	$help .= '<p>' . __( '<a href="https://wordpress.org/support/forums/">Support forums</a>', 'tapgoods-wp' ) . '</p>';
+	$help .= '<p>' . __( '<a href="https://wordpress.org/support/forums/">Support forums</a>', 'tapgoods' ) . '</p>';
 
 	get_current_screen()->set_help_sidebar( $help );
 
@@ -353,7 +353,7 @@ if ( isset( $_REQUEST['s'] ) ) {
         echo '<span class="subtitle">';
         printf(
             /* translators: %s: Search query. */
-            esc_html__( 'Search results for: %s', 'tapgoods-wp' ),
+            esc_html__( 'Search results for: %s', 'tapgoods' ),
             '<strong>' . esc_html( $search_query ) . '</strong>'
         );
         echo '</span>';
@@ -453,12 +453,12 @@ if ( true ) {
 	<?php wp_nonce_field( 'add-tag', '_wpnonce_add-tag' ); ?>
 
 <div class="form-field form-required term-name-wrap">
-	<label for="tag-name"><?php esc_html_ex( 'Name', 'term name', 'tapgoods-wp' ); ?></label>
+	<label for="tag-name"><?php esc_html_ex( 'Name', 'term name', 'tapgoods' ); ?></label>
 	<input name="tag-name" id="tag-name" type="text" value="" size="40" aria-required="true" aria-describedby="name-description" />
 	<p id="name-description"><?php echo esc_html( $tax->labels->name_field_description ); ?></p>
 </div>
 <div class="form-field term-slug-wrap">
-	<label for="tag-slug"><?php esc_html_e( 'Slug', 'tapgoods-wp' ); ?></label>
+	<label for="tag-slug"><?php esc_html_e( 'Slug', 'tapgoods' ); ?></label>
 	<input name="slug" id="tag-slug" type="text" value="" size="40" aria-describedby="slug-description" />
 	<p id="slug-description"><?php echo esc_html( $tax->labels->slug_field_description ); ?></p>
 </div>
@@ -473,7 +473,7 @@ if ( true ) {
 			'name'             => 'parent',
 			'orderby'          => 'name',
 			'hierarchical'     => true,
-			'show_option_none' => __( 'None', 'tapgoods-wp' ),
+			'show_option_none' => __( 'None', 'tapgoods' ),
 		);
 
 		/**
@@ -504,14 +504,14 @@ if ( true ) {
 		wp_dropdown_categories( $dropdown_args );
 		?>
 		<?php if ( 'category' === $taxonomy ) : ?>
-		<p id="parent-description"><?php esc_html_e( 'Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have children categories for Bebop and Big Band. Totally optional.', 'tapgoods-wp' ); ?></p>
+		<p id="parent-description"><?php esc_html_e( 'Categories, unlike tags, can have a hierarchy. You might have a Jazz category, and under that have children categories for Bebop and Big Band. Totally optional.', 'tapgoods' ); ?></p>
 	<?php else : ?>
 		<p id="parent-description"><?php echo esc_html( $tax->labels->parent_field_description ); ?></p>
 	<?php endif; ?>
 </div>
 	<?php endif; // is_taxonomy_hierarchical() ?>
 <div class="form-field term-description-wrap">
-	<label for="tag-description"><?php esc_html_e( 'Description', 'tapgoods-wp' ); ?></label>
+	<label for="tag-description"><?php esc_html_e( 'Description', 'tapgoods' ); ?></label>
 	<textarea name="description" id="tag-description" rows="5" cols="40" aria-describedby="description-description"></textarea>
 	<p id="description-description"><?php echo esc_html( $tax->labels->desc_field_description ); ?></p>
 </div>
@@ -591,7 +591,7 @@ if ( true ) {
 	printf(
 		wp_kses(
 			'Deleting a category does not delete the posts in that category. Instead, posts that were only assigned to the deleted category are set to the default category %s. The default category cannot be deleted.',
-			'tapgoods-wp'
+			'tapgoods'
 		),
 		'<strong>' . esc_html( apply_filters( 'the_category', get_cat_name( get_option( 'default_category' ) ), '', '' ) ) . '</strong>'
 	);
@@ -603,7 +603,7 @@ if ( true ) {
 		printf(
 			wp_kses(
 				/* translators: %s: URL to Categories to Tags Converter tool. */
-				__( 'Categories can be selectively converted to tags using the <a href="%s">category to tag converter</a>.', 'tapgoods-wp' ),
+				__( 'Categories can be selectively converted to tags using the <a href="%s">category to tag converter</a>.', 'tapgoods' ),
 				array( 'a' => array( 'href' => array() ) ) // Permitir solo <a> con atributo href
 			),
 			esc_url( $import_link )
@@ -619,7 +619,7 @@ if ( true ) {
 	printf(
 		wp_kses(
 			/* translators: %s: URL to Tag to Category Converter tool. */
-			__( 'Tags can be selectively converted to categories using the <a href="%s">tag to category converter</a>.', 'tapgoods-wp' ),
+			__( 'Tags can be selectively converted to categories using the <a href="%s">tag to category converter</a>.', 'tapgoods' ),
 			array( 'a' => array( 'href' => array() ) ) // Permitir solo <a> con atributo href
 		),
 		esc_url( $import_link )

@@ -38,18 +38,18 @@ class TG_Admin_Permalink_Settings {
 	 * Init our settings.
 	 */
 	public function settings_init() {
-		add_settings_section( 'tg-permalink', __( 'Inventory permalinks', 'tapgoods-wp' ), array( $this, 'settings' ), 'permalink' );
+		add_settings_section( 'tg-permalink', __( 'Inventory permalinks', 'tapgoods' ), array( $this, 'settings' ), 'permalink' );
 
 		add_settings_field(
 			'tg_category_rewrite_slug',
-			__( 'Inventory category base', 'tapgoods-wp' ),
+			__( 'Inventory category base', 'tapgoods' ),
 			array( $this, 'tg_category_slug_input' ),
 			'permalink',
 			'optional'
 		);
 		add_settings_field(
 			'tg_tags_rewrite_slug',
-			__( 'Inventory tag base', 'tapgoods-wp' ),
+			__( 'Inventory tag base', 'tapgoods' ),
 			array( $this, 'tg_tag_slug_input' ),
 			'permalink',
 			'optional'
@@ -60,7 +60,7 @@ class TG_Admin_Permalink_Settings {
 
 	public function tg_category_slug_input() {
 		?>
-		<input name="tapgoods_product_category_slug" type="text" class="regular-text code" value="<?php echo esc_attr( $this->permalinks['tg_category_base'] ); ?>" placeholder="<?php echo esc_attr_x( 'categories', 'slug', 'tapgoods-wp' ); ?>" />
+		<input name="tapgoods_product_category_slug" type="text" class="regular-text code" value="<?php echo esc_attr( $this->permalinks['tg_category_base'] ); ?>" placeholder="<?php echo esc_attr_x( 'categories', 'slug', 'tapgoods' ); ?>" />
 		<?php
 	}
 
@@ -69,7 +69,7 @@ class TG_Admin_Permalink_Settings {
 	 */
 	public function tg_tag_slug_input() {
 		?>
-		<input name="tapgoods_product_tag_slug" type="text" class="regular-text code" value="<?php echo esc_attr( $this->permalinks['tg_tag_base'] ); ?>" placeholder="<?php echo esc_attr_x( 'tags', 'slug', 'tapgoods-wp' ); ?>" />
+		<input name="tapgoods_product_tag_slug" type="text" class="regular-text code" value="<?php echo esc_attr( $this->permalinks['tg_tag_base'] ); ?>" placeholder="<?php echo esc_attr_x( 'tags', 'slug', 'tapgoods' ); ?>" />
 		<?php
 	}
 
@@ -78,12 +78,12 @@ class TG_Admin_Permalink_Settings {
 	 */
 	public function settings() {
 		/* translators: %s: Home URL */
-		echo wp_kses_post( wpautop( sprintf( __( 'Customize URL structures for inventory here. For example, using <code>rentals</code> would make your product links like <code>%srendtals/sample-product/</code>. This setting affects item URLs only, not item categories or tags.', 'tapgoods-wp' ), esc_url( home_url( '/' ) ) ) ) );
+		echo wp_kses_post( wpautop( sprintf( __( 'Customize URL structures for inventory here. For example, using <code>rentals</code> would make your product links like <code>%srendtals/sample-product/</code>. This setting affects item URLs only, not item categories or tags.', 'tapgoods' ), esc_url( home_url( '/' ) ) ) ) );
 
 		$shop_page_id = tg_get_page_id( 'shop' ); // TODO implement options for setting/getting default pages
 
-		$base_slug      = urldecode( ( $shop_page_id > 0 && get_post( $shop_page_id ) ) ? get_page_uri( $shop_page_id ) : _x( 'shop', 'default-slug', 'tapgoods-wp' ) );
-		$inventory_base = _x( 'products', 'default-slug', 'tapgoods-wp' );
+		$base_slug      = urldecode( ( $shop_page_id > 0 && get_post( $shop_page_id ) ) ? get_page_uri( $shop_page_id ) : _x( 'shop', 'default-slug', 'tapgoods' ) );
+		$inventory_base = _x( 'products', 'default-slug', 'tapgoods' );
 
 		$structures = array(
 			0 => '',
@@ -96,7 +96,7 @@ class TG_Admin_Permalink_Settings {
 				<tr>
 					<th>
 						<label>
-							<input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[0] ); ?>" class="tg_tog" <?php checked( $structures[0], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Default', 'tapgoods-wp' ); ?>
+							<input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[0] ); ?>" class="tg_tog" <?php checked( $structures[0], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Default', 'tapgoods' ); ?>
 						</label>
 					</th>
 					<td>
@@ -106,7 +106,7 @@ class TG_Admin_Permalink_Settings {
 				<tr>
 					<th>
 						<label>
-							<input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[1] ); ?>" class="tg_tog" <?php checked( $structures[1], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Shop base', 'tapgoods-wp' ); ?>
+							<input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[1] ); ?>" class="tg_tog" <?php checked( $structures[1], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Shop base', 'tapgoods' ); ?>
 						</label>
 					</th>
 					<td>
@@ -114,14 +114,14 @@ class TG_Admin_Permalink_Settings {
 					</td>
 				</tr>
 				<tr>
-					<th><label><input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[2] ); ?>" class="tg_tog" <?php checked( $structures[2], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Shop base with category', 'tapgoods-wp' ); ?></label></th>
+					<th><label><input name="inventory_permalink" type="radio" value="<?php echo esc_attr( $structures[2] ); ?>" class="tg_tog" <?php checked( $structures[2], $this->permalinks['tg_inventory_base'] ); ?> /> <?php esc_html_e( 'Shop base with category', 'tapgoods' ); ?></label></th>
 					<td><code><?php echo esc_html( home_url() ); ?>/<?php echo esc_html( $base_slug ); ?>/product-category/sample-product/</code></td>
 				</tr>
 				<tr>
 					<th><label><input name="inventory_permalink" id="tapgoods_custom_selection" type="radio" value="custom" class="tog" <?php checked( in_array( $this->permalinks['tg_inventory_base'], $structures, true ), false ); ?> />
-						<?php esc_html_e( 'Custom base', 'tapgoods-wp' ); ?></label></th>
+						<?php esc_html_e( 'Custom base', 'tapgoods' ); ?></label></th>
 					<td>
-						<input name="inventory_permalink_structure" id="inventory_permalink_structure" type="text" value="<?php echo esc_attr( $this->permalinks['tg_inventory_base'] ? trailingslashit( $this->permalinks['tg_inventory_base'] ) : '' ); ?>" class="regular-text code"> <span class="description"><?php esc_html_e( 'Enter a custom base to use. A base must be set or WordPress will use default instead.', 'tapgoods-wp' ); ?></span>
+						<input name="inventory_permalink_structure" id="inventory_permalink_structure" type="text" value="<?php echo esc_attr( $this->permalinks['tg_inventory_base'] ? trailingslashit( $this->permalinks['tg_inventory_base'] ) : '' ); ?>" class="regular-text code"> <span class="description"><?php esc_html_e( 'Enter a custom base to use. A base must be set or WordPress will use default instead.', 'tapgoods' ); ?></span>
 					</td>
 				</tr>
 			</tbody>

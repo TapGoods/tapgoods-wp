@@ -35,6 +35,6 @@ $custom_css = Tapgoods_Filesystem::get_file( TAPGOODS_PLUGIN_PATH . '/public/css
 	<?php wp_nonce_field( 'save', '_tgnonce_css' ); ?>
 	<textarea placeholder="" name="tg-custom-css" id="tg-custom-css" class="mb-2" spellcheck="false"><?php echo esc_textarea( $custom_css ); ?></textarea>
 	<hr class="mb-2">
-	<input name="<?php echo esc_attr( $input_submit ); ?>" type="submit" class="btn btn-primary round px-5" value="<?php esc_attr_e( 'SAVE', 'tapgoods-wp' ); ?>">
+	<input name="<?php echo esc_attr( $input_submit ); ?>" type="submit" class="btn btn-primary round px-5" value="<?php esc_attr_e( 'SAVE', 'tapgoods' ); ?>">
 <form>
 <?php

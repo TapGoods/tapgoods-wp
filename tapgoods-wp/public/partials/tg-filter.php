@@ -13,12 +13,12 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_before_date_filter' ); ?>
 <div id="tg-dates-selector" class="dates-selector px-4"  style="display: none;">
 	<div class="date-input-wrapper order-start">
-        <label><?php esc_html_e( 'Order Start', 'tapgoods-wp' ); ?></label>
+        <label><?php esc_html_e( 'Order Start', 'tapgoods' ); ?></label>
 		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
 		<input id="eventStartTime" name="eventStartTime" type="time" value="<?php echo esc_attr( tg_get_start_time() ); ?>" class="time-input form-control">
 	</div>
 	<div class="date-input-wrapper order-end">
-        <label><?php esc_html_e( 'Order End', 'tapgoods-wp' ); ?></label>
+        <label><?php esc_html_e( 'Order End', 'tapgoods' ); ?></label>
 		<input id="eventEndDate" type="date" name="eventEndDate" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
 		<input id="eventEndTime" name="eventEndTime" type="time" value="<?php echo esc_attr( tg_get_end_time() ); ?>" class="time-input form-control">
 	</div>
@@ -37,7 +37,7 @@ $today       = wp_date( $date_format );
 			</h2>
 			<div id="collapseOne" class="accordion-collapse collapse category-links">
                 <a class="category-link" href="#" data-category-id="">
-                    <?php esc_html_e( 'All Categories', 'tapgoods-wp' ); ?>
+                    <?php esc_html_e( 'All Categories', 'tapgoods' ); ?>
                 </a>
 				<?php foreach ( $categories as $category ) : ?>
 					<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">

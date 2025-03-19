@@ -173,7 +173,7 @@ class Tapgoods_Admin {
 	
 		if ( $success ) {
 			update_option( 'tg_api_connected', true );
-			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods-wp' ), [], false );
+			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
 			wp_send_json_success( $notice );
 		}
 	
@@ -191,7 +191,7 @@ class Tapgoods_Admin {
 
 		$notice = Tapgoods_Admin::tapgoods_admin_notice( 
 			// translators: %s is replaced with the environment name (e.g., 'production', 'staging').
-			sprintf( __( 'Unable to Connect, %s. Make sure your API Key is entered correctly.', 'tapgoods-wp' ), $env1 ), 
+			sprintf( __( 'Unable to Connect, %s. Make sure your API Key is entered correctly.', 'tapgoods' ), $env1 ), 
 			$args, 
 			false 
 		);
@@ -308,7 +308,7 @@ class Tapgoods_Admin {
 	// Add a link to this plugin to the action links.
 	public function add_action_links( $links ) {
 		$settings_link = array(
-			'<a href="' . admin_url( 'admin.php?page=' . $this->plugin_name ) . '">' . __( 'Settings', 'tapgoods-wp') . '</a>',
+			'<a href="' . admin_url( 'admin.php?page=' . $this->plugin_name ) . '">' . __( 'Settings', 'tapgoods') . '</a>',
 		);
 		return array_merge( $settings_link, $links );
 	}

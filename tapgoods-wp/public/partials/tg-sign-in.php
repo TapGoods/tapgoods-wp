@@ -11,7 +11,7 @@ $location = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_i
 // Generate the sign-in URL
 $url = tg_get_sign_in_url($location);
 ?>
-<a href="<?php echo esc_url($url); ?>" target="_self"><?php esc_html_e('Sign In', 'tapgoods-wp'); ?></a>
+<a href="<?php echo esc_url($url); ?>" target="_self"><?php esc_html_e('Sign In', 'tapgoods'); ?></a>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

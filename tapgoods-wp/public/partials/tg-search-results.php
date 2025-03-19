@@ -60,7 +60,7 @@ if ($location_option && is_array($location_option)) {
     $add_to_cart_base = $location_option['add_to_cart'];
 } else {
     // If location data is missing, display an error and stop execution
-    echo "<div style='color: red;'>" . esc_html__( 'Error: Configuration not found for location ID ', 'tapgoods-wp' ) . esc_html( $location_id ) . ".</div>";
+    echo "<div style='color: red;'>" . esc_html__( 'Error: Configuration not found for location ID ', 'tapgoods' ) . esc_html( $location_id ) . ".</div>";
     exit;
 }
 

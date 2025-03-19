@@ -98,12 +98,12 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                     <p>Know your event date/time? Set it now.</p>
                     <div id="tg-dates-selector" class="dates-selector">
                         <div class="date-input-wrapper order-start">
-                            <label><?php esc_html_e('Order Start', 'tapgoods-wp'); ?></label>
+                            <label><?php esc_html_e('Order Start', 'tapgoods'); ?></label>
                             <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_start_date()); ?>" min="<?php echo esc_attr($today); ?>">
                             <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_start_time()); ?>">
                         </div>
                         <div class="date-input-wrapper order-end">
-                            <label><?php esc_html_e('Order End', 'tapgoods-wp'); ?></label>
+                            <label><?php esc_html_e('Order End', 'tapgoods'); ?></label>
                             <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_end_date()); ?>" min="<?php echo esc_attr($today); ?>">
                             <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_end_time()); ?>">
                         </div>
