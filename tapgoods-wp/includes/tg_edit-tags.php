@@ -10,8 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', __DIR__ . '/' );
 }
 /** WordPress Administration Bootstrap */
-require_once ABSPATH . '/wp-admin/admin.php';
-
 global $taxnow;
 if ( ! $taxnow ) {
 	wp_die( esc_html__( 'Invalid taxonomy.', 'tapgoods-wp' ) );
@@ -331,10 +329,8 @@ if ( 'category' === $taxonomy || 'link_category' === $taxonomy || 'post_tag' ===
 	unset( $help );
 }
 
-require_once ABSPATH . 'wp-admin/admin-header.php';
 
 // Also used by the Edit Tag form.
-require_once ABSPATH . 'wp-admin/includes/edit-tag-messages.php';
 
 $class = ( isset( $_REQUEST['error'] ) ) ? 'error' : 'updated';
 
@@ -668,5 +664,3 @@ try{document.forms.addtag['tag-name'].focus();}catch(e){}
 endif;
 
 $wp_list_table->inline_edit();
-
-require_once ABSPATH . 'wp-admin/admin-footer.php';
