@@ -1206,9 +1206,12 @@ class Tapgoods_Connection {
 		$existing_meta = get_post_meta($post_id); // Get all existing meta fields
 		$new_meta = $this->prepare_meta_input($item); // Get updated meta fields from the API
 	
-		// Detect and remove meta fields that are no longer present in the API response
+		// Define meta keys that should not be removed
+		$protected_meta_keys = ['tg_custom_description'];
+	
+		// Detect and remove meta fields that are no longer present in the API response, except protected ones
 		foreach ($existing_meta as $meta_key => $value) {
-			if (!array_key_exists($meta_key, $new_meta)) {
+			if (!array_key_exists($meta_key, $new_meta) && !in_array($meta_key, $protected_meta_keys)) {
 				delete_post_meta($post_id, $meta_key); // Delete meta field if it no longer exists in the API
 				$this->console_log('Deleted meta_key: ' . $meta_key . ' from post ID: ' . $post_id);
 			}
@@ -1232,6 +1235,7 @@ class Tapgoods_Connection {
 			$this->tg_assign_terms($post_id); // Assign categories and tags after updating the post
 		}
 	}
+	
 	
 
 	
