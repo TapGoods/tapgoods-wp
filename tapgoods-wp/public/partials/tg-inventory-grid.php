@@ -198,51 +198,61 @@ $tg_pages = $query->max_num_pages;
 <?php endif; ?> <!-- Close if ($query->have_posts()) -->
 </div>
 
-<?php if ($tg_pages > 1) : ?>
-    <div class="<?php echo esc_attr(apply_filters('tg_inventory_pagination_class', $tg_inventory_pagination_class)); ?>">
-        <?php do_action('tg_before_inventory_pagination'); ?>
+<?php
+
+add_action( 'template_redirect', function() {
+    if ( ! is_admin() && get_query_var('paged') ) {
+        remove_action( 'template_redirect', 'redirect_canonical' );
+    }
+}, 1 );
+
+
+if ( $tg_pages > 1 ) : ?>
+    <div class="<?php echo esc_attr( apply_filters( 'tg_inventory_pagination_class', $tg_inventory_pagination_class ) ); ?>">
+        <?php do_action( 'tg_before_inventory_pagination' ); ?>
         <nav aria-label="Page navigation">
             <ul class="pagination justify-content-center align-items-center">
                 <!-- First Page -->
-                <li class="page-item <?php echo ($tg_page <= 1) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo esc_url(add_query_arg('paged', 1, $current_url)); ?>">
+                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', 1, $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-skipback"></span>
                     </a>
                 </li>
                 <!-- Previous Page -->
-                <li class="page-item <?php echo ($tg_page <= 1) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo esc_url(add_query_arg('paged', max(1, $tg_page - 1), $current_url)); ?>">
+                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', max( 1, $tg_page - 1 ), $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-back"></span>
                     </a>
                 </li>
                 <!-- Current Page -->
                 <li class="page-item current-page">
-                    <a class="page-link"><?php echo esc_html($tg_page); ?></a>
+                    <a class="page-link"><?php echo esc_html( $tg_page ); ?></a>
                 </li>
                 <li class="page-item disabled">
                     <a>of</a>
                 </li>
                 <!-- Total Pages -->
                 <li class="page-item disabled">
-                    <a class="page-link"><?php echo esc_html($tg_pages); ?></a>
+                    <a class="page-link"><?php echo esc_html( $tg_pages ); ?></a>
                 </li>
                 <!-- Next Page -->
-                <li class="page-item <?php echo ($tg_page >= $tg_pages) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo esc_url(add_query_arg('paged', min($tg_pages, $tg_page + 1), $current_url)); ?>">
+                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', min( $tg_pages, $tg_page + 1 ), $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-forward"></span>
                     </a>
                 </li>
                 <!-- Last Page -->
-                <li class="page-item <?php echo ($tg_page >= $tg_pages) ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="<?php echo esc_url(add_query_arg('paged', $tg_pages, $current_url)); ?>">
+                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', $tg_pages, $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-skipforward"></span>
                     </a>
                 </li>
             </ul>
         </nav>
-        <?php do_action('tg_after_inventory_pagination'); ?>
+        <?php do_action( 'tg_after_inventory_pagination' ); ?>
     </div>
 <?php endif; ?>
+
 
 <?php wp_reset_postdata(); ?>
 
