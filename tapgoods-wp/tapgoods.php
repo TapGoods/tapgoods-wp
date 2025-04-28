@@ -33,7 +33,7 @@
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
-
+define( 'TAPGOODS_PLUGIN_FILE', __FILE__ );
 define( 'TAPGOODSWP_VERSION', '0.1.0' );
 define( 'TAPGOODS_PLUGIN_DIR',  plugin_dir_path( TAPGOODS_PLUGIN_FILE ) );
 
