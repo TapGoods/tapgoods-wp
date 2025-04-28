@@ -669,7 +669,7 @@ class Tapgoods_Post_Types {
 			if ( is_array( $v ) && ! empty( $v ) ) {
 				self::print_array_list_recursive( $v, $printout );
 			} else {
-				echo '<li>' . $k . ': ' . $v . '</li>'; //phpcs:ignore
+				echo '<li>' . esc_html( $k ) . ': ' . esc_html( $v ) . '</li>';
 			}
 		}
 		echo '</ul>';

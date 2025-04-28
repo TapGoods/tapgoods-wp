@@ -92,7 +92,7 @@ do_action('tg_before_search_form');
 
 <script>
     
-const showPricing = <?php echo json_encode((bool) $show_pricing); ?>;
+const showPricing = <?php echo wp_json_encode( (bool) $show_pricing ); ?>;
 
 document.addEventListener("DOMContentLoaded", function () {
     window.locationId = "<?php echo esc_js($location_id); ?>";
@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         seenIds.add(item.tg_id);
-        const showPricing = <?php echo json_encode((bool) $show_pricing); ?>;
+        const showPricing = <?php echo wp_json_encode( (bool) $show_pricing ); ?>;
         console.log(showPricing);
         let priceHtml = '';
         if (showPricing==true){

@@ -5,7 +5,7 @@
 
 $bg = get_option( 'background-color', false );
 if ( $bg ) {
-	echo 'body { background: ' . $bg . '; !important }'; //phpcs:ignore
+	echo 'body { background: ' . esc_attr( $bg ) . ' !important }';
 }
 
 die();
