@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 	// TapGoods Navlinks
 	$enable_advanced = get_option( 'tg_enable_advanced', false );
 ?>

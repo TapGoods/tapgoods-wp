@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Log before generating CSS
 if (!defined('DOING_AJAX') || !DOING_AJAX) {
  //   error_log("tg_location_styles(): Generating CSS as this is not an AJAX request.");

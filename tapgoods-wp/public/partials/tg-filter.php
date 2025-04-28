@@ -1,5 +1,6 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 $tg_category_filter_class = 'col-sm-4 col-xs-12 p-0 tg-filter';
 
 $categories  = tg_get_categories();

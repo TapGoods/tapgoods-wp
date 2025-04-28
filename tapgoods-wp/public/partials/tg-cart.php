@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 // get id location and url cart
 global $post;
 // Capture the location ID from the URL if present

@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Check API connection status
 $api_connected = get_option('tg_api_connected');
 

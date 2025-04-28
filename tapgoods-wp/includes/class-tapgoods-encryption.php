@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 // Ckass for encrypting and decrypting
 
 class Tapgoods_Encryption {

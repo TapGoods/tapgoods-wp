@@ -1,4 +1,7 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 // Settings page for advanced settings
 
 $form_action = ( isset( $_SERVER['REQUEST_URI'] ) ) ? wp_kses( wp_unslash( $_SERVER['REQUEST_URI'] ), 'strip' ) : '';

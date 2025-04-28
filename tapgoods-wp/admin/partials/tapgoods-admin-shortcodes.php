@@ -1,5 +1,6 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 

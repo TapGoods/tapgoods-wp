@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 class Tapgoods_Helpers {
 	public static function tgdd( $data, $pre = true ) {
 		if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) {

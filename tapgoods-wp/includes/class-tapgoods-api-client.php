@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 	private $tokens  = array();

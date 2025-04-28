@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 $plugin_url = str_replace('/partials', '', plugin_dir_url(__FILE__)) . 'css/';
 global $wp;
 

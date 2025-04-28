@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 global $post;
 $images = apply_filters(
 	'tg_inventory_single_images',

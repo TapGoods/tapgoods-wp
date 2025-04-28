@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 global $wp;
 // Check if the 'nos' attribute is set; default to false if not
 $nos = isset($atts['nos']) ? filter_var($atts['nos'], FILTER_VALIDATE_BOOLEAN) : false;

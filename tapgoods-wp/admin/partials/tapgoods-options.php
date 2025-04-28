@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Get the locations set in 'tg_locationIds'
 $locations = maybe_unserialize(get_option('tg_locationIds'));
 if (!is_array($locations)) {

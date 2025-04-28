@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 // Initialize connection information and variables
 $tg_api  = Tapgoods_Connection::get_instance();
 $api_key = $tg_api->get_key();

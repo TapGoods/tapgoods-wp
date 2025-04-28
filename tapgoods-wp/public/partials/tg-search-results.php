@@ -1,4 +1,6 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Autoloading wp-load.php from multiple possible paths
 $wp_load_paths = [
     dirname(__DIR__, 3) . '/wp-load.php',

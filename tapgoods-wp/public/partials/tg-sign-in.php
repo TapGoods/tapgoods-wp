@@ -1,5 +1,6 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Check if 'local_storage_location' is present in the URL
 $local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_text_field( wp_unslash( $_GET['local_storage_location'] ) ) : null;
 

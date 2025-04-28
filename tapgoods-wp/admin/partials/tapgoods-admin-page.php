@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 // $loader = $tapgoods->get_loader();
 
 $card_class   = 'card text-light d-block pt-3 pb-4 px-1 h-100 my-0';

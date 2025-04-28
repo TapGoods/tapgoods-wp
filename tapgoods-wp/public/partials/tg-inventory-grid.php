@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 global $wp;
 
 $current_url = trailingslashit(home_url($wp->request, 'raw'));

@@ -11,7 +11,7 @@
         console.log("Cargando Bootstrap...");
 
         let script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js";
+        script.src = tapgoods_vars.pluginUrl + 'assets/js/bootstrap.bundle.min.js';
         script.onload = function () {
             console.log("Bootstrap cargado correctamente.");
             callback();

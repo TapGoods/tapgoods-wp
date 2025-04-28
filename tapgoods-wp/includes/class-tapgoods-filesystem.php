@@ -1,5 +1,7 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
 class Tapgoods_Filesystem {
 
 	// static reference to filesytem to prevent doing this more than once

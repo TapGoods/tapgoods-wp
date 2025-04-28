@@ -1,5 +1,6 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 // Priority the value from the URL over $atts['category']
 $category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : ( ! empty( $atts['category'] ) ? sanitize_text_field( $atts['category'] ) : '' );

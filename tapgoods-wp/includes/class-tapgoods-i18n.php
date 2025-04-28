@@ -1,5 +1,6 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Loads and defines internationalization files for this plugin
 
 class Tapgoods_i18n {
