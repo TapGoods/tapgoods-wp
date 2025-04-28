@@ -1142,7 +1142,7 @@ function tg_custom_tax_template($template) {
     // Check if this is a taxonomy archive page for a custom taxonomy
     if (is_tax('tg_tags')) { // Replace 'tags' with your custom taxonomy slug
         // Define the correct custom template path
-        $custom_template = WP_PLUGIN_DIR . '/tapgoods-wp/public/partials/tg-tag-results.php';
+        $custom_template = TAPGOODS_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
 
         // Log to debug
 //        error_log('Custom taxonomy template being checked: ' . $custom_template);
@@ -1179,7 +1179,7 @@ function enqueue_yoast_seo_assets($hook) {
     if ('post.php' === $hook && isset($post) && 'tg_inventory' === get_post_type($post)) {
         wp_enqueue_script(
             'yoast-seo-post-edit',
-            plugins_url('wordpress-seo/js/dist/wp-seo-metabox.js'),
+            TAPGOODS_PLUGIN_URL . 'assets/js/wp-seo-metabox.js',
             array('jquery'),
             filemtime(plugin_dir_path(__FILE__) . 'wordpress-seo/js/dist/wp-seo-metabox.js'), // version based in time
             true

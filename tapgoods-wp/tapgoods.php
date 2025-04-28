@@ -35,6 +35,9 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 define( 'TAPGOODSWP_VERSION', '0.1.0' );
+define( 'TAPGOODS_PLUGIN_DIR',  plugin_dir_path( TAPGOODS_PLUGIN_FILE ) );
+
+
 
 /**
  * Path to the plugin root directory.
@@ -44,7 +47,6 @@ define( 'TAPGOODS_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
  * Url to the plugin root directory.
  */
 define( 'TAPGOODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-
 $uploads = wp_upload_dir();
 define( 'TAPGOODS_UPLOADS', trailingslashit( $uploads['basedir'] . '/tapgoods' ) );
 
