@@ -8,7 +8,7 @@ Stable tag: 0.1.88
 =======
 Requires at least: 
 Tested up to: 6.7.1
-Stable tag: 0.1.96
+Stable tag: 0.1.97
 >>>>>>> 86936442275b9e1b8a69dc1f58d029d5966bd28c
 License: MIT
 
