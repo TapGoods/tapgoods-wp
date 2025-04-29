@@ -1,32 +1,24 @@
 <?php
-
-if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
 
 global $post;
 
-// Check if `nprice=true` is present in the URL
-$hide_price = isset($_GET['nprice']) && $_GET['nprice'] === 'true';
+$hide_price         = isset( $_GET['nprice'] ) && $_GET['nprice'] === 'true';
+$description        = apply_filters( 'tg_item_description',   get_post_meta( $post->ID, 'tg_description',        true ) );
+$custom_description = apply_filters( 'tg_custom_description', get_post_meta( $post->ID, 'tg_custom_description', true ) );
+$tags               = get_the_terms( $post, 'tg_tags' );
 
-
-
-$description = apply_filters(
-    'tg_item_description',
-    get_post_meta($post->ID, 'tg_description', true)
-);
-
-$custom_description = apply_filters(
-    'tg_custom_description',
-    get_post_meta($post->ID, 'tg_custom_description', true)
-);
-
-$tags = get_the_terms($post, 'tg_tags');
-if (false !== $tags) {
+if ( false !== $tags ) {
     $tag_links = array();
-    foreach ($tags as $tg_tag) {
-        $tag_link = get_term_link($tg_tag);
-        $tag_links[] = "<a href=\"{$tag_link}\">$tg_tag->name</a>";
+    foreach ( $tags as $tg_tag ) {
+        $tag_links[] = '<a href="' . esc_url( get_term_link( $tg_tag ) ) . '">' . esc_html( $tg_tag->name ) . '</a>';
     }
 }
+
+
+
 
 $tg_per_page = (isset($_COOKIE['tg-per-page'])) ? sanitize_text_field(wp_unslash($_COOKIE['tg-per-page'])) : get_option('tg_per_page', '12');
 

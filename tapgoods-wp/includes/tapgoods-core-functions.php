@@ -1266,3 +1266,42 @@ add_action('init', function() {
     }
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+// Build up to 150 chars of your own “tg_description” or fallback
+function tapgoods_get_default_meta_description() {
+    if ( ! is_singular( 'tg_inventory' ) ) {
+        return '';
+    }
+    global $post;
+    $desc = get_post_meta( $post->ID, 'tg_description', true );
+    if ( empty( $desc ) ) {
+        $desc = sprintf( 'Rent %s today.', get_the_title( $post ) );
+    }
+    $desc = wp_strip_all_tags( $desc );
+    return trim( mb_substr( $desc, 0, 150 ) );
+}
+
+// Only if Yoast is NOT active, print your fallback in <head>
+add_action( 'wp_head', 'tapgoods_print_fallback_meta_description', 1 );
+function tapgoods_print_fallback_meta_description() {
+    // Bail if Yoast is active or not on a single inventory item
+    if ( defined( 'WPSEO_VERSION' ) || ! is_singular( 'tg_inventory' ) ) {
+        return;
+    }
+    $desc = tapgoods_get_default_meta_description();
+    if ( $desc ) {
+        echo '<meta name="description" content="' . esc_attr( $desc ) . "\" />\n";
+    }
+}
+
