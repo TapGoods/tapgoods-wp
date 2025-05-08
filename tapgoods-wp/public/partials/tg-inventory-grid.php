@@ -114,7 +114,7 @@ $query = new WP_Query($args);
 $tg_pages = $query->max_num_pages;
 
 ?>
-
+<!-- <div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-2 row-cols-sm-2"> -->
 <div class="tapgoods tapgoods-inventory row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
 <?php if ($query->have_posts()) : ?>
     <?php while ($query->have_posts()) : ?>
