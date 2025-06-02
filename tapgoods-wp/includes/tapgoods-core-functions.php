@@ -1305,3 +1305,191 @@ function tapgoods_print_fallback_meta_description() {
     }
 }
 
+
+/**
+ * Fix pagination issues for TapGoods Inventory Grid
+ * Add this to your plugin's main file or functions.php
+ */
+
+// Fix pagination URL format and query handling
+function tg_fix_pagination_urls() {
+    // Only run on frontend
+    if (is_admin()) {
+        return;
+    }
+    
+    // Fix paged query var detection
+    add_action('init', 'tg_fix_paged_query_var');
+    
+    // Fix pagination links format
+    add_filter('paginate_links', 'tg_force_pagination_format');
+    
+    // Handle URL redirects for problematic formats
+    add_action('template_redirect', 'tg_redirect_pagination_urls');
+    
+    // Ensure paged parameter is recognized
+    add_action('pre_get_posts', 'tg_fix_main_query_paged');
+}
+add_action('wp', 'tg_fix_pagination_urls');
+
+/**
+ * Fix paged query var detection
+ */
+function tg_fix_paged_query_var() {
+    global $wp;
+    
+    // Add 'paged' to public query vars if not already present
+    if (!in_array('paged', $wp->public_query_vars)) {
+        $wp->add_query_var('paged');
+    }
+    
+    // Ensure paged parameter from URL is captured
+    if (isset($_GET['paged']) && !empty($_GET['paged'])) {
+        set_query_var('paged', intval($_GET['paged']));
+    }
+}
+
+/**
+ * Force pagination links to use ?paged=X format
+ */
+function tg_force_pagination_format($link) {
+    // Check if this is a pagination link with /page/X/ format
+    if (preg_match('/\/page\/(\d+)\/?(\?.*)?$/', $link, $matches)) {
+        $page_num = $matches[1];
+        $query_string = isset($matches[2]) ? $matches[2] : '';
+        
+        // Remove the /page/X/ part and add ?paged=X instead
+        $base_url = preg_replace('/\/page\/\d+\/?/', '', $link);
+        $base_url = rtrim($base_url, '/');
+        
+        // Parse existing query string
+        $query_params = array();
+        if (!empty($query_string)) {
+            parse_str(ltrim($query_string, '?'), $query_params);
+        }
+        
+        // Add paged parameter
+        $query_params['paged'] = $page_num;
+        
+        // Rebuild URL
+        $link = $base_url . '?' . http_build_query($query_params);
+    }
+    
+    return $link;
+}
+
+/**
+ * Redirect problematic pagination URLs to correct format
+ */
+function tg_redirect_pagination_urls() {
+    if (isset($_SERVER['REQUEST_URI'])) {
+        $request_uri = $_SERVER['REQUEST_URI'];
+        
+        // Check if URL contains /page/X/ format
+        if (preg_match('/\/page\/(\d+)\/?/', $request_uri, $matches)) {
+            $page_num = $matches[1];
+            
+            // Get current URL without the /page/X/ part
+            $clean_url = preg_replace('/\/page\/\d+\/?/', '', $request_uri);
+            
+            // Parse existing query string
+            $url_parts = parse_url($clean_url);
+            $query_params = array();
+            
+            if (isset($url_parts['query'])) {
+                parse_str($url_parts['query'], $query_params);
+            }
+            
+            // Add paged parameter
+            $query_params['paged'] = $page_num;
+            
+            // Build correct URL
+            $base_url = $url_parts['path'];
+            $correct_url = home_url($base_url . '?' . http_build_query($query_params));
+            
+            // Redirect with 301 status
+            wp_redirect($correct_url, 301);
+            exit;
+        }
+    }
+}
+
+/**
+ * Fix main query to properly handle paged parameter
+ */
+function tg_fix_main_query_paged($query) {
+    // Only modify main query on frontend
+    if (is_admin() || !$query->is_main_query()) {
+        return;
+    }
+    
+    // Check for paged parameter in URL
+    $paged = 0;
+    
+    // First check $_GET
+    if (isset($_GET['paged']) && !empty($_GET['paged'])) {
+        $paged = intval($_GET['paged']);
+    }
+    
+    // Then check query var
+    if (!$paged && get_query_var('paged')) {
+        $paged = intval(get_query_var('paged'));
+    }
+    
+    // Set the paged parameter for the query
+    if ($paged > 0) {
+        $query->set('paged', $paged);
+    }
+}
+
+/**
+ * Fix canonical redirect that might interfere with pagination
+ */
+function tg_disable_canonical_redirect_for_pagination() {
+    // Check if we have paged parameter
+    if (get_query_var('paged') || (isset($_GET['paged']) && !empty($_GET['paged']))) {
+        remove_action('template_redirect', 'redirect_canonical');
+    }
+}
+add_action('template_redirect', 'tg_disable_canonical_redirect_for_pagination', 1);
+
+/**
+ * Ensure WordPress recognizes custom pagination parameters
+ */
+function tg_add_pagination_rewrite_rules() {
+    // Add rewrite rule for pages with paged parameter
+    add_rewrite_rule(
+        '(.+?)/page/([0-9]{1,})/?$',
+        'index.php?pagename=$matches[1]&paged=$matches[2]',
+        'top'
+    );
+}
+add_action('init', 'tg_add_pagination_rewrite_rules');
+
+/**
+ * Add custom query vars for pagination
+ */
+function tg_add_pagination_query_vars($vars) {
+    $vars[] = 'paged';
+    return $vars;
+}
+add_filter('query_vars', 'tg_add_pagination_query_vars');
+
+/**
+ * Debug function
+ * Uncomment to debug pagination issues
+ */
+/*
+function tg_debug_pagination() {
+    if (isset($_GET['debug_pagination'])) {
+        echo '<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">';
+        echo '<strong>Pagination Debug Info:</strong><br>';
+        echo 'get_query_var("paged"): ' . get_query_var('paged') . '<br>';
+        echo '$_GET["paged"]: ' . (isset($_GET['paged']) ? $_GET['paged'] : 'not set') . '<br>';
+        echo 'Current URL: ' . $_SERVER['REQUEST_URI'] . '<br>';
+        echo 'is_paged(): ' . (is_paged() ? 'true' : 'false') . '<br>';
+        echo '</div>';
+    }
+}
+add_action('wp_head', 'tg_debug_pagination');
+*/
