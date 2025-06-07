@@ -45,7 +45,7 @@ $enable_advanced = get_option( 'tg_enable_advanced', false );
 					</a>            
 				</div>
 				<div class="col">
-					<a class='<?php echo esc_attr( $card_class ); ?> bg-purple' href='https://tapgoods.zendesk.com' target=”_blank”>
+					<a class='<?php echo esc_attr( $card_class ); ?> bg-purple' href='https://tapgoods.zendesk.com/hc/en-us/articles/33033655100948-Complete-Step-By-Step-Guide-to-the-TapGoods-WordPress-Plugin' target=”_blank”>
 						<span class="dashicons dashicons-editor-help icon py-2"></span><br>Help Articles
 					</a>
 				</div>
