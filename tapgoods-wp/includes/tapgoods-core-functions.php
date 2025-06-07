@@ -605,35 +605,55 @@ function tg_get_add_to_cart_url($wp_location_id) {
 
 
 function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
-    // Gets the specific location of the product
-    $location = get_the_terms( $product_id, 'tg_location' );
-
-    // If the specific location is not found, use the default location
-    if ( ! is_array( $location ) || empty( $location ) ) {
-        $default_location_id = get_option('tg_default_location');
-        if ( !$default_location_id ) {
-//            error_log("Location not found for product_id: $product_id and no default location set.");
-            return '#';
-        }
-        $base_url = tg_get_add_to_cart_url( $default_location_id );
-        $cart_url = tg_get_cart_url( $default_location_id ); // Cart URL
-    } else {
-        $location = current( $location );
-        $base_url = tg_get_add_to_cart_url( $location->term_id );
-        $cart_url = tg_get_cart_url( $location->term_id ); // Cart URL
+    // First, try to get the user's location from cookie/localStorage
+    $user_location_id = null;
+    
+    // Check if it comes in the parameters
+    if ( isset( $params['location_id'] ) ) {
+        $user_location_id = $params['location_id'];
+        unset( $params['location_id'] ); // Remove to avoid passing it in the URL
     }
-
-    // Verify that `base_url` and `cart_url` are valid
-    if ( $base_url === '#' || !$cart_url ) {
-//        error_log("Add to Cart URL or Cart URL not found for location_id: " . ( $location->term_id ?? 'Default' ));
+    // If not, check the cookie
+    elseif ( isset( $_COOKIE['tg_user_location'] ) ) {
+        $user_location_id = sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) );
+    }
+    // If not, check GET parameter
+    elseif ( isset( $_GET['local_storage_location'] ) ) {
+        $user_location_id = sanitize_text_field( wp_unslash( $_GET['local_storage_location'] ) );
+    }
+    
+    // If we have a user location, use it
+    if ( $user_location_id ) {
+        $location_id = $user_location_id;
+    } else {
+        // If not, get the product's location from post meta
+        $location_id = get_post_meta( $product_id, 'tg_locationId', true );
+        
+        // If the product has no location, use the default location
+        if ( ! $location_id ) {
+            $location_id = get_option('tg_default_location');
+            if ( ! $location_id ) {
+                error_log("Location not found for product_id: $product_id and no default location set.");
+                return '#';
+            }
+        }
+    }
+    
+    // Get the base URLs using the location_id
+    $base_url = tg_get_add_to_cart_url( $location_id );
+    $cart_url = tg_get_cart_url( $location_id );
+    
+    // Verify that URLs are valid
+    if ( $base_url === '#' || ! $cart_url ) {
+        error_log("Add to Cart URL or Cart URL not found for location_id: " . $location_id);
         return '#';
     }
-
-    // Get the `itemId` and `itemType` of the product
+    
+    // Get the product's itemId and itemType
     $tg_id = get_post_meta( $product_id, 'tg_id', true );
     $type  = get_post_meta( $product_id, 'tg_productType', true );
-
-    // Combine additional parameters without overriding `redirectUrl`
+    
+    // Merge additional parameters
     $params = array_merge(
         array(
             'itemId'   => $tg_id,
@@ -643,12 +663,12 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
         ),
         $params
     );
-
+    
     // Add parameters to the base URL
     $url = add_query_arg( $params, $base_url );
-
-//    error_log("Final Add to Cart URL: " . $url); // Log for verification
-
+    
+    error_log("Final Add to Cart URL for location $location_id: " . $url);
+    
     return $url;
 }
 
