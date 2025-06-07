@@ -208,18 +208,18 @@ add_action( 'template_redirect', function() {
 
 
 if ( $tg_pages > 1 ) : ?>
-    <div class="<?php echo esc_attr( apply_filters( 'tg_inventory_pagination_class', $tg_inventory_pagination_class ) ); ?>">
+<div class="<?php echo esc_attr( apply_filters( 'tg_inventory_pagination_class', $tg_inventory_pagination_class ) ); ?>">
         <?php do_action( 'tg_before_inventory_pagination' ); ?>
         <nav aria-label="Page navigation">
             <ul class="pagination justify-content-center align-items-center">
                 <!-- First Page -->
-                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>">
+                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>" <?php echo ( $tg_page <= 1 ) ? 'style="display: none;"' : ''; ?>>
                     <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', 1, $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-skipback"></span>
                     </a>
                 </li>
                 <!-- Previous Page -->
-                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>">
+                <li class="page-item <?php echo ( $tg_page <= 1 ) ? 'disabled' : ''; ?>" <?php echo ( $tg_page <= 1 ) ? 'style="display: none;"' : ''; ?>>
                     <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', max( 1, $tg_page - 1 ), $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-back"></span>
                     </a>
@@ -236,13 +236,13 @@ if ( $tg_pages > 1 ) : ?>
                     <a class="page-link"><?php echo esc_html( $tg_pages ); ?></a>
                 </li>
                 <!-- Next Page -->
-                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>">
+                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>" <?php echo ( $tg_page >= $tg_pages ) ? 'style="display: none;"' : ''; ?>>
                     <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', min( $tg_pages, $tg_page + 1 ), $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-forward"></span>
                     </a>
                 </li>
                 <!-- Last Page -->
-                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>">
+                <li class="page-item <?php echo ( $tg_page >= $tg_pages ) ? 'disabled' : ''; ?>" <?php echo ( $tg_page >= $tg_pages ) ? 'style="display: none;"' : ''; ?>>
                     <a class="page-link" href="<?php echo esc_url( add_query_arg( 'paged', $tg_pages, $current_url ) ); ?>">
                         <span class="dashicons dashicons-controls-skipforward"></span>
                     </a>
