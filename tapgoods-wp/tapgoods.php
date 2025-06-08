@@ -7,7 +7,7 @@
  * Version:           0.1.102
  * Requires at least: 5.2
  * Requires PHP:      7.2
- * Author:            Aaron Valiente <aaron.valiente@tapgoods.com> and Jeremy Benson <jeremy.benson@tapgoods.com> and TapGoods
+ * Author:            Aaron Valiente <aaron.valiente@tapgoods.com>
  * Author URI:        https://www.tapgoods.com/pro/
  * License:           MIT
  * Text Domain:       tapgoods

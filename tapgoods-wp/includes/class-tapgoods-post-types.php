@@ -10,44 +10,177 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
  * @version 0.1.0
  */
 
-defined( 'ABSPATH' ) || exit;
-
-/**
- * Post Types Class.
- */
 class Tapgoods_Post_Types {
 
-	public static function init() {
-		// Register Taxonomy first so that URL rewrites behave as expected.
-		add_action( 'init', array( __CLASS__, 'tg_register_taxonomies' ), 5 );
-		add_action( 'init', array( __CLASS__, 'register_post_types' ), 5 );
-		add_action( 'add_meta_boxes_tg_inventory', array( __CLASS__, 'add_inventory_metabox' ) );
-		add_filter( 'post_type_link', array( __CLASS__, 'tg_filter_post_type_link' ), 10, 2 );
-		add_action( 'admin_menu', array( __CLASS__, 'redirect_to_custom_edit_page' ) );
-		add_action( 'admin_menu', array( __CLASS__, 'register_custom_edit_page' ) );
-		// $this->loader->add_action( 'init', $this, 'tg_add_rewrites', 10, 0 );
+	    private static $instance = null;
+    
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
 
-		// add_action( 'tg_tags_add_form_fields', array( __CLASS__, 'tg_tags_metaboxes' ) );
-		add_action( 'tg_tags_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
-		add_action( 'tg_category_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
-		add_action( 'tg_location_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
-		add_action( 'add_meta_boxes_tg_location', array( __CLASS__, 'add_taxonomy_metabox' ) );
+	public static function init() {
+    // Register Taxonomy first so that URL rewrites behave as expected.
+    add_action( 'init', array( __CLASS__, 'tg_register_taxonomies' ), 5 );
+    add_action( 'init', array( __CLASS__, 'register_post_types' ), 5 );
+    
+    // Metaboxes
+    add_action( 'add_meta_boxes', array( __CLASS__, 'add_all_custom_metaboxes' ), 5 );
+    add_action( 'save_post_tg_inventory', array( __CLASS__, 'save_custom_description' ) );
+    
+    // Reorder metaboxes after all have been registered
+    add_action( 'add_meta_boxes', array( __CLASS__, 'reorder_yoast_metabox' ), 999 );
+    
+    // Force classic editor for `tg_inventory`
+    add_filter( 'use_block_editor_for_post_type', array( __CLASS__, 'disable_gutenberg' ), 10, 2 );
+    
+    add_filter( 'post_type_link', array( __CLASS__, 'tg_filter_post_type_link' ), 10, 2 );
+
+    // Taxonomies
+    add_action( 'tg_tags_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
+    add_action( 'tg_category_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
+    add_action( 'tg_location_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
+    add_action( 'add_meta_boxes_tg_location', array( __CLASS__, 'add_taxonomy_metabox' ) );
 	}
-	public static function redirect_to_custom_edit_page() {
-		global $pagenow;
-	
-		if ( $pagenow === 'post.php' && isset( $_GET['post'] ) ) {
-			$post_id = absint( $_GET['post'] ); 
+
+
+	// Function to move Yoast metabox to the bottom
+	public static function reorder_yoast_metabox() {
+		global $wp_meta_boxes;
 		
-			if ( 'tg_inventory' === get_post_type( $post_id ) ) {
-				// Redireccionar to custom page
-				wp_safe_redirect( admin_url( 'admin.php?page=custom-edit-page&post=' . $post_id ) );
-				exit;
-			}
+		// Only proceed if we are editing a tg_inventory post type
+		$screen = get_current_screen();
+		if (!$screen || $screen->post_type !== 'tg_inventory') {
+			return;
 		}
 		
+		// Find and move the Yoast metabox
+		if (isset($wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta'])) {
+			$yoast_box = $wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta'];
+			unset($wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta']);
+			
+			// Move it to low priority so it appears at the bottom
+			if (!isset($wp_meta_boxes['tg_inventory']['normal']['low'])) {
+				$wp_meta_boxes['tg_inventory']['normal']['low'] = array();
+			}
+			$wp_meta_boxes['tg_inventory']['normal']['low']['wpseo_meta'] = $yoast_box;
+		}
 	}
-	
+
+	// Disable Gutenberg for tg_inventory post type
+	public static function disable_gutenberg( $use_block_editor, $post_type ) {
+		if ( $post_type === 'tg_inventory' ) {
+			return false;
+		}
+		return $use_block_editor;
+	}
+
+
+	// Add CSS styles to improve appearance
+	public static function add_admin_styles() {
+		$screen = get_current_screen();
+		if ($screen && $screen->post_type === 'tg_inventory') {
+			?>
+			<style>
+				/* Ensure the title field is visible */
+				#titlediv {
+					margin-bottom: 20px;
+				}
+				
+				/* Style for Custom Description */
+				#tg_custom_description {
+					margin-bottom: 0;
+				}
+				
+				#tg_custom_description .inside {
+					padding-top: 10px;
+				}
+				
+				/* Style for Inventory Information */
+				#inventory_info {
+					margin-top: 20px;
+				}
+				
+				/* Visually move Yoast to the bottom */
+				#wpseo_meta {
+					margin-top: 30px;
+					order: 999;
+				}
+				
+				/* Improve general spacing */
+				.postbox {
+					margin-bottom: 20px;
+				}
+				
+				/* Hide main content editor if it exists */
+				#postdivrich {
+					display: none;
+				}
+			</style>
+			<?php
+		}
+	}
+
+	// Function to add all custom metaboxes at once
+	public static function add_all_custom_metaboxes() {
+		// Custom Description – High priority
+		add_meta_box(
+			'tg_custom_description',
+			__('Custom Description', 'tapgoods'),
+			array(__CLASS__, 'render_custom_description_metabox'),
+			'tg_inventory',
+			'normal',
+			'high'
+		);
+		
+		// Inventory Information – High priority
+		add_meta_box(
+			'inventory_info',
+			__('Inventory Information', 'tapgoods'),
+			array(__CLASS__, 'render_inventory_metabox'),
+			'tg_inventory',
+			'normal',
+			'high'
+		);
+	}
+
+	// Hide the default editor for inventory items
+	public static function hide_default_editor() {
+		$post_id = isset($_GET['post']) ? $_GET['post'] : (isset($_POST['post_ID']) ? $_POST['post_ID'] : false);
+		if (!$post_id) return;
+		
+		$post_type = get_post_type($post_id);
+		if ($post_type === 'tg_inventory') {
+			remove_post_type_support('tg_inventory', 'editor');
+		}
+	}
+
+	// Update the custom description metabox to appear right after title
+	public static function add_custom_description_metabox() {
+		add_meta_box(
+			'tg_custom_description',
+			__('Custom Description', 'tapgoods'),
+			array(__CLASS__, 'render_custom_description_metabox'),
+			'tg_inventory',
+			'normal',
+			'high' // High priority to appear at top
+		);
+	}
+		
+	// Update the inventory metabox priority
+	public static function add_inventory_metabox() {
+		add_meta_box(
+			'inventory_info',
+			'Inventory Information',
+			array(__CLASS__, 'render_inventory_metabox'),
+			'tg_inventory', // Changed from null to specific post type
+			'normal', // Changed from 'advanced' to 'normal'
+			'high' // High priority
+		);
+	}
+
 	public static function register_custom_edit_page() {
 		add_submenu_page(
 			'options-general.php', // Valid but irrelevant parent_slug.
@@ -59,167 +192,186 @@ class Tapgoods_Post_Types {
 		);
 	}
 	
-	public static function render_custom_edit_page() {
-		if (isset($_GET['post'])) {
-			$post_id = absint($_GET['post']);
-	
-			if ('tg_inventory' === get_post_type($post_id)) {
-				$post = get_post($post_id);
-	
-				if (!$post) {
-					echo '<p>' . esc_html__('Item not found.', 'tapgoods') . '</p>';
-					return;
-				}
-	
-				// Check if Yoast SEO is active
-				$yoast_active = defined('WPSEO_VERSION');
-	
-				// Handle saving the custom field
-				if (isset($_POST['tg_custom_description']) && check_admin_referer('save_tg_custom_description', 'tg_custom_description_nonce')) {
-					update_post_meta(
-						$post_id,
-						'tg_custom_description',
-						wp_kses_post(wp_unslash($_POST['tg_custom_description']))
-					);
-	
-					echo '<div class="notice notice-success"><p>' . esc_html__('Custom description updated.', 'tapgoods') . '</p></div>';
-				}
-	
-				// Handle saving Yoast SEO metadata manually
-				if ($yoast_active && isset($_POST['yoast_wpseo_title'], $_POST['yoast_wpseo_metadesc'], $_POST['yoast_wpseo_focuskw']) &&
-					check_admin_referer('save_yoast_seo_meta', 'yoast_seo_nonce')) {
-	
-						update_post_meta($post_id, '_yoast_wpseo_title', sanitize_text_field(wp_unslash($_POST['yoast_wpseo_title'])));
-						update_post_meta($post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field(wp_unslash($_POST['yoast_wpseo_metadesc'])));
-						update_post_meta($post_id, '_yoast_wpseo_focuskw', sanitize_text_field(wp_unslash($_POST['yoast_wpseo_focuskw'])));				
-	
-					echo '<div class="notice notice-success"><p>' . esc_html__('SEO settings updated.', 'tapgoods') . '</p></div>';
-				}
-	
-				// Retrieve values
-				$custom_description = get_post_meta($post_id, 'tg_custom_description', true);
-				$yoast_title = get_post_meta($post_id, '_yoast_wpseo_title', true);
-				$yoast_description = get_post_meta($post_id, '_yoast_wpseo_metadesc', true);
-				$yoast_focus_keyword = get_post_meta($post_id, '_yoast_wpseo_focuskw', true);
-	
-				echo '<div class="wrap">';
-				echo '<h1 style="margin-left: 15px;">' . esc_html($post->post_title) . '</h1>';
-	
-				// Custom Description Section (Fixed, not collapsible)
-				echo '<div class="postbox" style="padding: 15px;">';
-				echo '<h2 class="hndle" style="margin-left: 10px;"><span>' . esc_html__('Custom Description', 'tapgoods') . '</span></h2>';
-				echo '<div class="inside">';
-				echo '<form method="post">';
-				wp_nonce_field('save_tg_custom_description', 'tg_custom_description_nonce');
-	
-				wp_editor(
-					htmlspecialchars_decode($custom_description),
-					'tg_custom_description',
-					array(
-						'textarea_name' => 'tg_custom_description',
-						'media_buttons' => true,
-						'textarea_rows' => 6,
-						'teeny' => false,
-					)
-				);
-	
-				echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save Description', 'tapgoods') . '"></p>';
-				echo '</form>';
-				echo '</div>'; // Close .inside
-				echo '</div>'; // Close .postbox
-	
-				// Inventory Information (Collapsible with Arrow)
-				echo '<div class="postbox open">';
-				echo '<h2 class="hndle collapsible"><span>' . esc_html__('Inventory Information', 'tapgoods') . '</span> <span class="toggle-icon">▼</span></h2>';
-				echo '<div class="inside">';
-				
-				echo '<h3>' . esc_html__('General Information', 'tapgoods') . '</h3>';
-				echo '<p><strong>' . esc_html__('Description:', 'tapgoods') . '</strong> ' . esc_html($post->post_content) . '</p>';
-	
-				// Retrieve and display metadata
-				$meta = get_post_meta($post_id);
-				if (!empty($meta)) {
-					echo '<h3>' . esc_html__('Metadata:', 'tapgoods') . '</h3><ul>';
-					foreach ($meta as $key => $value) {
-						echo '<li><strong>' . esc_html($key) . ':</strong> ' . esc_html(maybe_unserialize($value[0])) . '</li>';
-					}
-					echo '</ul>';
-				}
-	
-				echo '</div>'; // Close .inside
-				echo '</div>'; // Close .postbox
-	
-				// Show SEO settings only if Yoast SEO is active
-				if ($yoast_active) {
-					echo '<div class="postbox open">';
-					echo '<h2 class="hndle collapsible"><span>' . esc_html__('SEO Settings', 'tapgoods') . '</span> <span class="toggle-icon">▼</span></h2>';
-					echo '<div class="inside">';
-					echo '<form method="post">';
-					wp_nonce_field('save_yoast_seo_meta', 'yoast_seo_nonce');
-	
-					echo '<p><label>' . esc_html__('SEO Title:', 'tapgoods') . '</label>';
-					echo '<input type="text" name="yoast_wpseo_title" value="' . esc_attr($yoast_title) . '" class="widefat"></p>';
-	
-					echo '<p><label>' . esc_html__('SEO Description:', 'tapgoods') . '</label>';
-					echo '<textarea name="yoast_wpseo_metadesc" class="widefat">' . esc_textarea($yoast_description) . '</textarea></p>';
-	
-					echo '<p><label>' . esc_html__('Focus Keyword:', 'tapgoods') . '</label>';
-					echo '<input type="text" name="yoast_wpseo_focuskw" value="' . esc_attr($yoast_focus_keyword) . '" class="widefat"></p>';
-	
-					echo '<p><input type="submit" class="button button-primary" value="' . esc_attr__('Save SEO Settings', 'tapgoods') . '"></p>';
-					echo '</form>';
-					echo '</div>'; // Close .inside
-					echo '</div>'; // Close .postbox
-				}
-	
-				echo '</div>'; // Close .wrap
-	
-				// JavaScript for collapsible boxes
-				echo '<script>
-					jQuery(document).ready(function($) {
-						$(".collapsible").click(function() {
-							$(this).next(".inside").slideToggle();
-							var icon = $(this).find(".toggle-icon");
-							if (icon.text() === "▼") {
-								icon.text("▲");
-							} else {
-								icon.text("▼");
-							}
-						});
-					});
-				</script>';
-	
-				// CSS for margin and better UI spacing
-				echo '<style>
-					.postbox {
-						margin: 20px 0;
-						border: 1px solid #ccc;
-						background: #fff;
-						padding: 10px;
-						border-radius: 4px;
-					}
-					.hndle {
-						cursor: pointer;
-						display: flex;
-						align-items: center;
-						justify-content: space-between;
-						padding: 10px;
-						font-size: 16px;
-						font-weight: bold;
-					}
-					.toggle-icon {
-						font-size: 14px;
-						margin-left: 10px;
-					}
-					.inside {
-						padding: 10px;
-						background: #f9f9f9;
-						border-top: 1px solid #ddd;
-					}
-				</style>';
-			} else {
-				echo '<p>' . esc_html__('Invalid or not found item.', 'tapgoods') . '</p>';
+	// Function to reorder metaboxes
+	public static function reorder_metaboxes() {
+		global $wp_meta_boxes;
+		
+		if (!isset($wp_meta_boxes['tg_inventory'])) {
+			return;
+		}
+		
+		// Store Yoast metabox if it exists
+		$yoast_metabox = null;
+		if (isset($wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta'])) {
+			$yoast_metabox = $wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta'];
+			unset($wp_meta_boxes['tg_inventory']['normal']['high']['wpseo_meta']);
+		}
+		
+		// Re-add Yoast with lower priority so it appears after our metaboxes
+		if ($yoast_metabox) {
+			if (!isset($wp_meta_boxes['tg_inventory']['normal']['core'])) {
+				$wp_meta_boxes['tg_inventory']['normal']['core'] = array();
 			}
+			$wp_meta_boxes['tg_inventory']['normal']['core']['wpseo_meta'] = $yoast_metabox;
+		}
+	}
+
+	// Enhanced render function for custom description with better styling
+	public static function render_custom_description_metabox($post) {
+		wp_nonce_field('save_tg_custom_description', 'tg_custom_description_nonce');
+		
+		// Get the custom description
+		$custom_description = get_post_meta($post->ID, 'tg_custom_description', true);
+		
+		// Debug: check what's stored
+		if (empty($custom_description)) {
+			// If it's empty, try pulling from post_content
+			$custom_description = $post->post_content;
+		}
+		?>
+		<div class="tg-custom-description-wrapper">
+			<p class="description"><?php _e('Use this field for the custom description that will be displayed on the frontend.', 'tapgoods'); ?></p>
+			<?php
+			// Editor settings
+			$editor_settings = array(
+				'textarea_name' => 'tg_custom_description',
+				'textarea_rows' => 15,
+				'drag_drop_upload' => true,
+				'tabfocus_elements' => 'content-html,save-post',
+				'editor_height' => 360,
+				'tinymce' => array(
+					'resize' => true,
+					'wp_autoresize_on' => true,
+					'add_unload_trigger' => false,
+				),
+				'wpautop' => true,
+				'media_buttons' => true,
+				'quicktags' => true,
+				'teeny' => false
+			);
+			
+			// Unique ID for the editor
+			$editor_id = 'tgcustomdescription';
+			
+			wp_editor($custom_description, $editor_id, $editor_settings);
+			?>
+		</div>
+		
+		<script type="text/javascript">
+		jQuery(document).ready(function($) {
+			// Ensure TinyMCE is initialized for our editor
+			if (typeof tinymce !== 'undefined') {
+				tinymce.on('AddEditor', function(e) {
+					if (e.editor.id === 'tgcustomdescription') {
+						e.editor.on('change', function() {
+							e.editor.save();
+						});
+					}
+				});
+			}
+		});
+		</script>
+		<?php
+	}
+
+
+	// Enhanced render function for inventory metabox with better styling
+	public static function render_inventory_metabox() {
+		global $post;
+		$meta = get_post_meta( $post->ID );
+		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tg_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
+
+		?>
+		<div class="tg-inventory-info">
+			<?php
+			if (!empty($tg_meta)) {
+				echo '<table class="widefat fixed striped">';
+				echo '<thead><tr><th style="width: 30%;">' . __('Field', 'tapgoods') . '</th><th>' . __('Value', 'tapgoods') . '</th></tr></thead>';
+				echo '<tbody>';
+				
+				foreach ( $tg_meta as $key => $values ) {
+					if ( null === $values[0] || $key === 'tg_custom_description' ) {
+						continue;
+					}
+					
+					echo '<tr>';
+					echo '<td><strong>' . esc_html(str_replace('tg_', '', $key)) . '</strong></td>';
+					echo '<td>';
+					
+					$value = maybe_unserialize($values[0]);
+					if (is_array($value)) {
+						if ($key === 'tg_pictures' && !empty($value)) {
+							// Show images
+							foreach ($value as $img) {
+								if (isset($img['imgixUrl'])) {
+									echo '<img src="' . esc_url($img['imgixUrl']) . '?w=100&h=100&fit=crop" style="margin: 5px; max-width: 100px; height: auto;" />';
+								}
+							}
+						} else {
+							echo '<pre style="margin: 0; white-space: pre-wrap;">' . esc_html(json_encode($value, JSON_PRETTY_PRINT)) . '</pre>';
+						}
+					} else {
+						echo esc_html($value);
+					}
+					
+					echo '</td>';
+					echo '</tr>';
+				}
+				
+				echo '</tbody></table>';
+			} else {
+				echo '<p>' . __('No inventory data available.', 'tapgoods') . '</p>';
+			}
+			?>
+		</div>
+		
+		<style>
+			.tg-inventory-info table {
+				margin-top: 10px;
+			}
+			.tg-inventory-info td {
+				padding: 8px 10px;
+			}
+			.tg-inventory-info pre {
+				background: #f0f0f0;
+				padding: 5px;
+				border-radius: 3px;
+			}
+		</style>
+		<?php
+	}
+
+	// Function to save the custom description
+	public static function save_custom_description($post_id) {
+		// Security checks
+		if (!isset($_POST['tg_custom_description_nonce'])) {
+			return;
+		}
+		
+		if (!wp_verify_nonce($_POST['tg_custom_description_nonce'], 'save_tg_custom_description')) {
+			return;
+		}
+		
+		if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+			return;
+		}
+		
+		if (!current_user_can('edit_post', $post_id)) {
+			return;
+		}
+		
+		// Save the custom description
+		if (isset($_POST['tg_custom_description'])) {
+			$content = wp_kses_post($_POST['tg_custom_description']);
+			update_post_meta($post_id, 'tg_custom_description', $content);
+			
+			// Optional: Also update post_content to keep in sync
+			remove_action('save_post_tg_inventory', array(__CLASS__, 'save_custom_description'));
+			wp_update_post(array(
+				'ID' => $post_id,
+				'post_content' => $content
+			));
+			add_action('save_post_tg_inventory', array(__CLASS__, 'save_custom_description'));
 		}
 	}
 	
@@ -446,7 +598,9 @@ class Tapgoods_Post_Types {
 		}
 
 		$permalinks = tg_get_permalink_structure();
-		$supports = array( 'title', 'editor', 'excerpt', 'thumbnail', 'custom-fields', 'publicize', 'wpcom-markdown', 'page-attributes' );
+		// IMPORTANTE: Elimina 'custom-fields' de supports para ocultar esa caja gigante
+		$supports = array( 'title', 'excerpt', 'thumbnail', 'publicize', 'wpcom-markdown', 'page-attributes' );
+		// NO incluyas 'editor' aquí si quieres ocultarlo
 
 		if ( 'yes' === get_option( 'tapgoods', 'no' ) ) {
 			$supports[] = 'comments';
@@ -489,13 +643,13 @@ class Tapgoods_Post_Types {
 						'filter_items_list'     => __( 'Filter items list', 'tapgoods' ),
 					),
 					'description'         => __( 'TapGoods Inventory', 'tapgoods' ),
-					'supports'            => $supports,
+					'supports'            => $supports, // Sin 'editor' ni 'custom-fields'
 					'taxonomies'          => array( 'tg_category', 'tg_tags' ),
 					'hierarchical'        => false,
 					'public'              => true,
 					'show_ui'             => true,
 					'show_in_menu'        => true,
-					'show_in_rest' 		  => true,
+					'show_in_rest'        => true,
 					'menu_position'       => 65,
 					'menu_icon'           => 'dashicons-screenoptions',
 					'show_in_admin_bar'   => true,
@@ -510,19 +664,19 @@ class Tapgoods_Post_Types {
 						'with_front' => false,
 						'feeds'      => false,
 					) : false,
-					'capability_type'     => 'page',
-					'capabilities'        => array(
-						'create_posts' => false,
+					'capability_type'     => 'post',
+					'capabilities' => array(
+						'create_posts' => 'edit_posts',
+						'edit_posts' => 'edit_posts',
+						'edit_others_posts' => 'edit_posts',
+						'publish_posts' => 'edit_posts',
+						'read_private_posts' => 'edit_posts',
 					),
 					'map_meta_cap'        => true,
-					'show_in_rest'        => true,
 				)
 			)
 		);
 		do_action( 'tapgoods_after_register_post_type_inventory', $tg_inventory );
-
-		// Move to fix rewrites
-		// add_rewrite_rule( '^shop/([^/]*)?$', 'index.php?inventory=$matches[1]&tg_category=$matches[1]', 'top' );
 	}
 
 	
@@ -554,15 +708,6 @@ class Tapgoods_Post_Types {
 		return $link;
 	}
 
-	public static function add_inventory_metabox() {
-		add_meta_box(
-			'inventory_info',
-			'Inventory Information',
-			__CLASS__ . '::render_inventory_metabox',
-			null,
-			'advanced'
-		);
-	}
 
 	public static function add_taxonomy_metabox() {
 		add_meta_box(
@@ -573,32 +718,7 @@ class Tapgoods_Post_Types {
 			'normal',
 			'low',
 		);
-	}
-
-	public static function render_inventory_metabox() {
-		// @TODO: move this into a partial tempalte?
-		// @TODO: metaboxes for taxonomy relationships?
-
-		global $post;
-		$meta = get_post_meta( $post->ID );
-		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tg_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
-
-		// Tapgoods_Helpers::tgpp( $tg_meta );
-
-		?>
-		<div class="container inside">
-			<h4><strong>TapGoods Data</strong></h4>
-			<?php
-			foreach ( $tg_meta as $k => $values ) {
-				if ( null === $values[0] ) {
-					continue;
-				}
-				echo self::tg_handle_postmeta( $k, $values ); //phpcs:ignore
-			}
-			?>
-		</div>
-		<?php
-	}
+	}	
 
 	public static function tg_get_inventory_meta() {
 		global $post;
@@ -827,7 +947,6 @@ function fill_location_column_in_inventory($column, $post_id) {
         // Get location details from 'tg_location_ID'
         $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
 
-        // Log para verificar datos de la ubicación
         //error_log("Location Data for ID {$location_id}: " . print_r($location_data, true));
 
         // Verify that the information has been obtained correctly
@@ -838,12 +957,14 @@ function fill_location_column_in_inventory($column, $post_id) {
             echo esc_html__( 'Location details not found', 'tapgoods' );
         }
     }
+
+
+
 }
 
 
 
-
-
-
-
 Tapgoods_Post_Types::init();
+
+
+add_action('admin_head', array('Tapgoods_Post_Types', 'add_admin_styles'));
