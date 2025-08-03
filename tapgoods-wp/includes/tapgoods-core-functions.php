@@ -1196,15 +1196,15 @@ add_action('add_meta_boxes', 'force_yoast_seo_metabox_on_tg_inventory');
 function enqueue_yoast_seo_assets($hook) {
     global $post;
 
+    // Solo verificar que estamos en la página correcta
+    // Yoast SEO maneja sus propios scripts automáticamente
     if ('post.php' === $hook && isset($post) && 'tg_inventory' === get_post_type($post)) {
-        wp_enqueue_script(
-            'yoast-seo-post-edit',
-            TAPGOODS_PLUGIN_URL . 'assets/js/wp-seo-metabox.js',
-            array('jquery'),
-            filemtime(plugin_dir_path(__FILE__) . 'wordpress-seo/js/dist/wp-seo-metabox.js'), // version based in time
-            true
-        );
-            }
+        // Verificar si Yoast SEO está activo antes de hacer cualquier cosa
+        if (defined('WPSEO_VERSION')) {
+            // Yoast SEO está activo y manejará sus propios scripts
+            // No necesitamos encolar scripts adicionales
+        }
+    }
 }
 add_action('admin_enqueue_scripts', 'enqueue_yoast_seo_assets');
 
