@@ -4,7 +4,7 @@ Tags: tapgoods, rental, inventory
 
 Requires at least: 5.8
 Tested up to: 6.7.1
-Stable tag: 0.1.105
+Stable tag: 0.1.106
 
 License: MIT
 
