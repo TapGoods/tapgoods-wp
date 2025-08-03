@@ -18,7 +18,7 @@ class Tapgoods_Shortcodes {
 		foreach ( $shortcodes as $shortcode => $info ) {
 			$template = self::get_template( $shortcode );
 			if ( ! shortcode_exists( $shortcode ) ) {
-				if ( is_file( $template ) && file_exists( $template ) ) {
+				if ( $template && is_file( $template ) && file_exists( $template ) ) {
 					add_shortcode( $shortcode, [ $this, $shortcode ] );
 				}
 			}
@@ -40,6 +40,11 @@ class Tapgoods_Shortcodes {
 
 	// This function receives the arguments passed to the shortcode callback and loads the PHP template from /public/partials
 	protected function shortcode_handler( $template, $args ) {
+
+		// Verificar que el template sea válido antes de incluirlo
+		if ( ! $template || ! is_file( $template ) || ! file_exists( $template ) ) {
+			return '';
+		}
 
 		$tag     = $args[2];
 		$content = ( '' !== $args[1] ) ? $args[1] : false;

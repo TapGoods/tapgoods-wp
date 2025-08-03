@@ -530,7 +530,7 @@ function tg_get_tg_location_id( $post_id = false ) {
 function tg_locate_template( $template = '' ) {
 
 	if ( empty( $template ) ) {
-		return;
+		return null;
 	}
 
 	$tg_template    = sprintf( TAPGOODS_PLUGIN_PATH . 'public/partials/%s.php', $template );
@@ -547,7 +547,7 @@ function tg_locate_template( $template = '' ) {
 		return $tg_template;
 	}
 
-	return $template_path;
+	return null;
 }
 
 function tg_get_sf_url($wp_location_id) {
