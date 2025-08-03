@@ -38,12 +38,13 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 					Use this shortcode to add inventory to any page. Example pages could be a SHOP PAGE, 
 					or a page you want to show off specifically tagged inventory.
 				</p>
-				<p><strong>Shortcode Modifiers:</strong></p>
+				<p style="color: var(--tg-blue);"><strong>Shortcode Modifiers:</strong></p>
 				<ul class="text-muted">
-					<li>Filter by Tags: <code>[tapgoods-inventory tags="your-tag"]</code></li>
-					<li>Hide Inventory Filters: <code>[tapgoods-inventory show_filters="false"]</code></li>
-					<li>Hide Item Pricing: <code>[tapgoods-inventory show_pricing="false"]</code></li>
-					<li>Combine Modifiers: <code>[tapgoods-inventory tags="Blush-Wedding" show_filters="false"]</code></li>
+					<li><strong>Filter by Categories:</strong> <code>[tapgoods-inventory category="your-slag-category"]</code></li>
+					<li><strong>Filter by Tags:</strong> <code>[tapgoods-inventory tags="your-tag"]</code></li>
+					<li><strong>Hide Inventory Filters:</strong> <code>[tapgoods-inventory show_filters="false"]</code></li>
+					<li><strong>Hide Item Pricing:</strong> <code>[tapgoods-inventory show_pricing="false"]</code></li>
+					<li><strong>Combine Modifiers:</strong> <code>[tapgoods-inventory tags="Blush-Wedding" show_filters="false"]</code></li>
 				</ul>
 			</div>
 			
