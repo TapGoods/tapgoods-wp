@@ -1182,13 +1182,19 @@ function tg_custom_tax_template($template) {
 
 // Ensure Yoast SEO metabox is added to tg_inventory
 function enable_yoast_seo_for_tg_inventory() {
-    add_post_type_support('tg_inventory', 'wpseo-meta'); // Enable Yoast SEO support
+    // Verificar si Yoast SEO está activo antes de habilitar el soporte
+    if (defined('WPSEO_VERSION')) {
+        add_post_type_support('tg_inventory', 'wpseo-meta'); // Enable Yoast SEO support
+    }
 }
 add_action('init', 'enable_yoast_seo_for_tg_inventory', 20);
 
 // Ensure Yoast metabox is added to the post edit screen
 function force_yoast_seo_metabox_on_tg_inventory() {
-    add_meta_box('wpseo_meta', __('Yoast SEO', 'tapgoods'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
+    // Verificar si Yoast SEO está activo antes de agregar el metabox
+    if (defined('WPSEO_VERSION') && function_exists('wpseo_meta_box')) {
+        add_meta_box('wpseo_meta', __('Yoast SEO', 'tapgoods'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
+    }
 }
 add_action('add_meta_boxes', 'force_yoast_seo_metabox_on_tg_inventory');
 
