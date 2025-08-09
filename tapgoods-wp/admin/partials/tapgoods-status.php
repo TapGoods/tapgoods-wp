@@ -14,28 +14,10 @@ $location_settings = maybe_unserialize(get_option('tg_location_settings'));
 $reset_done = get_option('tg_reset_done');
 ?>
 
-  
-    <style>
-        #status-content .wrap {
-            overflow: auto;
-        }
-        #status-content .wrap ul {
-            word-wrap: break-word; /* Break long words */
-            white-space: pre-wrap; /* Maintain line breaks and wrap text */
-            background:rgb(255, 0, 0); /* White background */
-            padding: 10px; /* Inner spacing */
-            border: 1px solid #ddd; /* Optional: Border */
-            border-radius: 5px; /* Optional: Rounded corners */
-        }
-        #status-content .status-yes {
-            color: green;
-            font-weight: bold;
-        }
-        #status-content .status-no {
-            color: red;
-            font-weight: bold;
-        }
-    </style>
+<?php
+// Status page styles are now handled by Tapgoods_Enqueue class
+// All styles moved to tapgoods-complete-styles.css
+?>
     
     
     <div class="container">
@@ -96,15 +78,17 @@ $reset_done = get_option('tg_reset_done');
     </div>
 </div>
 
-<script>
+<?php
+// Add status tab functionality using wp_add_inline_script
+wp_add_inline_script('tapgoods-admin-complete', '
 document.addEventListener("DOMContentLoaded", function () {
-    const statusTab = document.querySelector('#nav-status-tab');
-    const statusContent = document.querySelector('#status-content');
+    const statusTab = document.querySelector("#nav-status-tab");
+    const statusContent = document.querySelector("#status-content");
 
     if (statusTab) {
-        statusTab.addEventListener('click', function () {
+        statusTab.addEventListener("click", function () {
             // reload the content when the tab is clicked
-            fetch("<?php echo esc_url( admin_url('admin-ajax.php') ); ?>", {
+            fetch("' . esc_url( admin_url('admin-ajax.php') ) . '", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
@@ -115,8 +99,9 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 statusContent.innerHTML = data; // replace the content
             })
-            .catch(error => console.error("Error loading status content:", error));
+            .catch(error => console.error("TapGoods Admin: Error loading status content:", error));
         });
     }
 });
-</script>
+');
+?>

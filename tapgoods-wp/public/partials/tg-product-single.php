@@ -122,6 +122,11 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
 
 
 
+<?php
+// Product single page functionality is now handled by Tapgoods_Enqueue class
+// All JavaScript moved to public/js/tapgoods-public-complete.js initProductSingle() function
+// The system automatically detects tapgoods-product-single shortcode and loads the appropriate scripts
+/*
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const addButton = document.querySelector(".add-cart");
@@ -307,3 +312,5 @@ function updateCartButton(button, isAdded) {
 
 
 </script>
+*/
+?>

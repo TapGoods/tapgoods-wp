@@ -22,7 +22,10 @@ $shortcode .= ']';
 ?>
 
 <!-- ✅ JavaScript will dynamically load CSS files -->
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
 document.addEventListener("DOMContentLoaded", function () {
     function loadCSS(href) {
         const link = document.createElement("link");
@@ -38,7 +41,8 @@ document.addEventListener("DOMContentLoaded", function () {
     loadCSS("<?php echo esc_url($plugin_url); ?>tapgoods-custom.css?ver=0.1.0");
     loadCSS("<?php echo esc_url($plugin_url); ?>global-styles.css?ver=0.1.0");
 });
-</script>
+</script>*/
+?>
 
 <br />
 <div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
@@ -53,7 +57,10 @@ document.addEventListener("DOMContentLoaded", function () {
     </div>
 </div>
 
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
 document.addEventListener("DOMContentLoaded", function () {
     function handleAddToCart(event) {
         event.preventDefault();
@@ -108,4 +115,5 @@ document.addEventListener("DOMContentLoaded", function () {
         button.addEventListener("click", handleAddToCart);
     });
 });
-</script>
+</script>*/
+?>

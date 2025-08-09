@@ -78,49 +78,10 @@ class Tapgoods_Post_Types {
 	}
 
 
-	// Add CSS styles to improve appearance
+	// Add CSS styles to improve appearance - now handled by Tapgoods_Enqueue
 	public static function add_admin_styles() {
-		$screen = get_current_screen();
-		if ($screen && $screen->post_type === 'tg_inventory') {
-			?>
-			<style>
-				/* Ensure the title field is visible */
-				#titlediv {
-					margin-bottom: 20px;
-				}
-				
-				/* Style for Custom Description */
-				#tg_custom_description {
-					margin-bottom: 0;
-				}
-				
-				#tg_custom_description .inside {
-					padding-top: 10px;
-				}
-				
-				/* Style for Inventory Information */
-				#inventory_info {
-					margin-top: 20px;
-				}
-				
-				/* Visually move Yoast to the bottom */
-				#wpseo_meta {
-					margin-top: 30px;
-					order: 999;
-				}
-				
-				/* Improve general spacing */
-				.postbox {
-					margin-bottom: 20px;
-				}
-				
-				/* Hide main content editor if it exists */
-				#postdivrich {
-					display: none;
-				}
-			</style>
-			<?php
-		}
+		// Styles are now handled by Tapgoods_Enqueue class using wp_add_inline_style()
+		// This method is kept for backward compatibility but styles moved to central system
 	}
 
 	// Function to add all custom metaboxes at once
@@ -257,20 +218,10 @@ class Tapgoods_Post_Types {
 			?>
 		</div>
 		
-		<script type="text/javascript">
-		jQuery(document).ready(function($) {
-			// Ensure TinyMCE is initialized for our editor
-			if (typeof tinymce !== 'undefined') {
-				tinymce.on('AddEditor', function(e) {
-					if (e.editor.id === 'tgcustomdescription') {
-						e.editor.on('change', function() {
-							e.editor.save();
-						});
-					}
-				});
-			}
-		});
-		</script>
+		<?php
+		// Script now handled by Tapgoods_Enqueue class
+		// No inline script needed here
+		?>
 		<?php
 	}
 
@@ -286,7 +237,7 @@ class Tapgoods_Post_Types {
 			<?php
 			if (!empty($tg_meta)) {
 				echo '<table class="widefat fixed striped">';
-				echo '<thead><tr><th style="width: 30%;">' . __('Field', 'tapgoods') . '</th><th>' . __('Value', 'tapgoods') . '</th></tr></thead>';
+				echo '<thead><tr><th class="tapgoods-table-field-column">' . __('Field', 'tapgoods') . '</th><th>' . __('Value', 'tapgoods') . '</th></tr></thead>';
 				echo '<tbody>';
 				
 				foreach ( $tg_meta as $key => $values ) {
@@ -304,11 +255,11 @@ class Tapgoods_Post_Types {
 							// Show images
 							foreach ($value as $img) {
 								if (isset($img['imgixUrl'])) {
-									echo '<img src="' . esc_url($img['imgixUrl']) . '?w=100&h=100&fit=crop" style="margin: 5px; max-width: 100px; height: auto;" />';
+									echo '<img src="' . esc_url($img['imgixUrl']) . '?w=100&h=100&fit=crop" class="tapgoods-image-gallery" />';
 								}
 							}
 						} else {
-							echo '<pre style="margin: 0; white-space: pre-wrap;">' . esc_html(json_encode($value, JSON_PRETTY_PRINT)) . '</pre>';
+							echo '<pre class="tapgoods-json-display">' . esc_html(json_encode($value, JSON_PRETTY_PRINT)) . '</pre>';
 						}
 					} else {
 						echo esc_html($value);

@@ -1368,47 +1368,5 @@ add_action('wp_ajax_nopriv_tapgoods_manual_sync', function() {
     wp_send_json(array('success' => false, 'message' => 'Unauthorized request.'));
 });
 
-// JavaScript to call the sync endpoint continuously and update the button
-add_action('admin_footer', function() {
-    if (current_user_can('manage_options')) {
-        ?>
-        <button id="tg_api_sync">SYNC</button>
-        <span id="tapgoods_sync_status"></span>
-        <script type="text/javascript">
-            (function($) {
-                function syncInventory() {
-                    $('#tg_api_sync').prop('disabled', true).text('WORKING');
-                    $.ajax({
-                        url: ajaxurl,
-                        method: 'POST',
-                        data: {
-                            action: 'tapgoods_manual_sync'
-                        },
-                        success: function(response) {
-                            $('#tapgoods_sync_status').text(response.message);
-                            if (response.success && response.continue) {
-                                setTimeout(function() {
-                                    $('#tg_api_sync').click();
-                                }, 1000); // Wait 1 second before continuing with the next request
-                            } else {
-                             //   console.log('Sync completed or stopped: ' + response.message);
-                                $('#tg_api_sync').prop('disabled', false).text('SYNC');
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('Error during sync: ' + error);
-                            $('#tapgoods_sync_status').text('Error during sync: ' + error);
-                            $('#tg_api_sync').prop('disabled', false).text('SYNC');
-                        }
-                    });
-                }
-
-                // Start synchronization when the button is clicked
-                $('#tg_api_sync').on('click', function() {
-                    syncInventory();
-                });
-            })(jQuery);
-        </script>
-        <?php
-    }
-});
+// Sync button and script now handled by Tapgoods_Enqueue class
+// This function is deprecated but kept for backward compatibility

@@ -656,11 +656,9 @@ if ( $can_edit_terms ) {
 
 </div><!-- /wrap -->
 
-<?php if ( ! wp_is_mobile() ) : ?>
-<script type="text/javascript">
-try{document.forms.addtag['tag-name'].focus();}catch(e){}
-</script>
-	<?php
-endif;
+<?php
+// Script now handled by Tapgoods_Enqueue class
+// No inline script needed here
+?>
 
 $wp_list_table->inline_edit();

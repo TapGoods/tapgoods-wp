@@ -29,14 +29,14 @@ $today       = wp_date( $date_format );
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">
-				<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
                     <?php 
                         $categories_text = apply_filters( 'tg_categories_header_text', 'Categories' ); 
                         echo esc_html( $categories_text ); 
                     ?>
 				</button>
 			</h2>
-			<div id="collapseOne" class="accordion-collapse collapse category-links">
+            <div id="collapseOne" class="accordion-collapse collapse show category-links">
                 <a class="category-link" href="#" data-category-id="">
                     <?php esc_html_e( 'All Categories', 'tapgoods' ); ?>
                 </a>
@@ -52,7 +52,10 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
 
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
 document.addEventListener("DOMContentLoaded", function() {
     var accordionCollapse = document.getElementById("collapseOne");
     var accordionButton = document.querySelector(".accordion-button");
@@ -99,4 +102,5 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 });
-</script>
+</script>*/
+?>

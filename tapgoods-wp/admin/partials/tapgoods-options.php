@@ -25,16 +25,15 @@ if (isset($_POST['set_default_location']) && $selected_location) {
     // Assign the selected location to the variable
     $default_location = $selected_location;
 
-    // Output JavaScript to save in Local Storage
-    echo "
-    <script>
+    // Enqueue script inline instead of direct echo
+    wp_add_inline_script('tapgoods-admin-complete', "
+        // Save default location to localStorage when admin sets it
         document.addEventListener('DOMContentLoaded', function () {
             var defaultLocation = '" . esc_js( $default_location ) . "';
             localStorage.setItem('tg_user_location', defaultLocation);
-            console.log('Default location saved to Local Storage:', defaultLocation);
+            console.log('TapGoods Admin: Default location saved to Local Storage:', defaultLocation);
         });
-    </script>
-    ";
+    ");
 }
 
 // Get the data for the selected location only if it exists

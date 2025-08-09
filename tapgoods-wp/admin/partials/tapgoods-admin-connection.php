@@ -45,8 +45,8 @@ if (isset($_POST['confirm_reset'])) {
 
     update_option('tg_reset_done', true);
     $connected = false;
-    echo "<p style='color: green;'>All data has been successfully deleted.</p>";
-    echo '<script>showSuccessMessage();</script>';
+    echo '<p class="tapgoods-success">All data has been successfully deleted.</p>';
+    wp_add_inline_script('tapgoods-admin-complete', 'showSuccessMessage();');
     exit;
 }
 ?>
@@ -106,74 +106,12 @@ if (isset($_POST['confirm_reset'])) {
     <a href="javascript:void(0);" onclick="openPopup()">Reset to Default</a>
 </p>
 
-<script>
-jQuery(document).ready(function($) {
-    $('#tg_api_sync').on('click', function() {
-        $(this).prop('disabled', true).text('Syncing...');
+<?php
+// Scripts are now handled by Tapgoods_Enqueue class
+// No inline scripts needed here
+?>
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'execute_manual_sync',
-                nonce: '<?php echo wp_create_nonce("tg_sync_nonce"); ?>'
-            },
-            success: function(response) {
-                alert('Synchronization completed.');
-                $('#tg_api_sync').prop('disabled', false).text('SYNC');
-            },
-            error: function() {
-                alert('Synchronization failed.');
-                $('#tg_api_sync').prop('disabled', false).text('SYNC');
-            }
-        });
-    });
-});
-
-function openPopup() {
-    document.getElementById('popup').style.display = 'flex';
-}
-
-function closePopup() {
-    document.getElementById('popup').style.display = 'none';
-}
-</script>
-
-<style>
-    .overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-    .popup {
-        background: #333;
-        color: #ecf0f1;
-        padding: 20px;
-        border-radius: 8px;
-        width: 400px;
-        text-align: center;
-    }
-    .btn-danger {
-        background-color: #e74c3c;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    .btn-secondary {
-        background-color: #bdc3c7;
-        color: black;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-</style>
+<?php
+// Styles are now handled by Tapgoods_Enqueue class using wp_add_inline_style()
+// No inline styles needed here
+?>

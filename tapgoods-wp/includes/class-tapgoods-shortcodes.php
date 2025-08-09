@@ -46,6 +46,9 @@ class Tapgoods_Shortcodes {
 			return '';
 		}
 
+		// Force enqueue of TapGoods scripts and styles when shortcode is used
+		$this->force_enqueue_assets();
+
 		$tag     = $args[2];
 		$content = ( '' !== $args[1] ) ? $args[1] : false;
 		$atts    = Tapgoods_Shortcodes::get_atts( $tag );
@@ -54,6 +57,86 @@ class Tapgoods_Shortcodes {
 		ob_start();
 		include $template;
 		return do_shortcode( shortcode_unautop( ob_get_clean() ) );
+	}
+
+	/**
+	 * Force enqueue of TapGoods assets when shortcode is used
+	 */
+	private function force_enqueue_assets() {
+		// Enqueue main public styles
+		if (!wp_style_is('tapgoods-public', 'enqueued')) {
+			wp_enqueue_style(
+				'tapgoods-public',
+				plugin_dir_url(dirname(__FILE__)) . 'public/css/tapgoods-public.css',
+				array(),
+				TAPGOODSWP_VERSION
+			);
+		}
+
+		// Enqueue custom styles
+		if (!wp_style_is('tapgoods-custom', 'enqueued')) {
+			wp_enqueue_style(
+				'tapgoods-custom',
+				plugin_dir_url(dirname(__FILE__)) . 'public/css/tapgoods-custom.css',
+				array(),
+				TAPGOODSWP_VERSION
+			);
+		}
+
+		// Enqueue inline styles
+		if (!wp_style_is('tapgoods-inline-styles', 'enqueued')) {
+			wp_enqueue_style(
+				'tapgoods-inline-styles',
+				plugin_dir_url(dirname(__FILE__)) . 'assets/css/tapgoods-inline-styles.css',
+				array(),
+				TAPGOODSWP_VERSION
+			);
+		}
+
+		// Disabled - using tapgoods-public-complete.js instead
+		// if (!wp_script_is('tapgoods-public', 'enqueued')) {
+		//	wp_enqueue_script(
+		//		'tapgoods-public',
+		//		plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public.js',
+		//		array('jquery'),
+		//		TAPGOODSWP_VERSION,
+		//		true
+		//	);
+		// }
+
+		// Enqueue inline script
+		if (!wp_script_is('tapgoods-public-inline', 'enqueued')) {
+			wp_enqueue_script(
+				'tapgoods-public-inline',
+				plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-inline.js',
+				array('jquery'),
+				TAPGOODSWP_VERSION,
+				true
+			);
+
+			// Localize script with necessary data
+			wp_localize_script('tapgoods-public-inline', 'tg_public_vars', array(
+				'ajaxurl' => admin_url('admin-ajax.php'),
+				'default_location' => get_option('tg_default_location'),
+				'plugin_url' => plugin_dir_url(dirname(__FILE__))
+			));
+		}
+
+		// Add location styles inline
+		$location_styles = $this->get_location_styles();
+		if (!empty($location_styles)) {
+			wp_add_inline_style('tapgoods-public', $location_styles);
+		}
+	}
+
+	/**
+	 * Get location styles
+	 */
+	private function get_location_styles() {
+		if (function_exists('tg_location_styles')) {
+			return tg_location_styles();
+		}
+		return '';
 	}
 
 	public static function get_shortcodes() {

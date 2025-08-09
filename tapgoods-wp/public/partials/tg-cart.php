@@ -43,7 +43,10 @@ $url = tg_get_cart_url($location);
 
 </button>
 
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
 document.addEventListener("DOMContentLoaded", function() {
     const fullCartIcon = document.querySelector(".full-cart-icon");
     const emptyCartIcon = document.querySelector(".empty-cart-icon");
@@ -96,4 +99,5 @@ if (savedLocation) {
         .catch((error) => console.error('Error sending location to server:', error));
     }
 
-</script>
+</script>*/
+?>

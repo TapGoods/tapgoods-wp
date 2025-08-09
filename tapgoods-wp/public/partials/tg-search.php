@@ -90,7 +90,10 @@ do_action('tg_before_search_form');
     <div id="tg-pagination-container" class="pagination-container mt-4"></div>
 </div>
 
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
     
 const showPricing = <?php echo wp_json_encode( (bool) $show_pricing ); ?>;
 
@@ -395,4 +398,5 @@ Object.keys(cartData[locationId] || {}).forEach(itemId => {
     }
 });
 });
-</script>
+</script>*/
+?>

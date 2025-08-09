@@ -45,7 +45,8 @@ class Tapgoods_Public {
 		$location = tg_get_wp_location_id();
 		$cart_url = tg_get_cart_url($location);
 	
-		wp_enqueue_script($this->plugin_name . '-public', plugin_dir_url(__FILE__) . 'js/tapgoods-public.js', array('jquery'), $this->version, false);
+		// Disabled - using tapgoods-public-complete.js instead
+		// wp_enqueue_script($this->plugin_name . '-public', plugin_dir_url(__FILE__) . 'js/tapgoods-public.js', array('jquery'), $this->version, false);
 		wp_enqueue_script(
 			'tg-bootstrap',
 			TAPGOODS_PLUGIN_URL . 'assets/js/bootstrap.bundle.min.js', // Archivo local en lugar de CDN
@@ -151,6 +152,7 @@ class Tapgoods_Public {
 	}
 
 	public function tapgoods_search( $data ) {
+		// error_log("TAPGOODS_SEARCH method called with action: " . ($_POST['action'] ?? 'NO_ACTION') . " and data: " . print_r($_POST, true));
 		//check_ajax_referer( 'search', '_tgnonce_search' );
 
 		if ( array_key_exists( 's', $_POST ) ) {

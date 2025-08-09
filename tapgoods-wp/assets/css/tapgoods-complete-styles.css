@@ -1,0 +1,321 @@
+/**
+ * TapGoods Complete Styles
+ * Refactored from inline styles to proper WordPress enqueue system
+ */
+
+/* Admin Connection Styles - from admin/partials/tapgoods-admin-connection.php:113 */
+.tapgoods-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    display: none;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.overlay .popup {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.overlay .popup h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.overlay .popup .spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 20px 0;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Admin Status Styles - from admin/partials/tapgoods-status.php:17 */
+.tapgoods-status-page .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.tapgoods-status-page .status-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.tapgoods-status-page .status-card h3 {
+    margin-top: 0;
+    color: #1d2327;
+    font-size: 16px;
+}
+
+/* Frontend: Location Select (scoped) */
+.tapgoods.location-select .wrapper {
+    border: 1px solid #cfd4da;
+    border-radius: 9999px; /* pill */
+    padding: 4px 10px; /* más compacto */
+    background-color: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: relative; /* para ubicar caret */
+    flex-wrap: nowrap; /* evita salto de línea */
+    min-height: 36px; /* altura controlada */
+}
+.tapgoods.location-select #tg-location-select {
+    border: 0;
+    background-color: transparent;
+    box-shadow: none;
+    padding: 0 28px 0 0; /* espacio para la flecha */
+    height: 30px;
+    line-height: 30px;
+    font-size: 14px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: auto; /* no forzar ancho completo */
+    flex: 1 1 auto; /* ocupar espacio sin romper el layout */
+}
+.tapgoods.location-select .icon {
+    color: #212529;
+}
+.tapgoods.location-select .caret { 
+    display: inline-flex; 
+    align-items: center; 
+    position: absolute; 
+    right: 12px; 
+    top: 50%; 
+    transform: translateY(-50%);
+    pointer-events: none; /* clic pasa al select */
+}
+.tapgoods.location-select .caret .dashicons { line-height: 1; font-size: 16px; }
+.tapgoods.location-select .wrapper:focus-within {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 .12rem rgba(13,110,253,.18);
+}
+
+.tapgoods-status-page .status-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #135e96;
+    margin: 10px 0;
+}
+
+.tapgoods-status-page .status-description {
+    color: #646970;
+    font-size: 13px;
+}
+
+/* Admin Post Types Styles - from includes/class-tapgoods-post-types.php:85,317 */
+.tapgoods-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.tapgoods-admin-table th,
+.tapgoods-admin-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.tapgoods-admin-table th {
+    background-color: #f9f9f9;
+    font-weight: bold;
+}
+
+.tapgoods-table-field-column {
+    width: 150px;
+    font-weight: bold;
+    vertical-align: top;
+}
+
+.tapgoods-image-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 10px 0;
+}
+
+.tapgoods-image-gallery img {
+    max-width: 100px;
+    max-height: 100px;
+    object-fit: cover;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tapgoods-json-display {
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Debug Info Styles - from includes/tapgoods-core-functions.php */
+.tapgoods-debug-info {
+    background: #f0f0f0;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+/* Error and Success Messages - from public/partials/tg-search-results.php */
+.tapgoods-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+.tapgoods-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+/* Location Styles - from includes/tapgoods-core-functions.php:464 */
+:root {
+    --tg-location-primary-color: #007cba;
+    --tg-location-secondary-color: #005a87;
+    --tg-location-accent-color: #00a0d2;
+}
+
+.tapgoods-location-styles {
+    /* Location-specific styles will be populated dynamically */
+}
+
+/* Cart button and icons */
+#tg_cart.tg-cart-button {
+    border-radius: 6px;
+    padding: 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tg-primary { color: var(--tg-location-primary-color, #0d6efd); }
+
+/* Location dropdown rounded */
+#tg-location-select {
+    border-radius: 20px;
+}
+
+/* Filter categories heading */
+.categories .accordion-button {
+    font-weight: 600;
+}
+
+/* Sign In / Sign Up links */
+.tapgoods-auth-links a {
+    font-weight: 500;
+}
+
+/* Public Form Styles */
+.tapgoods-form {
+    max-width: 400px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.tapgoods-form .form-group {
+    margin-bottom: 15px;
+}
+
+.tapgoods-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.tapgoods-form input[type="text"],
+.tapgoods-form input[type="email"],
+.tapgoods-form input[type="password"],
+.tapgoods-form select,
+.tapgoods-form textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.tapgoods-form button {
+    background: #007cba;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.tapgoods-form button:hover {
+    background: #005a87;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tapgoods-status-page .status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tapgoods-form {
+        margin: 10px;
+        padding: 15px;
+    }
+    
+    .tapgoods-image-gallery {
+        justify-content: center;
+    }
+}

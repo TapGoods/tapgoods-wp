@@ -41,6 +41,8 @@ $local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_te
 $cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
 $location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
 
+// Location detection completed
+
 
 // Prepare query arguments
 $args = array(
@@ -55,6 +57,7 @@ $args = array(
             'key'     => 'tg_locationId',
             'value'   => $location_id,
             'compare' => '=',
+            'type'    => 'CHAR', // Force string comparison to match various data types
         ),
     ),
 );
@@ -107,13 +110,14 @@ if (count($tax_args) > 1) {
 
 $query = new WP_Query($args);
 
-// Log the number of results
-// error_log('Total number of results: ' . $query->found_posts);
+// Query executed successfully
 
 
 $tg_pages = $query->max_num_pages;
 
 ?>
+
+
 <!-- <div class="tapgoods tapgoods-inventory row row-cols-lg-3 row-cols-md-2 row-cols-sm-2"> -->
 <div class="tapgoods tapgoods-inventory row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
 <?php if ($query->have_posts()) : ?>
@@ -260,17 +264,20 @@ if ( $tg_pages > 1 ) : ?>
 
 
 
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// All JavaScript functionality including cart management, search, pagination, and category filtering
+// is now handled by the proper WordPress enqueue system via initInventoryGrid() function
+/*
+Original inline script removed - functionality preserved in public/js/tapgoods-public-complete.js
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    const locationId = "<?php echo esc_js($location_id); ?>"; // Current location ID
+    const locationId = "REMOVED_FOR_REFACTOR"; // Current location ID
     const savedLocation = localStorage.getItem('tg_user_location');
     if (savedLocation) {
         document.cookie = `tg_user_location=${savedLocation}; path=/;`;
     }
 
-    /**
-     * Load cart data from localStorage and update UI on page load
-     */
     function updateCartItemsOnLoad(container) {
         const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
         if (cartData[locationId]) {
@@ -311,9 +318,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    /**
-     * Handle "Add to Cart" button click
-     */
+
     function handleAddToCart(event) {
         event.preventDefault();
 
@@ -378,9 +383,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error("Request error:", error));
     }
 
-    /**
-     * Attach event listeners to all "Add to Cart" buttons
-     */
+
     document.querySelectorAll(".tapgoods-inventory").forEach(container => {
         updateCartItemsOnLoad(container);
 
@@ -392,7 +395,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /**
      * Handling search, categories, and pagination
-     */
+
     const searchForm = document.querySelector(".tapgoods-search-form");
     const categoryLinks = document.querySelectorAll(".category-link");
     const paginationLinks = document.querySelectorAll(".pagination a");
@@ -493,4 +496,5 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-</script>
+</script>*/
+?>

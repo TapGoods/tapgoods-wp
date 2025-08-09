@@ -31,13 +31,13 @@ foreach ($wp_load_paths as $path) {
 
 if (!$wp_load_found) {
     // Display a critical error if wp-load.php cannot be loaded
-    echo "<div style='color: red;'>Critical error: WordPress could not be loaded. Please contact support.</div>";
+    echo '<div class="tapgoods-error">Critical error: WordPress could not be loaded. Please contact support.</div>';
     exit;
 }
 
 // Verify WordPress is loaded
 if (!defined('ABSPATH')) {
-    echo "<div style='color: red;'>Critical error: WordPress environment not initialized.</div>";
+    echo '<div class="tapgoods-error">Critical error: WordPress environment not initialized.</div>';
     exit;
 }
 
@@ -62,7 +62,7 @@ if ($location_option && is_array($location_option)) {
     $add_to_cart_base = $location_option['add_to_cart'];
 } else {
     // If location data is missing, display an error and stop execution
-    echo "<div style='color: red;'>" . esc_html__( 'Error: Configuration not found for location ID ', 'tapgoods' ) . esc_html( $location_id ) . ".</div>";
+    echo '<div class="tapgoods-error">' . esc_html__( 'Error: Configuration not found for location ID ', 'tapgoods' ) . esc_html( $location_id ) . '.</div>';
     exit;
 }
 
@@ -125,7 +125,10 @@ if ($query->have_posts()) {
         <?php endwhile; ?>
         <?php wp_reset_postdata(); ?>
     </div>
-    <script>
+    <?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
     function updateQuantityAndSubmit(form) {
         const baseUrl = form.getAttribute('data-base-url');
         const quantity = form.querySelector('.qty-input').value;
@@ -134,7 +137,8 @@ if ($query->have_posts()) {
         window.location.href = addToCartUrl;
         return false;
     }
-    </script>
+    </script>*/
+?>
     <?php
 } else {
     // If no results are found, show a simple "No results" message

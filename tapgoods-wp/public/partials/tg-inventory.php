@@ -68,7 +68,10 @@ do_action( 'tg_after_inventory', $atts );
 echo do_shortcode( ob_get_clean() );
 
 ?>
-<script>
+<?php
+// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
+// Inline script removed for WordPress best practices compliance
+/*<script>
 document.addEventListener("DOMContentLoaded", function() {
     const categoryLinks = document.querySelectorAll(".category-link");
     const paginationLinks = document.querySelectorAll(".pagination a");
@@ -145,4 +148,5 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 
-</script>
+</script>*/
+?>

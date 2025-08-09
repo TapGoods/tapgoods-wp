@@ -460,6 +460,7 @@ function tg_location_styles() {
 add_action('wp_head', 'tg_output_location_styles');
 
 function tg_output_location_styles() {
+    // Re-enabled to ensure styles load when needed
     if (!defined('DOING_AJAX') || !DOING_AJAX) {
         echo '<style>';
         echo wp_kses_post( tg_location_styles() );
@@ -846,8 +847,8 @@ add_action('template_redirect', function () {
 
 
 // Register the AJAX handlers for logged-in and logged-out users
-add_action('wp_ajax_tg_search', 'handle_tg_search');
-add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
+add_action('wp_ajax_tg_search_grid', 'handle_tg_search');
+add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
 
 /**
  * Handles the AJAX search request for tg_inventory.
@@ -859,7 +860,7 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
  
 
  function handle_tg_search() {
-   // error_log("AJAX Request Received: " . print_r($_POST, true));
+   // error_log("TG_SEARCH_GRID handle_tg_search called with action: " . ($_POST['action'] ?? 'NO_ACTION') . " and data: " . print_r($_POST, true));
 
     $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field( wp_unslash( $_POST['s'] ) ) : null;
     $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field( wp_unslash( $_POST['tg_location_id'] ) ) : '';
@@ -920,6 +921,24 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
     $query = new WP_Query($args);
 
     $results = [];
+    // Include row wrapper to preserve exact structure used by templates
+    $row_open  = '<div class="tapgoods tapgoods-inventory row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">';
+    $row_close = '</div>';
+    $items_html = '';
+    $base_url = tg_get_add_to_cart_url( $location_id );
+    // Build current URL for proper redirect, can be overridden by POST
+    $redirect_url = null;
+    if ( isset($_POST['redirect_url']) && $_POST['redirect_url'] !== '' ) {
+        $redirect_url = esc_url_raw( wp_unslash( $_POST['redirect_url'] ) );
+    } else {
+        // Fallback to current URL logic mirroring tg-inventory-grid.php
+        $current_url = home_url( add_query_arg( array(), $wp->request ) );
+        if ( ! empty( $_SERVER['QUERY_STRING'] ) ) {
+            $query_string = isset( $_SERVER['QUERY_STRING'] ) ? sanitize_text_field( wp_unslash( $_SERVER['QUERY_STRING'] ) ) : '';
+            $current_url .= '?' . $query_string;
+        }
+        $redirect_url = $current_url;
+    }
     if ($query->have_posts()) {
         while ($query->have_posts()) {
             $query->the_post();
@@ -931,15 +950,52 @@ add_action('wp_ajax_nopriv_tg_search', 'handle_tg_search');
                 'tg_id'   => get_post_meta(get_the_ID(), 'tg_id', true),
                 'price'   => tg_get_single_display_price(get_the_ID()),
             ];
+
+            // Build minimal, styled item card HTML to allow client-side direct replacement of grid only
+            $tg_id    = get_post_meta(get_the_ID(), 'tg_id', true);
+            // Prefer imgixUrl like the template
+            $pictures = get_post_meta(get_the_ID(), 'tg_pictures', true);
+            $img_tag  = '';
+            if (!empty($pictures) && is_array($pictures) && isset($pictures[0]['imgixUrl'])) {
+                $img_tag = Tapgoods_Public::get_img_tag($pictures[0]['imgixUrl'], '254', '150');
+            }
+            $price    = tg_get_single_display_price(get_the_ID());
+            $item_url = get_permalink();
+            // Build add to cart URL using current page as redirect (like original template)
+            $add_url  = tg_get_product_add_to_cart_url(
+                get_the_ID(),
+                array('redirectUrl' => $redirect_url)
+            );
+            $items_html .= '<div id="tg-item-' . esc_attr($tg_id) . '" class="col item">'
+                . '<div class="item-wrap">'
+                . '<figure>'
+                . '<a class="d-block" href="' . esc_url( $item_url ) . '">'
+                . ( ! empty( $img_tag ) ? wp_kses( $img_tag, [ 'img' => [ 'src'=>true,'srcset'=>true,'sizes'=>true,'width'=>true,'height'=>true,'alt'=>true,'loading'=>true,'decoding'=>true,'class'=>true,'id'=>true ] ] ) : '' )
+                . '</a>'
+                . '</figure>'
+                . (! empty( $price ) ? '<div class="price mb-2">' . esc_html( $price ) . '</div>' : '')
+                . '<a class="d-block item-name mb-2" href="' . esc_url( $item_url ) . '"><strong>' . esc_html( get_the_title() ) . '</strong></a>'
+                . '<div class="add-to-cart">'
+                . '<input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-' . esc_attr( $tg_id ) . '">'
+                . '<button type="button" data-target="' . esc_url( $add_url ) . '" data-item-id="' . esc_attr( $tg_id ) . '" class="add-cart btn btn-primary">' . esc_html__( 'Add', 'tapgoods' ) . '</button>'
+                . '</div>'
+                . '</div>'
+                . '</div>';
         }
     } else {
-//        error_log("No posts found.");
+        // No results. If a search term was provided, return a friendly message in the grid
+        if (!empty($search_term)) {
+            $safe_term = esc_html($search_term);
+            $items_html = '<div class="col-12"><p>No results found for "' . $safe_term . '". Please try a different search.</p></div>';
+        }
+        // else leave empty to show an empty grid for default load with zero items
     }
 
     wp_reset_postdata();
 
     wp_send_json_success([
         'results'      => $results,
+        'html'         => $row_open . $items_html . $row_close,
         'total_pages'  => $query->max_num_pages,
         'current_page' => $paged,
     ]);
@@ -1508,7 +1564,7 @@ add_filter('query_vars', 'tg_add_pagination_query_vars');
 /*
 function tg_debug_pagination() {
     if (isset($_GET['debug_pagination'])) {
-        echo '<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">';
+        echo '<div class="tapgoods-debug-info">';
         echo '<strong>Pagination Debug Info:</strong><br>';
         echo 'get_query_var("paged"): ' . get_query_var('paged') . '<br>';
         echo '$_GET["paged"]: ' . (isset($_GET['paged']) ? $_GET['paged'] : 'not set') . '<br>';
