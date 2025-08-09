@@ -1209,7 +1209,28 @@ class Tapgoods_Connection {
 		$new_meta = $this->prepare_meta_input($item); // Get updated meta fields from the API
 	
 		// Define meta keys that should not be removed
-		$protected_meta_keys = ['tg_custom_description'];
+		$protected_meta_keys = [
+			'tg_custom_description',
+			// Yoast SEO meta fields - proteger todos los campos de Yoast
+			'_yoast_wpseo_title',
+			'_yoast_wpseo_metadesc', 
+			'_yoast_wpseo_focuskw',
+			'_yoast_wpseo_meta-robots-noindex',
+			'_yoast_wpseo_meta-robots-nofollow',
+			'_yoast_wpseo_meta-robots-adv',
+			'_yoast_wpseo_canonical',
+			'_yoast_wpseo_bctitle',
+			'_yoast_wpseo_opengraph-title',
+			'_yoast_wpseo_opengraph-description',
+			'_yoast_wpseo_opengraph-image',
+			'_yoast_wpseo_twitter-title',
+			'_yoast_wpseo_twitter-description',
+			'_yoast_wpseo_twitter-image',
+			'_yoast_wpseo_linkdex',
+			'_yoast_wpseo_content_score',
+			'_yoast_wpseo_estimated-reading-time-minutes',
+			'_yoast_wpseo_wordproof_timestamp'
+		];
 	
 		// Detect and remove meta fields that are no longer present in the API response, except protected ones
 		foreach ($existing_meta as $meta_key => $value) {
