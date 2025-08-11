@@ -231,11 +231,11 @@ function initLocationSelector(rootDoc) {
 
         if (canUseStored) {
             console.log('TapGoods: Setting stored location:', storedLocation);
-            selectElement.value = storedLocation;
+            applySelectValue(selectElement, storedLocation);
             setCookie('tg_user_location', storedLocation);
         } else if (canUseDefault) {
             console.log('TapGoods: Setting default location:', defaultLoc);
-            selectElement.value = defaultLoc;
+            applySelectValue(selectElement, defaultLoc);
             setCookie('tg_user_location', defaultLoc);
             localStorage.setItem('tg_user_location', defaultLoc);
         } else {
@@ -243,7 +243,7 @@ function initLocationSelector(rootDoc) {
             const firstOption = selectElement.querySelector('option[value]:not([value=""])');
             if (firstOption) {
                 console.log('TapGoods: Falling back to first available location:', firstOption.value);
-                selectElement.value = firstOption.value;
+                applySelectValue(selectElement, firstOption.value);
                 setCookie('tg_user_location', firstOption.value);
                 localStorage.setItem('tg_user_location', firstOption.value);
             } else {
@@ -265,6 +265,29 @@ function initLocationSelector(rootDoc) {
         window.__tgLocationInit = true;
         console.log('TapGoods: Location selector initialization completed');
     }
+}
+
+function applySelectValue(selectElement, value) {
+    try {
+        // Set the value
+        selectElement.value = String(value);
+        // Normalize selected attributes to reflect the current value
+        const options = selectElement.querySelectorAll('option');
+        options.forEach(opt => {
+            if (opt.value === String(value)) {
+                opt.selected = true;
+                opt.setAttribute('selected', 'selected');
+            } else {
+                opt.selected = false;
+                opt.removeAttribute('selected');
+            }
+        });
+        // Ensure selectedIndex is correct
+        const idx = Array.from(options).findIndex(o => o.value === String(value));
+        if (idx >= 0) selectElement.selectedIndex = idx;
+        // Dispatch input to update custom UIs
+        selectElement.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) { /* ignore */ }
 }
 
 // Attach delegated change handlers for location select in a document, and hook into iframes
