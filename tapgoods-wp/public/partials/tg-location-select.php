@@ -12,6 +12,9 @@ if (!defined('DOING_AJAX') || !DOING_AJAX) {
 // Retrieve location IDs and default location
 $location_ids = maybe_unserialize(get_option('tg_locationIds', []));
 $default_location = get_option('tg_default_location'); // Default location in options
+// Prefer user-selected location from cookie, if present
+$cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : '';
+$selected_location = $cookie_location !== '' ? $cookie_location : $default_location;
 ?>
 <div class="tapgoods location-select container">
     <div class="wrapper row row-cols-auto align-items-center">
@@ -21,7 +24,7 @@ $default_location = get_option('tg_default_location'); // Default location in op
             <?php foreach ($location_ids as $location_id) : 
                 $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
                 $location_name = $location_data['fullName'] ?? "Location {$location_id}";
-                $is_selected = selected((string)$default_location, (string)$location_id, false);
+                $is_selected = selected((string)$selected_location, (string)$location_id, false);
             ?>
                 <option value="<?php echo esc_attr($location_id); ?>" <?php echo $is_selected; ?>>
                     <?php echo esc_html("{$location_id} - {$location_name}"); ?>
