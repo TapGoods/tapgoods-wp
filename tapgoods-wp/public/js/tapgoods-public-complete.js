@@ -22,17 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
  * Location Selector - from public/partials/tg-location-select.php:32
  */
 function initLocationSelector() {
-    console.log('TapGoods: Initializing location selector');
-    const selectElement = document.getElementById('tg-location-select');
-    
-    if (!selectElement) {
-        console.log('TapGoods: Location selector element not found');
+    if (window.__tgLocationInit) {
         return;
     }
+    console.log('TapGoods: Initializing location selector');
 
-    console.log('TapGoods: Location selector found', selectElement);
+    const maxAttempts = 30;
+    const delayMs = 100;
+    let attempts = 0;
 
-    // Cookie functions
     const getCookie = (name) => {
         const cookies = document.cookie.split('; ');
         for (let cookie of cookies) {
@@ -47,35 +45,53 @@ function initLocationSelector() {
         document.cookie = `${name}=${value}; expires=${expires}; path=/`;
     };
 
-    // Get stored location
-    const storedLocation = getCookie('tg_user_location') || localStorage.getItem('tg_user_location');
-    console.log('TapGoods: Stored location:', storedLocation);
-    
-    // Set initial value
-    if (storedLocation && selectElement.querySelector(`option[value="${storedLocation}"]`)) {
-        console.log('TapGoods: Setting stored location:', storedLocation);
-        selectElement.value = storedLocation;
-        setCookie('tg_user_location', storedLocation);
-    } else if (typeof tg_public_vars !== 'undefined' && tg_public_vars.default_location) {
-        console.log('TapGoods: Setting default location:', tg_public_vars.default_location);
-        selectElement.value = tg_public_vars.default_location;
-        setCookie('tg_user_location', tg_public_vars.default_location);
-        localStorage.setItem('tg_user_location', tg_public_vars.default_location);
-    }
-
-    // Handle changes
-    selectElement.addEventListener('change', function () {
-        const selectedLocation = this.value;
-        console.log('TapGoods: Location changed to:', selectedLocation);
-        if (selectedLocation) {
-            setCookie('tg_user_location', selectedLocation);
-            localStorage.setItem('tg_user_location', selectedLocation);
-            console.log('TapGoods: Location saved, reloading page');
-            location.reload();
+    const tryInitialize = () => {
+        const selectElement = document.getElementById('tg-location-select');
+        if (!selectElement) {
+            if (attempts < maxAttempts) {
+                attempts += 1;
+                return setTimeout(tryInitialize, delayMs);
+            }
+            console.log('TapGoods: Location selector element not found after retries');
+            return;
         }
-    });
 
-    console.log('TapGoods: Location selector initialization completed');
+        if (window.__tgLocationInit) {
+            return;
+        }
+
+        console.log('TapGoods: Location selector found', selectElement);
+
+        const storedLocation = getCookie('tg_user_location') || localStorage.getItem('tg_user_location');
+        console.log('TapGoods: Stored location:', storedLocation);
+
+        if (storedLocation && selectElement.querySelector(`option[value="${storedLocation}"]`)) {
+            console.log('TapGoods: Setting stored location:', storedLocation);
+            selectElement.value = storedLocation;
+            setCookie('tg_user_location', storedLocation);
+        } else if (typeof tg_public_vars !== 'undefined' && tg_public_vars.default_location && selectElement.querySelector(`option[value="${tg_public_vars.default_location}"]`)) {
+            console.log('TapGoods: Setting default location:', tg_public_vars.default_location);
+            selectElement.value = tg_public_vars.default_location;
+            setCookie('tg_user_location', tg_public_vars.default_location);
+            localStorage.setItem('tg_user_location', tg_public_vars.default_location);
+        }
+
+        selectElement.addEventListener('change', function () {
+            const selectedLocation = this.value;
+            console.log('TapGoods: Location changed to:', selectedLocation);
+            if (selectedLocation) {
+                setCookie('tg_user_location', selectedLocation);
+                localStorage.setItem('tg_user_location', selectedLocation);
+                console.log('TapGoods: Location saved, reloading page');
+                location.reload();
+            }
+        });
+
+        window.__tgLocationInit = true;
+        console.log('TapGoods: Location selector initialization completed');
+    };
+
+    tryInitialize();
 }
 
 /**
