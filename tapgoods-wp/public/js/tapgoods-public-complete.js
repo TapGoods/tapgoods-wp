@@ -29,17 +29,25 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('TapGoods: initLocationSelector threw', e);
     }
 
+    // Attach robust delegated handlers (main doc + iframes)
+    try {
+        attachDelegatedLocationHandlers(document);
+    } catch (e) { /* ignore */ }
+
     // Elementor integration: initialize when shortcode widget renders
     try {
         if (window.jQuery && window.elementorFrontend && window.elementorFrontend.hooks) {
             jQuery(window).on('elementor/frontend/init', function () {
                 try {
+                    // Ensure delegated handlers are attached when Elementor initializes
+                    try { attachDelegatedLocationHandlers(document); } catch(_) {}
                     elementorFrontend.hooks.addAction('frontend/element_ready/shortcode.default', function ($scope) {
                         try {
                             const el = $scope && $scope[0] ? $scope[0].querySelector('#tg-location-select') : null;
                             if (el) {
                                 console.log('TapGoods: Elementor shortcode rendered; initializing selector inside widget');
                                 initializeWithElement(el);
+                                try { attachDelegatedLocationHandlers(document); } catch(_) {}
                             }
                         } catch (e) { /* ignore */ }
                     });
@@ -50,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (el) {
                                 console.log('TapGoods: Elementor global element ready; initializing selector');
                                 initializeWithElement(el);
+                                try { attachDelegatedLocationHandlers(document); } catch(_) {}
                             }
                         } catch (e) { /* ignore */ }
                     });
@@ -62,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (el) {
                         console.log('TapGoods: Elementor popup show; initializing selector');
                         initializeWithElement(el);
+                        try { attachDelegatedLocationHandlers(document); } catch(_) {}
                     }
                 } catch (e) { /* ignore */ }
             });
@@ -254,6 +264,69 @@ function initLocationSelector(rootDoc) {
 
         window.__tgLocationInit = true;
         console.log('TapGoods: Location selector initialization completed');
+    }
+}
+
+// Attach delegated change handlers for location select in a document, and hook into iframes
+function attachDelegatedLocationHandlers(doc) {
+    if (!doc || !doc.body) return;
+    if (!doc.__tgDelegatedBound) {
+        doc.addEventListener('change', function (e) {
+            const t = e.target;
+            const Elem = (doc.defaultView || window).Element;
+            if (!t || !(t instanceof Elem)) return;
+            const sel = t.closest && t.closest('#tg-location-select');
+            if (!sel) return;
+            const val = sel.value;
+            if (!val) return;
+            document.cookie = 'tg_user_location=' + val + ';path=/;max-age=' + (60 * 60 * 24 * 30);
+            try { localStorage.setItem('tg_user_location', String(val)); } catch(_){ }
+            console.log('TapGoods: delegated change →', val);
+            location.href = location.href;
+        }, true);
+        doc.__tgDelegatedBound = true;
+        console.log('TapGoods: delegated change handler attached on', doc === document ? 'main document' : 'iframe doc');
+    }
+
+    // For main document: bind existing iframes and observe for new iframes
+    if (doc === document) {
+        const bindIframe = (frame) => {
+            try {
+                const idoc = frame.contentDocument || frame.contentWindow?.document;
+                if (idoc) {
+                    attachDelegatedLocationHandlers(idoc);
+                    // If selector is already present inside iframe, initialize
+                    const el = idoc.getElementById('tg-location-select');
+                    if (el) initializeWithElement(el);
+                }
+            } catch(_){ /* cross-origin or not ready */ }
+        };
+
+        // Bind current iframes
+        document.querySelectorAll('iframe').forEach(f => {
+            if (f.complete || f.readyState === 'complete') {
+                bindIframe(f);
+            } else {
+                f.addEventListener('load', () => bindIframe(f), { once: true });
+            }
+        });
+
+        // Observe for new iframes added to the DOM
+        if (typeof MutationObserver !== 'undefined') {
+            const obs = new MutationObserver((mutations) => {
+                mutations.forEach(m => {
+                    m.addedNodes && m.addedNodes.forEach(node => {
+                        if (node && node.tagName === 'IFRAME') {
+                            bindIframe(node);
+                        }
+                        if (node && node.querySelectorAll) {
+                            node.querySelectorAll('iframe').forEach(f => bindIframe(f));
+                        }
+                    });
+                });
+            });
+            try { obs.observe(document.body, { childList: true, subtree: true }); } catch(_) {}
+        }
     }
 }
 
