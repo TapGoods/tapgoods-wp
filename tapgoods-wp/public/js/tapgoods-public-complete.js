@@ -28,6 +28,45 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {
         console.error('TapGoods: initLocationSelector threw', e);
     }
+
+    // Elementor integration: initialize when shortcode widget renders
+    try {
+        if (window.jQuery && window.elementorFrontend && window.elementorFrontend.hooks) {
+            jQuery(window).on('elementor/frontend/init', function () {
+                try {
+                    elementorFrontend.hooks.addAction('frontend/element_ready/shortcode.default', function ($scope) {
+                        try {
+                            const el = $scope && $scope[0] ? $scope[0].querySelector('#tg-location-select') : null;
+                            if (el) {
+                                console.log('TapGoods: Elementor shortcode rendered; initializing selector inside widget');
+                                initializeWithElement(el);
+                            }
+                        } catch (e) { /* ignore */ }
+                    });
+                    // Also listen to generic element ready
+                    elementorFrontend.hooks.addAction('frontend/element_ready/global', function ($scope) {
+                        try {
+                            const el = $scope && $scope[0] ? $scope[0].querySelector('#tg-location-select') : null;
+                            if (el) {
+                                console.log('TapGoods: Elementor global element ready; initializing selector');
+                                initializeWithElement(el);
+                            }
+                        } catch (e) { /* ignore */ }
+                    });
+                } catch (e) { /* ignore */ }
+            });
+            // Elementor popup support
+            jQuery(document).on('elementor/popup/show', function () {
+                try {
+                    const el = document.getElementById('tg-location-select');
+                    if (el) {
+                        console.log('TapGoods: Elementor popup show; initializing selector');
+                        initializeWithElement(el);
+                    }
+                } catch (e) { /* ignore */ }
+            });
+        }
+    } catch (e) { /* ignore */ }
     initCartHandlers();
     initFilterHandlers();
     window.TG.initInventoryGrid();
