@@ -99,7 +99,7 @@
     padding: 0 28px 0 0; /* espacio para la flecha */
     height: 30px;
     line-height: 30px;
-    font-size: 14px;
+    font-size: 1rem; /* match Bootstrap base size */
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;

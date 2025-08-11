@@ -231,34 +231,44 @@ function initLocationSelector(rootDoc) {
 
         if (canUseStored) {
             console.log('TapGoods: Setting stored location:', storedLocation);
-            applySelectValue(selectElement, storedLocation);
+            window.__tgProgrammaticChange = true;
+            const changed = applySelectValue(selectElement, storedLocation);
             setCookie('tg_user_location', storedLocation);
+            try { localStorage.setItem('tg_user_location', storedLocation); } catch(_){}
+            setTimeout(() => { delete window.__tgProgrammaticChange; }, 50);
         } else if (canUseDefault) {
             console.log('TapGoods: Setting default location:', defaultLoc);
-            applySelectValue(selectElement, defaultLoc);
+            window.__tgProgrammaticChange = true;
+            const changed = applySelectValue(selectElement, defaultLoc);
             setCookie('tg_user_location', defaultLoc);
             localStorage.setItem('tg_user_location', defaultLoc);
+            setTimeout(() => { delete window.__tgProgrammaticChange; }, 50);
         } else {
             // Fallback: si no hay stored/default válidos, seleccionar la primera opción con value
             const firstOption = selectElement.querySelector('option[value]:not([value=""])');
             if (firstOption) {
                 console.log('TapGoods: Falling back to first available location:', firstOption.value);
-                applySelectValue(selectElement, firstOption.value);
+                window.__tgProgrammaticChange = true;
+                const changed = applySelectValue(selectElement, firstOption.value);
                 setCookie('tg_user_location', firstOption.value);
                 localStorage.setItem('tg_user_location', firstOption.value);
+                setTimeout(() => { delete window.__tgProgrammaticChange; }, 50);
             } else {
                 console.warn('TapGoods: No valid location options available in selector');
             }
         }
 
-        selectElement.addEventListener('change', function () {
+        selectElement.addEventListener('change', function (event) {
             const selectedLocation = this.value;
             console.log('TapGoods: Location changed to:', selectedLocation);
             if (selectedLocation) {
                 setCookie('tg_user_location', selectedLocation);
                 localStorage.setItem('tg_user_location', selectedLocation);
-                console.log('TapGoods: Location saved, reloading page');
-                location.reload();
+                // Solo recargar si el evento es de usuario
+                if (event && event.isTrusted && !window.__tgProgrammaticChange) {
+                    console.log('TapGoods: Location saved, reloading page');
+                    location.reload();
+                }
             }
         });
 
@@ -269,6 +279,9 @@ function initLocationSelector(rootDoc) {
 
 function applySelectValue(selectElement, value) {
     try {
+        if (String(selectElement.value) === String(value)) {
+            return false;
+        }
         // Set the value
         selectElement.value = String(value);
         // Normalize selected attributes to reflect the current value
@@ -285,9 +298,8 @@ function applySelectValue(selectElement, value) {
         // Ensure selectedIndex is correct
         const idx = Array.from(options).findIndex(o => o.value === String(value));
         if (idx >= 0) selectElement.selectedIndex = idx;
-        // Dispatch input to update custom UIs
-        selectElement.dispatchEvent(new Event('input', { bubbles: true }));
-    } catch (e) { /* ignore */ }
+        return true;
+    } catch (e) { return false; }
 }
 
 // Attach delegated change handlers for location select in a document, and hook into iframes
@@ -305,6 +317,9 @@ function attachDelegatedLocationHandlers(doc) {
             document.cookie = 'tg_user_location=' + val + ';path=/;max-age=' + (60 * 60 * 24 * 30);
             try { localStorage.setItem('tg_user_location', String(val)); } catch(_){ }
             console.log('TapGoods: delegated change →', val);
+            // Si el evento no es de usuario o está suprimida la recarga, no recargar
+            if (e && !e.isTrusted) return;
+            if (window.__tgSuppressReload) return;
             location.href = location.href;
         }, true);
         doc.__tgDelegatedBound = true;
