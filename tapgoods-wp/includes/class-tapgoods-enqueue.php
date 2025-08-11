@@ -97,7 +97,7 @@ class Tapgoods_Enqueue {
      */
     public function enqueue_public_scripts() {
         
-        // Only enqueue on pages that use TapGoods
+        // Always enqueue on frontend to support builders like Elementor that lazy-load content
         if ($this->should_enqueue_public_scripts()) {
             
             // Enqueue complete public script
@@ -116,6 +116,7 @@ class Tapgoods_Enqueue {
                 'plugin_url' => plugin_dir_url(dirname(__FILE__))
             ));
 
+            // Add inline scripts only when shortcodes are present to avoid duplicate init
             $this->add_public_inline_scripts();
         }
     }

@@ -5,6 +5,7 @@
 
 // Initialize all public functions when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('TapGoods: DOMContentLoaded - initializing modules');
     initLocationSelector();
     initCartHandlers();
     initFilterHandlers();
@@ -22,9 +23,6 @@ document.addEventListener('DOMContentLoaded', function() {
  * Location Selector - from public/partials/tg-location-select.php:32
  */
 function initLocationSelector() {
-    if (window.__tgLocationInit) {
-        return;
-    }
     console.log('TapGoods: Initializing location selector');
 
     const maxAttempts = 30;
@@ -64,6 +62,8 @@ function initLocationSelector() {
                     }
                 });
                 observer.observe(root, { childList: true, subtree: true });
+            } else {
+                console.warn('TapGoods: MutationObserver not available or root missing');
             }
             return;
         }
@@ -88,13 +88,10 @@ function initLocationSelector() {
             location.reload();
         }, true);
         window.__tgLocationDelegated = true;
+        console.log('TapGoods: Delegated change handler attached');
     }
 
     function initializeWithElement(selectElement) {
-        if (window.__tgLocationInit) {
-            return;
-        }
-
         console.log('TapGoods: Location selector found', selectElement);
 
         const storedLocation = getCookie('tg_user_location') || localStorage.getItem('tg_user_location');
