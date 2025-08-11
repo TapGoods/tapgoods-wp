@@ -17,17 +17,19 @@ class Tapgoods_Public {
 
 	public function enqueue_styles() {
 
-		add_action( 'wp_enqueue_scripts', function() {
-			wp_enqueue_style( 'custom-css',  'custom.css', array(), $this->version, 'all' );
-		}, 15 );
+        // Load plugin public styles with absolute URLs to avoid relative-path issues on some hosts
+        add_action( 'wp_enqueue_scripts', function() {
+            wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array(), $this->version, 'all' );
+        }, 30 );
 
-		add_action( 'wp_enqueue_scripts', function() {
-			wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array( 'custom-css' ), $this->version, 'all' );
-		}, 30 );
+        add_action( 'wp_enqueue_scripts', function() {
+            wp_enqueue_style( $this->plugin_name . '-custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+        }, 50 );
 
-		add_action( 'wp_enqueue_scripts', function() {
-			wp_enqueue_style( $this->plugin_name . '-custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
-		}, 50 );
+        // Optionally include additional global styles from the plugin
+        add_action( 'wp_enqueue_scripts', function() {
+            wp_enqueue_style( $this->plugin_name . '-global-styles', plugin_dir_url( __FILE__ ) . 'css/global-styles.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+        }, 55 );
 
 
 
