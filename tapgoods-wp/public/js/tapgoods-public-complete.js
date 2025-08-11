@@ -6,11 +6,32 @@
 // Initialize all public functions when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('TapGoods: DOMContentLoaded - initializing modules');
-    initLocationSelector();
+    // Namespace to avoid global name collisions (e.g., with themes/builders)
+    window.TG = window.TG || {};
+    window.TG.initLocationSelector = initLocationSelector;
+    window.TG.initInventoryGrid = initInventoryGrid;
+    window.TG.initProductSingle = initProductSingle;
+    window.TG.initCartHandlers = initCartHandlers;
+    window.TG.initFilterHandlers = initFilterHandlers;
+    window.TG.initSearchHandlers = initSearchHandlers;
+    window.TG.initSearchResults = initSearchResults;
+    window.TG.initSignInHandlers = initSignInHandlers;
+    window.TG.initSignUpHandlers = initSignUpHandlers;
+    window.TG.initTagResults = initTagResults;
+    window.TG.initThankYouPage = initThankYouPage;
+
+    // Call namespaced version to ensure our implementation runs
+    console.log('TapGoods: Calling TG.initLocationSelector');
+    try {
+        window.TG.initLocationSelector();
+        console.log('TapGoods: TG.initLocationSelector call completed');
+    } catch (e) {
+        console.error('TapGoods: initLocationSelector threw', e);
+    }
     initCartHandlers();
     initFilterHandlers();
-    initInventoryGrid();
-    initProductSingle();
+    window.TG.initInventoryGrid();
+    window.TG.initProductSingle();
     initSearchHandlers();
     initSearchResults();
     initSignInHandlers();
@@ -22,8 +43,9 @@ document.addEventListener('DOMContentLoaded', function() {
 /**
  * Location Selector - from public/partials/tg-location-select.php:32
  */
-function initLocationSelector() {
+function initLocationSelector(rootDoc) {
     console.log('TapGoods: Initializing location selector');
+    const doc = rootDoc && rootDoc.getElementById ? rootDoc : document;
 
     const maxAttempts = 30;
     const delayMs = 100;
@@ -44,7 +66,7 @@ function initLocationSelector() {
     };
 
     const tryInitialize = () => {
-        const selectElement = document.getElementById('tg-location-select');
+        const selectElement = doc.getElementById('tg-location-select');
         if (!selectElement) {
             if (attempts < maxAttempts) {
                 attempts += 1;
@@ -52,10 +74,10 @@ function initLocationSelector() {
             }
             console.log('TapGoods: Location selector element not found after retries, attaching observer');
             // Fallback: observar el body por si el selector se inyecta dinámicamente
-            const root = document.body;
+            const root = doc.body;
             if (root && typeof MutationObserver !== 'undefined') {
                 const observer = new MutationObserver(() => {
-                    const el = document.getElementById('tg-location-select');
+                    const el = doc.getElementById('tg-location-select');
                     if (el) {
                         observer.disconnect();
                         initializeWithElement(el);
@@ -72,7 +94,7 @@ function initLocationSelector() {
 
     tryInitialize();
 
-    // Delegated change handler to survive DOM replacements
+    // Delegated change handler to survive DOM replacements (main document)
     if (!window.__tgLocationDelegated) {
         document.addEventListener('change', function (event) {
             const target = event.target;
@@ -89,6 +111,63 @@ function initLocationSelector() {
         }, true);
         window.__tgLocationDelegated = true;
         console.log('TapGoods: Delegated change handler attached');
+    }
+
+    // Also scan same-origin iframes and attach handlers
+    try {
+        const iframes = document.querySelectorAll('iframe');
+        if (iframes.length > 0) {
+            console.log('TapGoods: Scanning iframes for location selector:', iframes.length);
+        }
+        iframes.forEach((frame) => {
+            // Attach on load and immediate if already loaded
+            const attach = () => {
+                try {
+                    const idoc = frame.contentDocument || frame.contentWindow?.document;
+                    if (!idoc) return;
+                    const sel = idoc.getElementById('tg-location-select');
+                    if (sel) {
+                        console.log('TapGoods: Location selector found inside iframe');
+                        // Attach change handler within iframe doc
+                        idoc.addEventListener('change', function (event) {
+                            const t = event.target;
+                            if (!(t instanceof idoc.defaultView.Element)) return;
+                            const s = t.closest('#tg-location-select');
+                            if (!s) return;
+                            const val = s.value;
+                            if (!val) return;
+                            console.log('TapGoods: Delegated (iframe) location change to:', val);
+                            const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+                            document.cookie = `tg_user_location=${val}; expires=${expires}; path=/`;
+                            try { localStorage.setItem('tg_user_location', val); } catch (e) {}
+                            location.reload();
+                        }, true);
+                    } else {
+                        // Observe iframe doc for dynamic injection
+                        if (idoc.body && typeof MutationObserver !== 'undefined') {
+                            const obs = new MutationObserver(() => {
+                                const sel2 = idoc.getElementById('tg-location-select');
+                                if (sel2) {
+                                    obs.disconnect();
+                                    console.log('TapGoods: Iframe selector appeared, initializing');
+                                    initializeWithElement(sel2);
+                                }
+                            });
+                            obs.observe(idoc.body, { childList: true, subtree: true });
+                        }
+                    }
+                } catch (e) {
+                    // Cross-origin or access denied; ignore
+                }
+            };
+            if (frame.complete || frame.readyState === 'complete') {
+                attach();
+            } else {
+                frame.addEventListener('load', attach, { once: true });
+            }
+        });
+    } catch (e) {
+        // ignore
     }
 
     function initializeWithElement(selectElement) {
