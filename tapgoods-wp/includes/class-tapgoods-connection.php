@@ -202,8 +202,7 @@ class Tapgoods_Connection {
 			update_option('tg_last_api_key', $current_key);
 		}
 	
-		$batch_size = 50;
-		$progress = get_option('tg_last_sync_progress', array('location_id' => null, 'current_page' => 1));
+        $batch_size = 50;
 		$client = $this->get_connection();
 	
 		// Prevent concurrent syncs
@@ -227,9 +226,10 @@ class Tapgoods_Connection {
 		$existing_items = $this->get_all_existing_inventory_ids();
 		$synced_items = [];
 	
-		foreach ($location_ids as $lid) {
-			$current_page = $progress['current_page'];
-			$continue_fetching = true;
+        foreach ($location_ids as $lid) {
+            // Reiniciar paginación por cada ubicación
+            $current_page = 1;
+            $continue_fetching = true;
 	
 			while ($continue_fetching) {
 				$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
@@ -242,17 +242,16 @@ class Tapgoods_Connection {
 				$inventory = $response['collection'];
 				$total_items += count($inventory);
 	
-				foreach ($inventory as $item) {
-					$this->sync_inventory_item($item, false); // Skip assigning terms initially
-					$synced_items[] = $item['id'];
-				}
+                foreach ($inventory as $item) {
+                    $this->sync_inventory_item($item);
+                    $synced_items[] = $item['id'];
+                }
 	
 				if (count($inventory) < $batch_size) {
 					$continue_fetching = false;
-				} else {
-					$current_page++;
-					update_option('tg_last_sync_progress', array('location_id' => $lid, 'current_page' => $current_page));
-				}
+                } else {
+                    $current_page++;
+                }
 			}
 		}
 	
@@ -280,8 +279,7 @@ class Tapgoods_Connection {
 		$this->update_sync_info($start_time);
 	
 		// Unlock the process
-		delete_transient('tg_sync_lock');
-		delete_option('tg_last_sync_progress');
+        delete_transient('tg_sync_lock');
 	
 		return array('success' => true, 'message' => '');
 	}

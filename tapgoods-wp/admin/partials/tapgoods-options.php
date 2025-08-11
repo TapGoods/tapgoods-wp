@@ -49,44 +49,39 @@ if (!empty($selected_location)) {
     
     <!-- Form to select location -->
     <div class="row align-items-center">
-    <!-- First Form -->
-    <div class="col-md-6">
-        <form method="post" action="">
-            <div class="position-relative">
-                <select name="selected_location" id="selected_location" 
-                        class="form-select" 
-                        style="background-color: #E5E8E9; color: #000; border-radius: 50px; font-weight: bold; height: 2.2rem; padding: 0.35rem 2.5rem 0.35rem 1rem; border: none; appearance: none;" 
-                        onchange="this.form.submit();">
-                    <?php
-                    foreach ($locations as $location_id) {
-                        // Retrieve the location data for each ID
-                        $individual_location_data = get_option("tg_location_{$location_id}");
-                        $individual_location_data = maybe_unserialize($individual_location_data);
-                        
-                        // Get the name of the location, or use a default if not found
-                        $location_name = $individual_location_data['fullName'] ?? "Location {$location_id}";
-                        
-                        // Display both ID and name in the option
-                        echo '<option value="' . esc_attr($location_id) . '"' . selected($selected_location, $location_id, false) . '>' . esc_html("{$location_id} - {$location_name}") . '</option>';
-                    }
-                    ?>
-                </select>
+        <!-- Unified Form: select + submit in the same form to preserve current selection -->
+        <form method="post" action="" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="col-md-6">
+                <div class="position-relative">
+                    <select name="selected_location" id="selected_location" 
+                            class="form-select" 
+                            style="background-color: #E5E8E9; color: #000; border-radius: 50px; font-weight: bold; height: 2.2rem; padding: 0.35rem 2.5rem 0.35rem 1rem; border: none; appearance: none;">
+                        <?php
+                        foreach ($locations as $location_id) {
+                            // Retrieve the location data for each ID
+                            $individual_location_data = get_option("tg_location_{$location_id}");
+                            $individual_location_data = maybe_unserialize($individual_location_data);
+                            
+                            // Get the name of the location, or use a default if not found
+                            $location_name = $individual_location_data['fullName'] ?? "Location {$location_id}";
+                            
+                            // Display both ID and name in the option
+                            echo '<option value="' . esc_attr($location_id) . '"' . selected($selected_location, $location_id, false) . '>' . esc_html("{$location_id} - {$location_name}") . '</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="col col-sm-3">
+                <button type="submit" name="set_default_location" 
+                        class="btn btn-primary w-100 round" 
+                        id="tg_api_sync2">
+                    SET DEFAULT
+                </button>
             </div>
         </form>
     </div>
-
-    <!-- Second Form -->
-    <div class="col col-sm-3">
-        <form method="post" action="">
-            <input type="hidden" name="selected_location" value="<?php echo esc_attr($selected_location); ?>">
-            <button type="submit" name="set_default_location" 
-                    class="btn btn-primary w-100 round" 
-                    id="tg_api_sync2">
-                SET DEFAULT
-            </button>
-        </form>
-    </div>
-</div>
 
 
     <p>Select the inventory location that your website visitors will see.</p>

@@ -21,8 +21,9 @@ $default_location = get_option('tg_default_location'); // Default location in op
             <?php foreach ($location_ids as $location_id) : 
                 $location_data = maybe_unserialize(get_option("tg_location_{$location_id}"));
                 $location_name = $location_data['fullName'] ?? "Location {$location_id}";
+                $is_selected = selected((string)$default_location, (string)$location_id, false);
             ?>
-                <option value="<?php echo esc_attr($location_id); ?>">
+                <option value="<?php echo esc_attr($location_id); ?>" <?php echo $is_selected; ?>>
                     <?php echo esc_html("{$location_id} - {$location_name}"); ?>
                 </option>
             <?php endforeach; ?>

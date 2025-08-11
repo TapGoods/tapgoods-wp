@@ -137,7 +137,7 @@ function initTagFocus() {
  * Sync Button Functionality - from admin connection
  */
 function initSyncButton() {
-    const syncButton = document.querySelector('#sync-inventory-btn');
+    const syncButton = document.querySelector('#tg_api_sync');
     if (syncButton) {
         syncButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -149,8 +149,8 @@ function initSyncButton() {
                 // Show popup overlay
                 showSyncPopup();
                 
-                // Perform AJAX sync
-                performInventorySync();
+            // Perform AJAX sync
+            performInventorySync();
             }
         });
     }
@@ -171,6 +171,23 @@ function showSyncPopup() {
  */
 function hideSyncPopup() {
     const overlay = document.querySelector('.overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+/**
+ * Reset-to-default confirmation popup controls (used by admin/partials/tapgoods-admin-connection.php)
+ */
+function openPopup() {
+    const overlay = document.getElementById('popup');
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+}
+
+function closePopup() {
+    const overlay = document.getElementById('popup');
     if (overlay) {
         overlay.style.display = 'none';
     }
@@ -221,7 +238,7 @@ function performInventorySync() {
         }
     };
     
-    const params = 'action=sync_inventory&_ajax_nonce=' + encodeURIComponent(tg_admin_vars.nonce);
+    const params = 'action=tg_api_sync';
     xhr.send(params);
 }
 
