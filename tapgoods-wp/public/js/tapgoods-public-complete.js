@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const cartButton = $scope && $scope[0] ? $scope[0].querySelector('#tg_cart') : null;
                             if (cartButton) {
                                 console.log('TapGoods: Elementor shortcode rendered; initializing cart handlers');
-                                initCartHandlers();
+                                initCartHandlers($scope[0]);
                             }
                         } catch (e) { /* ignore */ }
                     });
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const cartButton = $scope && $scope[0] ? $scope[0].querySelector('#tg_cart') : null;
                             if (cartButton) {
                                 console.log('TapGoods: Elementor global element ready; initializing cart handlers');
-                                initCartHandlers();
+                                initCartHandlers($scope[0]);
                             }
                         } catch (e) { /* ignore */ }
                     });
@@ -389,19 +389,44 @@ function attachDelegatedLocationHandlers(doc) {
 /**
  * Cart Handlers - from public/partials/tg-cart.php:45
  */
-function initCartHandlers() {
+function initCartHandlers(context) {
+    const searchContext = context || document;
     // Update cart icon based on localStorage status
-    const fullCartIcon = document.querySelector('.full-cart-icon');
-    const emptyCartIcon = document.querySelector('.empty-cart-icon');
+    const fullCartIcon = searchContext.querySelector('.full-cart-icon');
+    const emptyCartIcon = searchContext.querySelector('.empty-cart-icon');
     const cartStatus = localStorage.getItem('cart');
-
+    
+    console.log('TapGoods: initCartHandlers - cart status:', cartStatus, 'fullCartIcon:', !!fullCartIcon, 'emptyCartIcon:', !!emptyCartIcon);
+    
+    // If cart status is null, default to empty cart
+    const isCartActive = cartStatus === '1';
+    
     if (fullCartIcon && emptyCartIcon) {
-        if (cartStatus === '1') {
+        if (isCartActive) {
             fullCartIcon.style.display = 'inline-block';
             emptyCartIcon.style.display = 'none';
+            console.log('TapGoods: Showing full cart icon');
         } else {
             fullCartIcon.style.display = 'none';
             emptyCartIcon.style.display = 'inline-block';
+            console.log('TapGoods: Showing empty cart icon');
+        }
+    } else {
+        console.warn('TapGoods: Cart icons not found in context');
+        // Fallback: try to find icons in the entire document if context search failed
+        if (searchContext !== document) {
+            const fallbackFullCart = document.querySelector('.full-cart-icon');
+            const fallbackEmptyCart = document.querySelector('.empty-cart-icon');
+            if (fallbackFullCart && fallbackEmptyCart) {
+                console.log('TapGoods: Using fallback document-wide cart icons');
+                if (isCartActive) {
+                    fallbackFullCart.style.display = 'inline-block';
+                    fallbackEmptyCart.style.display = 'none';
+                } else {
+                    fallbackFullCart.style.display = 'none';
+                    fallbackEmptyCart.style.display = 'inline-block';
+                }
+            }
         }
     }
 
