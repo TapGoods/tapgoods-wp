@@ -95,7 +95,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     } catch (e) { /* ignore */ }
+    // Initialize cart handlers with multiple attempts
+    console.log('TapGoods: Attempting to initialize cart handlers');
     initCartHandlers();
+    
+    // Additional cart initialization attempts for Elementor compatibility
+    setTimeout(() => {
+        console.log('TapGoods: Secondary cart handlers initialization attempt');
+        initCartHandlers();
+    }, 100);
+    
+    setTimeout(() => {
+        console.log('TapGoods: Tertiary cart handlers initialization attempt');
+        initCartHandlers();
+    }, 500);
+    
+    setTimeout(() => {
+        console.log('TapGoods: Final cart handlers initialization attempt');
+        initCartHandlers();
+    }, 1000);
+    
     initFilterHandlers();
     window.TG.initInventoryGrid();
     window.TG.initProductSingle();
