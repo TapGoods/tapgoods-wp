@@ -47,7 +47,7 @@ class Tapgoods_Shortcodes {
 		}
 
 		// Force enqueue of TapGoods scripts and styles when shortcode is used
-		$this->force_enqueue_assets();
+		$this->force_enqueue_assets($args[2]);
 
 		$tag     = $args[2];
 		$content = ( '' !== $args[1] ) ? $args[1] : false;
@@ -62,7 +62,7 @@ class Tapgoods_Shortcodes {
 	/**
 	 * Force enqueue of TapGoods assets when shortcode is used
 	 */
-	private function force_enqueue_assets() {
+	private function force_enqueue_assets($tag = '') {
 		// Enqueue main public styles
 		if (!wp_style_is('tapgoods-public', 'enqueued')) {
 			wp_enqueue_style(
@@ -126,6 +126,19 @@ class Tapgoods_Shortcodes {
 		$location_styles = $this->get_location_styles();
 		if (!empty($location_styles)) {
 			wp_add_inline_style('tapgoods-public', $location_styles);
+		}
+		
+		// Enqueue specific scripts based on shortcode type
+		if ($tag === 'tg-cart') {
+			if (!wp_script_is('tapgoods-cart-init', 'enqueued')) {
+				wp_enqueue_script(
+					'tapgoods-cart-init',
+					plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-cart-init.js',
+					array(),
+					TAPGOODSWP_VERSION,
+					true
+				);
+			}
 		}
 	}
 

@@ -44,18 +44,11 @@ $url = tg_get_cart_url($location);
 </button>
 
 <?php
-// Enqueue cart initialization script when this shortcode is rendered
-wp_enqueue_script(
-    'tapgoods-cart-init',
-    plugin_dir_url(dirname(dirname(__FILE__))) . 'js/tapgoods-cart-init.js',
-    array(),
-    '1.0.0',
-    true
-);
-
-// Localize script with cart URL
-wp_localize_script('tapgoods-cart-init', 'tapgoodsCartData', array(
-    'cartUrl' => $url,
-    'ajaxUrl' => admin_url('admin-ajax.php')
-));
+// Cart initialization script is enqueued via class-tapgoods-shortcodes.php
+// Cart URL data is passed via global JavaScript variable
 ?>
+<script>
+window.tapgoodsCartData = window.tapgoodsCartData || {};
+window.tapgoodsCartData.cartUrl = '<?php echo esc_js($url); ?>';
+window.tapgoodsCartData.ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+</script>
