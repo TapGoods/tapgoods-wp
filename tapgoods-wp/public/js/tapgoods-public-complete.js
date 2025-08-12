@@ -49,6 +49,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 initializeWithElement(el);
                                 try { attachDelegatedLocationHandlers(document); } catch(_) {}
                             }
+                            // Check for cart button and initialize cart handlers
+                            const cartButton = $scope && $scope[0] ? $scope[0].querySelector('#tg_cart') : null;
+                            if (cartButton) {
+                                console.log('TapGoods: Elementor shortcode rendered; initializing cart handlers');
+                                initCartHandlers();
+                            }
                         } catch (e) { /* ignore */ }
                     });
                     // Also listen to generic element ready
@@ -59,6 +65,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 console.log('TapGoods: Elementor global element ready; initializing selector');
                                 initializeWithElement(el);
                                 try { attachDelegatedLocationHandlers(document); } catch(_) {}
+                            }
+                            // Check for cart button and initialize cart handlers
+                            const cartButton = $scope && $scope[0] ? $scope[0].querySelector('#tg_cart') : null;
+                            if (cartButton) {
+                                console.log('TapGoods: Elementor global element ready; initializing cart handlers');
+                                initCartHandlers();
                             }
                         } catch (e) { /* ignore */ }
                     });
@@ -72,6 +84,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.log('TapGoods: Elementor popup show; initializing selector');
                         initializeWithElement(el);
                         try { attachDelegatedLocationHandlers(document); } catch(_) {}
+                    }
+                    // Check for cart button and initialize cart handlers in popup
+                    const cartButton = document.getElementById('tg_cart');
+                    if (cartButton) {
+                        console.log('TapGoods: Elementor popup show; initializing cart handlers');
+                        initCartHandlers();
                     }
                 } catch (e) { /* ignore */ }
             });
