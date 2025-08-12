@@ -40,8 +40,8 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 				</p>
 				<p style="color: var(--tg-blue);"><strong>Shortcode Modifiers:</strong></p>
 				<ul class="text-muted">
-					<li><strong>Filter by Categories:</strong> <code>[tapgoods-inventory category="your-slag-category"]</code></li>
-					<li><strong>Filter by Tags:</strong> <code>[tapgoods-inventory tags="your-tag"]</code></li>
+					<li><strong>Filter by Categories:</strong> <code>[tapgoods-inventory category="your-category, your-category"]</code></li>
+					<li><strong>Filter by Tags:</strong> <code>[tapgoods-inventory tags="your-tag, your-tag"]</code></li>
 					<li><strong>Hide Inventory Filters:</strong> <code>[tapgoods-inventory show_filters="false"]</code></li>
 					<li><strong>Hide Item Pricing:</strong> <code>[tapgoods-inventory show_pricing="false"]</code></li>
 					<li><strong>Combine Modifiers:</strong> <code>[tapgoods-inventory tags="Blush-Wedding" show_filters="false"]</code></li>
