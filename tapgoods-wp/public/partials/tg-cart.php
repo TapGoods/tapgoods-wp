@@ -44,60 +44,18 @@ $url = tg_get_cart_url($location);
 </button>
 
 <?php
-// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
-// Inline script removed for WordPress best practices compliance
-/*<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const fullCartIcon = document.querySelector(".full-cart-icon");
-    const emptyCartIcon = document.querySelector(".empty-cart-icon");
-    const cartStatus = localStorage.getItem("cart");
+// Enqueue cart initialization script when this shortcode is rendered
+wp_enqueue_script(
+    'tapgoods-cart-init',
+    plugin_dir_url(dirname(dirname(__FILE__))) . 'js/tapgoods-cart-init.js',
+    array(),
+    '1.0.0',
+    true
+);
 
-    const savedLocation = localStorage.getItem('tg_user_location');
-    if (savedLocation) {
-        document.cookie = `tg_user_location=${savedLocation}; path=/;`;
-    }
-
-
-    
-    // Check if cart is active (1) or empty (0)
-    if (cartStatus === "1") {
-        fullCartIcon.style.display = "inline-block";
-        emptyCartIcon.style.display = "none";
-    } else {
-        fullCartIcon.style.display = "none";
-        emptyCartIcon.style.display = "inline-block";
-    }
-});
-
-
-const savedLocation = localStorage.getItem('tg_user_location');
-
-if (savedLocation) {
-        // Enviar el valor al servidor mediante AJAX
-        fetch('<?php echo esc_url( admin_url("admin-ajax.php") ); ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                action: 'tg_set_local_storage_location', // Acción definida en PHP
-                local_storage_location: savedLocation,   // Valor de localStorage
-            }),
-        })
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.success) {
-                // Mostrar el valor en el contenedor
-                const output = document.getElementById('location-output');
-                if (output) {
-                    output.textContent = `Location ID: ${data.data}`;
-                }
-            } else {
-                console.error('Error setting location:', data.data);
-            }
-        })
-        .catch((error) => console.error('Error sending location to server:', error));
-    }
-
-</script>*/
+// Localize script with cart URL
+wp_localize_script('tapgoods-cart-init', 'tapgoodsCartData', array(
+    'cartUrl' => $url,
+    'ajaxUrl' => admin_url('admin-ajax.php')
+));
 ?>

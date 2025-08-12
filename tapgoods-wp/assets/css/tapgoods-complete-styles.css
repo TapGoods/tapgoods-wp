@@ -238,17 +238,9 @@
     align-items: center;
     gap: 6px;
     background: transparent !important;
-    border: 1px solid var(--tg-location-primary-color, #0d6efd);
+    border: none;
     color: var(--tg-location-primary-color, #0d6efd);
-}
-
-#tg_cart.tg-cart-button:hover {
-    background: var(--tg-location-primary-color, #0d6efd) !important;
-    color: white !important;
-}
-
-#tg_cart.tg-cart-button:hover .tg-primary {
-    color: white !important;
+    cursor: pointer;
 }
 
 .tg-primary { color: var(--tg-location-primary-color, #0d6efd); }
