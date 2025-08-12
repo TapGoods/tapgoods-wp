@@ -45,10 +45,5 @@ $url = tg_get_cart_url($location);
 
 <?php
 // Cart initialization script is enqueued via class-tapgoods-shortcodes.php
-// Cart URL data is passed via global JavaScript variable
+// Cart URL data is passed via wp_localize_script
 ?>
-<script>
-window.tapgoodsCartData = window.tapgoodsCartData || {};
-window.tapgoodsCartData.cartUrl = '<?php echo esc_js($url); ?>';
-window.tapgoodsCartData.ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
-</script>

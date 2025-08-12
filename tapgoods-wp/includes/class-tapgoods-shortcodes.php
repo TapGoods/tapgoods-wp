@@ -56,7 +56,22 @@ class Tapgoods_Shortcodes {
 
 		ob_start();
 		include $template;
-		return do_shortcode( shortcode_unautop( ob_get_clean() ) );
+		$output = ob_get_clean();
+		
+		// For cart shortcode, localize script with cart data after template execution
+		if ($tag === 'tg-cart' && wp_script_is('tapgoods-cart-init', 'enqueued')) {
+			// Extract cart URL from the generated HTML
+			if (preg_match('/data-target="([^"]+)"/', $output, $matches)) {
+				$cart_url = html_entity_decode($matches[1]);
+				wp_localize_script('tapgoods-cart-init', 'tapgoodsCartData', array(
+					'cartUrl' => $cart_url,
+					'ajaxUrl' => admin_url('admin-ajax.php')
+				));
+				error_log('TapGoods: Localized cart script with URL: ' . $cart_url);
+			}
+		}
+		
+		return do_shortcode( shortcode_unautop( $output ) );
 	}
 
 	/**
@@ -130,6 +145,7 @@ class Tapgoods_Shortcodes {
 		
 		// Enqueue specific scripts based on shortcode type
 		if ($tag === 'tg-cart') {
+			error_log('TapGoods: Enqueuing cart-init script for shortcode: ' . $tag);
 			if (!wp_script_is('tapgoods-cart-init', 'enqueued')) {
 				wp_enqueue_script(
 					'tapgoods-cart-init',
@@ -138,7 +154,14 @@ class Tapgoods_Shortcodes {
 					TAPGOODSWP_VERSION,
 					true
 				);
+				error_log('TapGoods: Successfully enqueued tapgoods-cart-init.js');
+			} else {
+				error_log('TapGoods: tapgoods-cart-init.js was already enqueued');
 			}
+			
+			// Set cart-specific flag to pass data later
+			global $tapgoods_cart_needs_data;
+			$tapgoods_cart_needs_data = true;
 		}
 	}
 
