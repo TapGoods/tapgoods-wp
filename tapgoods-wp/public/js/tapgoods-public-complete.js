@@ -448,23 +448,6 @@ function initCartHandlers(context) {
             }
         }
     }
-    
-    // ADD CART BUTTON CLICK HANDLER HERE
-    const cartButton = searchContext.querySelector('#tg_cart') || document.getElementById('tg_cart');
-    if (cartButton && !cartButton.hasAttribute('data-click-handler-added')) {
-        const cartUrl = cartButton.getAttribute('data-target');
-        if (cartUrl) {
-            cartButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('TapGoods: Cart button clicked, navigating to:', cartUrl);
-                window.location.href = cartUrl;
-            });
-            cartButton.setAttribute('data-click-handler-added', 'true');
-            console.log('TapGoods: Cart click handler added to button with URL:', cartUrl);
-        } else {
-            console.warn('TapGoods: Cart button found but no data-target URL');
-        }
-    }
 
     // Update cart, sign-in, and sign-up links to selected location
     const savedLocation = localStorage.getItem('tg_user_location');
