@@ -869,6 +869,8 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
     $per_page = isset($_POST['per_page_default']) ? (int) sanitize_text_field( wp_unslash( $_POST['per_page_default'] ) ) : 12;
     $paged = isset($_POST['paged']) ? (int) sanitize_text_field( wp_unslash( $_POST['paged'] ) ) : 1;
     $is_default  = isset($_POST['default']) && $_POST['default'] === 'true';
+    $show_pricing = isset($_POST['show_pricing']) ? $_POST['show_pricing'] === 'true' : true;
+    
 
     $categories = array_map(function($category) {
         return htmlspecialchars_decode($category);
@@ -942,14 +944,19 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
     if ($query->have_posts()) {
         while ($query->have_posts()) {
             $query->the_post();
-            $results[] = [
+            $result_item = [
                 'title'   => get_the_title(),
                 'excerpt' => wp_trim_words(get_the_content(), 15),
                 'url'     => get_permalink(),
                 'img_url' => get_the_post_thumbnail_url(get_the_ID(), 'medium'),
                 'tg_id'   => get_post_meta(get_the_ID(), 'tg_id', true),
-                'price'   => tg_get_single_display_price(get_the_ID()),
             ];
+            
+            if ($show_pricing) {
+                $result_item['price'] = tg_get_single_display_price(get_the_ID());
+            }
+            
+            $results[] = $result_item;
 
             // Build minimal, styled item card HTML to allow client-side direct replacement of grid only
             $tg_id    = get_post_meta(get_the_ID(), 'tg_id', true);
@@ -959,8 +966,15 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
             if (!empty($pictures) && is_array($pictures) && isset($pictures[0]['imgixUrl'])) {
                 $img_tag = Tapgoods_Public::get_img_tag($pictures[0]['imgixUrl'], '254', '150');
             }
-            $price    = tg_get_single_display_price(get_the_ID());
+            $price    = $show_pricing ? tg_get_single_display_price(get_the_ID()) : '';
             $item_url = get_permalink();
+            
+            // Add nprice=true parameter to URL when pricing is disabled
+            if (!$show_pricing) {
+                $separator = strpos($item_url, '?') !== false ? '&' : '?';
+                $item_url .= $separator . 'nprice=true';
+            }
+            
             // Build add to cart URL using current page as redirect (like original template)
             $add_url  = tg_get_product_add_to_cart_url(
                 get_the_ID(),
@@ -973,7 +987,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
                 . ( ! empty( $img_tag ) ? wp_kses( $img_tag, [ 'img' => [ 'src'=>true,'srcset'=>true,'sizes'=>true,'width'=>true,'height'=>true,'alt'=>true,'loading'=>true,'decoding'=>true,'class'=>true,'id'=>true ] ] ) : '' )
                 . '</a>'
                 . '</figure>'
-                . (! empty( $price ) ? '<div class="price mb-2">' . esc_html( $price ) . '</div>' : '')
+                . ($show_pricing && ! empty( $price ) ? '<div class="price mb-2">' . esc_html( $price ) . '</div>' : '')
                 . '<a class="d-block item-name mb-2" href="' . esc_url( $item_url ) . '"><strong>' . esc_html( get_the_title() ) . '</strong></a>'
                 . '<div class="add-to-cart">'
                 . '<input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-' . esc_attr( $tg_id ) . '">'

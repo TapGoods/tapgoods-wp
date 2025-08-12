@@ -35,6 +35,7 @@ if (isset($atts['show_pricing'])) {
 }
 
 
+
 // Get the base URL for adding items to the cart
 $base_url = tg_get_add_to_cart_url( $location_id );
 
@@ -84,6 +85,7 @@ do_action('tg_before_search_form');
         <input type="hidden" name="category" value="<?php echo esc_attr($category); ?>">
         <input type="hidden" name="tags" value="<?php echo esc_attr($atts['tags'] ?? ''); ?>">
         <input type="hidden" name="per_page_default" value="<?php echo esc_attr($tg_per_page); ?>">
+        <input type="hidden" name="show_pricing" value="<?php echo esc_attr($show_pricing ? 'true' : 'false'); ?>">
     </form>
 
     <div id="tg-results-container" class="tapgoods-results row mt-4"></div>
@@ -110,6 +112,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const locationId = "<?php echo esc_js($location_id); ?>";
     const redirectUrl = "<?php echo esc_js($current_url); ?>";
     const baseurl = "<?php echo esc_js($base_url); ?>";
+    const showPricingInput = document.querySelector('input[name="show_pricing"]');
+    const showPricingParam = showPricingInput ? showPricingInput.value === 'true' : true;
+    console.log('Show pricing input value:', showPricingInput ? showPricingInput.value : 'input not found');
+    console.log('Show pricing param:', showPricingParam);
 
     window.fetchResults = function(query, page = 1, isDefault = false) {
         const params = new URLSearchParams({
@@ -121,7 +127,9 @@ document.addEventListener("DOMContentLoaded", function () {
             per_page_default: perPage,
             paged: page,
             default: isDefault ? "true" : "false",
+            show_pricing: showPricingParam ? "true" : "false",
         });
+        console.log('AJAX params being sent:', Object.fromEntries(params));
 
         fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
             method: "POST",
@@ -192,7 +200,9 @@ document.addEventListener("DOMContentLoaded", function () {
             per_page_default: perPage,
             paged: page,
             default: isDefault ? "true" : "false",
+            show_pricing: showPricingParam ? "true" : "false",
         });
+        console.log('AJAX params being sent (local function):', Object.fromEntries(params));
 
         fetch("<?php echo esc_url(admin_url('admin-ajax.php')); ?>", {
             method: "POST",
@@ -226,16 +236,15 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         seenIds.add(item.tg_id);
-        const showPricing = <?php echo wp_json_encode( (bool) $show_pricing ); ?>;
-        console.log(showPricing);
+        console.log('Show pricing:', showPricingParam);
         let priceHtml = '';
-        if (showPricing==true){
+        if (showPricingParam == true){
             priceHtml = `<div class="price mb-2">${item.price || ''}</div>`;
             
         }
 
         const placeholder = placeholderImage; // Default placeholder image
-        const itemUrl = !showPricing 
+        const itemUrl = !showPricingParam 
         ? `${item.url}${item.url.includes('?') ? '&' : '?'}nprice=true` 
         : item.url;
 

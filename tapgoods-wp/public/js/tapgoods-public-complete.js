@@ -928,6 +928,8 @@ function initSearchHandlers() {
     const categoriesField = document.querySelector('input[name="category"]');
     const perPageField = document.querySelector('input[name="per_page_default"]');
     const perPage = perPageField ? perPageField.value : 12;
+    const showPricingField = document.querySelector('input[name="show_pricing"]');
+    const showPricing = showPricingField ? showPricingField.value === 'true' : true;
     
     // Prevent Enter submit
     searchInput.addEventListener('keydown', function (event) {
@@ -961,8 +963,10 @@ function initSearchHandlers() {
             per_page_default: perPage,
             paged: page,
             default: isDefault ? 'true' : 'false',
-            redirect_url: window.location.href
+            redirect_url: window.location.href,
+            show_pricing: showPricing ? 'true' : 'false'
         });
+        console.log('TapGoods: Search request with show_pricing:', showPricing);
         
         fetch(tg_public_vars.ajaxurl, {
             method: 'POST',
@@ -988,7 +992,7 @@ function initSearchHandlers() {
                     // keep processing so pagination renders
                     inventoryGrid = updatedGrid;
                 } else if (Array.isArray(data.data.results)) {
-                    inventoryGrid.innerHTML = buildInventoryGridHtml(data.data.results);
+                    inventoryGrid.innerHTML = buildInventoryGridHtml(data.data.results, showPricing);
                 }
                 setupInventoryCartButtons(inventoryGrid, locationId);
             }
@@ -1095,14 +1099,21 @@ function initSearchHandlers() {
 }
 
 // Build inventory grid cards from results array
-function buildInventoryGridHtml(items) {
+function buildInventoryGridHtml(items, showPricing = true) {
     if (!items || items.length === 0) {
         return '<p>No items found.</p>';
     }
     let html = '';
     items.forEach((item) => {
-        const priceHtml = item.price ? `<div class="price mb-2">${item.price}</div>` : '';
-        const itemUrl = item.url || '#';
+        const priceHtml = (showPricing && item.price) ? `<div class="price mb-2">${item.price}</div>` : '';
+        let itemUrl = item.url || '#';
+        
+        // Add nprice=true parameter if pricing is disabled
+        if (!showPricing) {
+            const separator = itemUrl.includes('?') ? '&' : '?';
+            itemUrl += `${separator}nprice=true`;
+        }
+        
         const imgUrl = item.img_url || (tg_public_vars && tg_public_vars.plugin_url ? tg_public_vars.plugin_url + 'public/partials/assets/img/placeholder.png' : '');
         html += `
         <div id="tg-item-${item.tg_id}" class="col item">
