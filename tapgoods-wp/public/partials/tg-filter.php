@@ -25,30 +25,48 @@ $today       = wp_date( $date_format );
 	</div>
 </div>
 <?php do_action( 'tg_after_date_filter' ); ?>
+
+<?php
+$is_mobile        = wp_is_mobile();
+$button_classes   = 'accordion-button' . ( $is_mobile ? ' collapsed' : '' );
+$aria_expanded    = $is_mobile ? 'false' : 'true';
+$collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' );
+?>
+
 <div class="categories">
 	<div class="accordion">
 		<div class="accordion-item">
 			<h2 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                    <?php 
-                        $categories_text = apply_filters( 'tg_categories_header_text', 'Categories' ); 
-                        echo esc_html( $categories_text ); 
-                    ?>
+				<button
+					class="<?php echo esc_attr( $button_classes ); ?>"
+					type="button"
+					data-bs-toggle="collapse"
+					data-bs-target="#collapseOne"
+					aria-expanded="<?php echo esc_attr( $aria_expanded ); ?>"
+					aria-controls="collapseOne"
+				>
+					<?php
+					$categories_text = apply_filters( 'tg_categories_header_text', 'Categories' );
+					echo esc_html( $categories_text );
+					?>
 				</button>
 			</h2>
-            <div id="collapseOne" class="accordion-collapse collapse show category-links">
-                <a class="category-link" href="#" data-category-id="">
-                    <?php esc_html_e( 'All Categories', 'tapgoods' ); ?>
-                </a>
+
+			<div id="collapseOne" class="<?php echo esc_attr( $collapse_classes ); ?> category-links">
+				<a class="category-link" href="#" data-category-id="">
+					<?php esc_html_e( 'All Categories', 'tapgoods' ); ?>
+				</a>
+
 				<?php foreach ( $categories as $category ) : ?>
 					<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
-					<?php echo esc_html( $category->name ); ?>
+						<?php echo esc_html( $category->name ); ?>
 					</a>
 				<?php endforeach; ?>
 			</div>
 		</div>
 	</div>
 </div>
+
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
 

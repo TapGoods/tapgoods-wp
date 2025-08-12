@@ -922,7 +922,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
 
     $results = [];
     // Include row wrapper to preserve exact structure used by templates
-    $row_open  = '<div class="tapgoods tapgoods-inventory row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">';
+    $row_open  = '<div class="tapgoods tapgoods-inventory row row-cols-2 row-cols-sm-2 row-cols-lg-3 g-3">';
     $row_close = '</div>';
     $items_html = '';
     $base_url = tg_get_add_to_cart_url( $location_id );
