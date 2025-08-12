@@ -1,119 +1,160 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
-$plugin_url = str_replace('/partials', '', plugin_dir_url(__FILE__)) . 'css/';
+
+// Debug log to verify this template is being used
+error_log('TapGoods: Tag results template loaded - tg-tag-results.php');
+
 global $wp;
 
 // Get the tag from url
 $request_uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI'])) : '';
-$segments = explode('/', $request_uri);
+$segments = explode('/', trim($request_uri, '/'));
 $tag = '';
 
-if (count($segments) > 1 && $segments[0] === 'tags') {
-    $tag = sanitize_text_field($segments[1]);
+// Find 'tags' in segments and get the next segment
+$tags_index = array_search('tags', $segments);
+if ($tags_index !== false && isset($segments[$tags_index + 1])) {
+    $tag = sanitize_text_field($segments[$tags_index + 1]);
 }
 
-// Generate shortcode with tag from url
-$shortcode = '[tapgoods-inventory per_page_default="14"';
-if (!empty($tag)) {
-    $shortcode .= ' tags="' . esc_attr($tag) . '"';
-}
-$shortcode .= ']';
-?>
+// Set up inventory display similar to tg-inventory.php
+$show_search = true;
+$show_filters = true;
+$show_pricing = 'show_pricing="true"';
+$per_page_default = 'per_page_default="14"';
+$tags_attribute = !empty($tag) ? 'tags="' . esc_attr($tag) . '"' : '';
 
-<!-- ✅ JavaScript will dynamically load CSS files -->
-<?php
-// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
-// Inline script removed for WordPress best practices compliance
-/*<script>
-document.addEventListener("DOMContentLoaded", function () {
-    function loadCSS(href) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = href;
-        link.type = "text/css";
-        link.media = "all";
-        document.head.appendChild(link);
+$tg_inventory_grid_class = $show_filters 
+    ? 'col-sm-8 col-xs-12' 
+    : 'col-sm-12 col-xs-12';
+
+// Debug log
+error_log('TapGoods: Tag results - Found tag: ' . $tag . ', Grid class: ' . $tg_inventory_grid_class);
+error_log('TapGoods: Tag results - Tags attribute: ' . $tags_attribute);
+
+// Force load TapGoods styles directly for tag pages
+// Build correct plugin URLs
+$global_styles_url = '/wp-content/plugins/tapgoods-wp/public/css/global-styles.css';
+$public_css_url = '/wp-content/plugins/tapgoods-wp/public/css/tapgoods-public.css';
+$complete_css_url = '/wp-content/plugins/tapgoods-wp/assets/css/tapgoods-complete-styles.css';
+$inline_styles_url = '/wp-content/plugins/tapgoods-wp/assets/css/tapgoods-inline-styles.css';
+$custom_css_url = '/wp-content/plugins/tapgoods-wp/public/css/tapgoods-custom.css';
+
+// Load styles that work well for tag pages (excluding tg-bootstrap.css that conflicts)
+echo '<link rel="stylesheet" href="' . esc_url($global_styles_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($public_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($complete_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($inline_styles_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($custom_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+
+// Add location-specific dynamic styles (colors, themes, etc.)
+if (function_exists('tg_location_styles')) {
+    $location_styles = tg_location_styles();
+    if (!empty($location_styles)) {
+        echo '<style type="text/css">';
+        echo wp_kses_post($location_styles);
+        echo '</style>';
     }
+}
 
-    // ✅ Dynamically load styles to avoid WordPress enqueue restrictions
-    loadCSS("<?php echo esc_url($plugin_url); ?>tapgoods-public.css?ver=0.1.0");
-    loadCSS("<?php echo esc_url($plugin_url); ?>tapgoods-custom.css?ver=0.1.0");
-    loadCSS("<?php echo esc_url($plugin_url); ?>global-styles.css?ver=0.1.0");
-});
-</script>*/
+
+// Force enqueue jQuery and main script for tag pages
+wp_enqueue_script('jquery');
+wp_enqueue_script(
+    'tapgoods-public-complete',
+    plugin_dir_url(dirname(dirname(__FILE__))) . 'public/js/tapgoods-public-complete.js',
+    array('jquery'),
+    '0.1.124-tag-inline',
+    true
+);
+
+// Localize script with necessary data
+wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
+    'ajaxurl' => admin_url('admin-ajax.php'),
+    'default_location' => get_option('tg_default_location'),
+    'plugin_url' => plugin_dir_url(dirname(dirname(__FILE__)))
+));
+
+// Print scripts immediately - this forces them to load
+wp_print_scripts('jquery');
+wp_print_scripts('tapgoods-public-complete');
 ?>
 
-<br />
+<!-- Initialize tag page functionality -->
+<script>
+console.log('TapGoods: Tag page inline script starting');
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('TapGoods: Tag page DOM ready, checking for TG namespace');
+    
+    if (typeof window.TG !== 'undefined') {
+        console.log('TapGoods: TG namespace found, initializing tag page functions');
+        
+        try {
+            // Initialize all necessary functions for tag pages
+            window.TG.initLocationSelector();
+            window.TG.initInventoryGrid();
+            window.TG.initFilterHandlers();
+            window.TG.initSearchHandlers();
+            window.TG.initCartHandlers();
+            console.log('TapGoods: Tag page initialization complete');
+        } catch (e) {
+            console.error('TapGoods: Error during tag page initialization:', e);
+        }
+    } else {
+        console.error('TapGoods: TG namespace not available');
+        
+        // Fallback: try again after a short delay
+        setTimeout(function() {
+            if (typeof window.TG !== 'undefined') {
+                console.log('TapGoods: TG namespace found on retry, initializing');
+                try {
+                    window.TG.initLocationSelector();
+                    window.TG.initInventoryGrid();
+                    window.TG.initFilterHandlers();
+                    window.TG.initSearchHandlers();
+                    window.TG.initCartHandlers();
+                    console.log('TapGoods: Tag page initialization complete (retry)');
+                } catch (e) {
+                    console.error('TapGoods: Error during tag page retry initialization:', e);
+                }
+            } else {
+                console.error('TapGoods: TG namespace still not available after retry');
+            }
+        }, 500);
+    }
+});
+</script>
+
 <div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
+    <?php if ( false !== $show_search ) : ?>
+        <?php
+        echo do_shortcode( 
+            '[tapgoods-search nos="true" ' . esc_attr($show_pricing) . ' ' . 
+            esc_attr($tags_attribute) . ' ' . 
+            esc_attr($per_page_default) . ']' 
+        ); 
+        ?>
+    <?php endif; ?>
     <div class="container shop">
         <div class="row align-items-start">
-            <section class="col-sm-12 col-xs-12" id="tg-inventory-grid-container">
+            <?php if ( false !== $show_filters ) : ?>
+                <?php echo do_shortcode('[tapgoods-filter]'); ?>
+            <?php endif; ?>
+            <section class="<?php echo esc_attr( $tg_inventory_grid_class ); ?>" id="tg-inventory-grid-container">
                 <div id="tg-inventory-grid">
-                    <?php echo do_shortcode($shortcode); ?>
+                    <?php 
+                    echo do_shortcode( 
+                        '[tapgoods-inventory-grid ' . esc_attr($per_page_default) . ' ' . 
+                        esc_attr($show_pricing) . ' ' . 
+                        esc_attr($tags_attribute) . ']' 
+                    ); 
+                    ?>
                 </div>
             </section>
         </div>
     </div>
 </div>
 
-<?php
-// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
-// Inline script removed for WordPress best practices compliance
-/*<script>
-document.addEventListener("DOMContentLoaded", function () {
-    function handleAddToCart(event) {
-        event.preventDefault();
-
-        const button = event.currentTarget;
-        const itemId = button.getAttribute("data-item-id");
-        const container = button.closest(".tapgoods-inventory");
-        const qtyInput = container.querySelector(`#qty-${itemId}`);
-
-        if (!qtyInput) {
-            alert("Quantity input field is missing.");
-            return;
-        }
-
-        const quantityValue = qtyInput.value.trim();
-        if (!quantityValue || isNaN(quantityValue) || parseInt(quantityValue, 10) <= 0) {
-            alert("Please enter a valid quantity.");
-            return;
-        }
-
-        const quantity = parseInt(quantityValue, 10);
-
-        // 🔥 Ensure the correct redirect URL
-        const redirectUrl = encodeURIComponent(window.location.href);
-        const addToCartUrl = `https://hooli2.preprod.tapgoods.dev/addToCart?itemId=${itemId}&itemType=items&quantity=${quantity}&redirectUrl=${redirectUrl}`;
-
-        console.log("Fetching:", addToCartUrl); // Debugging: Check if the URL is correct
-
-        fetch(addToCartUrl, { 
-            method: "GET", 
-            credentials: "include", 
-            mode: "cors"
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log("Added to cart:", data);
-            button.textContent = "Added";
-            button.style.setProperty("background-color", "green", "important");
-            button.disabled = true;
-        })
-        .catch(error => console.error("Fetch error:", error));
-    }
-
-    // ✅ Ensure event listeners are not duplicated
-    document.querySelectorAll(".add-cart").forEach(button => {
-        button.removeEventListener("click", handleAddToCart); // Prevent duplicate event bindings
-        button.addEventListener("click", handleAddToCart);
-    });
-});
-</script>*/
-?>

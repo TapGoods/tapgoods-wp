@@ -3,9 +3,13 @@
  * Refactored from inline scripts to proper WordPress enqueue system
  */
 
+console.log('TapGoods: JavaScript file loaded!');
+
 // Initialize all public functions when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('TapGoods: DOMContentLoaded - initializing modules');
+    console.log('TapGoods: Current page URL:', window.location.pathname);
+    console.log('TapGoods: Is tag page:', window.location.pathname.includes('/tags/'));
     // Namespace to avoid global name collisions (e.g., with themes/builders)
     window.TG = window.TG || {};
     window.TG.initLocationSelector = initLocationSelector;
@@ -1234,10 +1238,34 @@ function initSignUpHandlers() {
  * Tag Results - from public/partials/tg-tag-results.php:24,55
  */
 function initTagResults() {
-    const tagResults = document.querySelector('.tapgoods-tag-results');
-    if (tagResults) {
-        // Tag results functionality will be populated via wp_add_inline_script
-        console.log('TapGoods: Tag results initialized');
+    console.log('TapGoods: initTagResults called');
+    console.log('TapGoods: Current URL:', window.location.pathname);
+    
+    // Check if we're on a tag page (URL contains /tags/)
+    const isTagPage = window.location.pathname.includes('/tags/');
+    const inventoryContainers = document.querySelectorAll('.tapgoods-inventory');
+    
+    console.log('TapGoods: isTagPage:', isTagPage);
+    console.log('TapGoods: inventoryContainers found:', inventoryContainers.length);
+    
+    if (isTagPage && inventoryContainers.length > 0) {
+        console.log('TapGoods: Tag page detected, initializing inventory grid functionality');
+        
+        // Tag pages use the same structure as inventory pages, so initialize the same functionality
+        console.log('TapGoods: Calling initInventoryGrid()');
+        initInventoryGrid();
+        
+        console.log('TapGoods: Calling initFilterHandlers()');
+        initFilterHandlers();
+        
+        console.log('TapGoods: Calling initSearchHandlers()');
+        initSearchHandlers();
+        
+        console.log('TapGoods: Tag results initialized with full inventory functionality');
+    } else if (inventoryContainers.length > 0) {
+        console.log('TapGoods: Generic tag results initialized');
+    } else {
+        console.log('TapGoods: No inventory containers found or not a tag page');
     }
 }
 

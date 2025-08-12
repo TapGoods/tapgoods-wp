@@ -1230,23 +1230,63 @@ add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tg_update_inventory_grid' )
 add_filter('template_include', 'tg_custom_tax_template');
 function tg_custom_tax_template($template) {
     // Check if this is a taxonomy archive page for a custom taxonomy
-    if (is_tax('tg_tags')) { // Replace 'tags' with your custom taxonomy slug
+    if (is_tax('tg_tags')) {
         // Define the correct custom template path
         $custom_template = TAPGOODS_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
 
-        // Log to debug
-//        error_log('Custom taxonomy template being checked: ' . $custom_template);
-
         // Check if the custom template file exists
         if (file_exists($custom_template)) {
-//            error_log('Custom taxonomy template found and used.');
             return $custom_template; // Return the custom template
-        } else {
-//            error_log('Custom taxonomy template NOT found.');
         }
     }
 
     return $template; // Return the default template if conditions are not met
+}
+
+// Force enqueue scripts for tag pages - using wp_head to ensure proper timing
+add_action('wp_head', 'tg_enqueue_tag_page_scripts', 1);
+function tg_enqueue_tag_page_scripts() {
+    global $wp_query;
+    
+    // Debug: Check what WordPress thinks we are
+    error_log('TapGoods: tg_enqueue_tag_page_scripts called');
+    error_log('TapGoods: is_tax(): ' . (is_tax() ? 'true' : 'false'));
+    error_log('TapGoods: is_tax(tg_tags): ' . (is_tax('tg_tags') ? 'true' : 'false'));
+    error_log('TapGoods: get_queried_object: ' . print_r(get_queried_object(), true));
+    
+    // Debug URL check
+    $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    $is_tag_url = strpos($request_uri, '/tags/') !== false;
+    error_log('TapGoods: REQUEST_URI: ' . $request_uri);
+    error_log('TapGoods: is_tag_url: ' . ($is_tag_url ? 'true' : 'false'));
+    
+    // Check multiple conditions to catch tag pages
+    if (is_tax('tg_tags') || 
+        (is_tax() && isset($wp_query->queried_object->taxonomy) && $wp_query->queried_object->taxonomy === 'tg_tags') ||
+        $is_tag_url) {
+        
+        error_log('TapGoods: Tag page detected, enqueuing scripts');
+        
+        // Enqueue main JavaScript file
+        wp_enqueue_script(
+            'tapgoods-public-complete',
+            plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-complete.js',
+            array('jquery'),
+            '0.1.124-tag-fix',
+            true
+        );
+        
+        // Localize script with necessary data
+        wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'default_location' => get_option('tg_default_location'),
+            'plugin_url' => plugin_dir_url(dirname(__FILE__))
+        ));
+        
+        error_log('TapGoods: Scripts enqueued for tag page');
+    } else {
+        error_log('TapGoods: Not a tag page, skipping script enqueue');
+    }
 }
 
 

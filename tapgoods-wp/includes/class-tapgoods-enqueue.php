@@ -97,8 +97,22 @@ class Tapgoods_Enqueue {
      */
     public function enqueue_public_scripts() {
         
+        // Debug: Log enqueue attempts
+        error_log('TapGoods: enqueue_public_scripts called');
+        error_log('TapGoods: is_tax(tg_tags): ' . (is_tax('tg_tags') ? 'true' : 'false'));
+        error_log('TapGoods: should_enqueue_public_scripts(): ' . ($this->should_enqueue_public_scripts() ? 'true' : 'false'));
+        
         // Always enqueue on frontend to support builders like Elementor that lazy-load content
         if ($this->should_enqueue_public_scripts()) {
+            
+            // Enqueue global styles first (contains Inter font definitions)
+            wp_enqueue_style(
+                'tapgoods-global-styles',
+                plugin_dir_url(dirname(__FILE__)) . 'public/css/global-styles.css',
+                array(),
+                TAPGOODSWP_VERSION,
+                'all'
+            );
             
             // Enqueue complete public script
             wp_enqueue_script(
