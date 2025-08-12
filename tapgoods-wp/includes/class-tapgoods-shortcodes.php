@@ -59,7 +59,7 @@ class Tapgoods_Shortcodes {
 		$output = ob_get_clean();
 		
 		// For cart shortcode, localize script with cart data after template execution
-		if ($tag === 'tg-cart' && wp_script_is('tapgoods-cart-init', 'enqueued')) {
+		if ($tag === 'tapgoods-cart' && wp_script_is('tapgoods-cart-init', 'enqueued')) {
 			// Extract cart URL from the generated HTML
 			if (preg_match('/data-target="([^"]+)"/', $output, $matches)) {
 				$cart_url = html_entity_decode($matches[1]);
@@ -144,7 +144,7 @@ class Tapgoods_Shortcodes {
 		}
 		
 		// Enqueue specific scripts based on shortcode type
-		if ($tag === 'tg-cart') {
+		if ($tag === 'tapgoods-cart') {
 			error_log('TapGoods: Enqueuing cart-init script for shortcode: ' . $tag);
 			if (!wp_script_is('tapgoods-cart-init', 'enqueued')) {
 				wp_enqueue_script(
