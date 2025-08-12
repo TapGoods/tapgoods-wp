@@ -4,7 +4,7 @@
  * Plugin Name:       TapGoods Rental Inventory
  * Plugin URI:        https://github.com/TapGoods/tapgoods_wp-plugin
  * Description:       WordPress integration for TapGoods
- * Version:           0.1.133
+ * Version:           0.1.134
  * Requires at least: 5.2
  * Requires PHP:      7.2
  * Author:            Aaron Valiente <aaron.valiente@tapgoods.com>
