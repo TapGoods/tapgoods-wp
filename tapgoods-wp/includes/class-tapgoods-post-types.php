@@ -617,7 +617,7 @@ class Tapgoods_Post_Types {
 					) : false,
 					'capability_type'     => 'post',
 					'capabilities' => array(
-						'create_posts' => 'edit_posts',
+						'create_posts' => 'do_not_allow',
 						'edit_posts' => 'edit_posts',
 						'edit_others_posts' => 'edit_posts',
 						'publish_posts' => 'edit_posts',
