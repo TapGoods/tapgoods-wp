@@ -766,6 +766,9 @@ function initProductSingle() {
     
     // Setup add to cart functionality
     setupAddToCartButton(addButton, quantityInput, itemId, locationId);
+    
+    // Initialize image carousel functionality
+    initImageCarousel();
 }
 
 /**
@@ -1278,4 +1281,115 @@ function initThankYouPage() {
         // Thank you page functionality will be populated via wp_add_inline_script
         console.log('TapGoods: Thank you page initialized');
     }
+}
+
+/**
+ * Image Carousel - Initialize Bootstrap carousel with thumbnail navigation
+ */
+function initImageCarousel() {
+    console.log('TapGoods: initImageCarousel called');
+    
+    // Try to find carousel element with retry logic
+    function findCarouselElement(retries = 0) {
+        const carouselElement = document.querySelector('#tg-carousel');
+        if (!carouselElement && retries < 3) {
+            console.log('TapGoods: Carousel element not found, retrying in 100ms (attempt ' + (retries + 1) + ')');
+            setTimeout(() => findCarouselElement(retries + 1), 100);
+            return;
+        }
+        
+        if (!carouselElement) {
+            console.log('TapGoods: No image carousel found on this page after retries');
+            return;
+        }
+        
+        console.log('TapGoods: Found carousel element, initializing');
+        setupCarousel(carouselElement);
+    }
+    
+    function setupCarousel(carouselElement) {
+        let carousel;
+        
+        // Function to update active thumbnail
+        function updateActiveThumbnail(index) {
+            const thumbnails = document.querySelectorAll('.thumbnail-btn');
+            console.log('TapGoods: Updating active thumbnail to index:', index, 'Found thumbnails:', thumbnails.length);
+            thumbnails.forEach(thumb => thumb.classList.remove('active'));
+            const activeThumb = document.querySelector('.thumbnail-btn[data-cindex="' + index + '"]');
+            if (activeThumb) {
+                activeThumb.classList.add('active');
+                console.log('TapGoods: Set active thumbnail for index:', index);
+            }
+        }
+        
+        // Function to initialize carousel events
+        function initCarouselEvents(element) {
+            element.addEventListener('slide.bs.carousel', function (event) {
+                console.log('TapGoods: Carousel sliding to index:', event.to);
+                updateActiveThumbnail(event.to);
+            });
+        }
+        
+        // Function to setup thumbnail click handlers
+        function setupThumbnailHandlers() {
+            const thumbnailButtons = document.querySelectorAll('.thumbnail-btn');
+            console.log('TapGoods: Setting up thumbnail handlers for', thumbnailButtons.length, 'buttons');
+            
+            thumbnailButtons.forEach(function(button, index) {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetIndex = parseInt(this.getAttribute('data-cindex'));
+                    console.log('TapGoods: Thumbnail clicked - button index:', index, 'target index:', targetIndex);
+                    
+                    if (!isNaN(targetIndex)) {
+                        // Update active state immediately
+                        updateActiveThumbnail(targetIndex);
+                        
+                        // Navigate to image if carousel is ready
+                        if (carousel) {
+                            console.log('TapGoods: Navigating carousel to index:', targetIndex);
+                            carousel.to(targetIndex);
+                        } else {
+                            console.error('TapGoods: Carousel not initialized yet');
+                        }
+                    } else {
+                        console.error('TapGoods: Invalid thumbnail index:', targetIndex);
+                    }
+                });
+            });
+        }
+        
+        // Initialize carousel based on Bootstrap availability
+        function initBootstrapCarousel() {
+            if (typeof bootstrap !== 'undefined') {
+                carousel = new bootstrap.Carousel(carouselElement);
+                initCarouselEvents(carouselElement);
+                setupThumbnailHandlers();
+                console.log('TapGoods: Carousel initialized with existing Bootstrap');
+            } else {
+                // Load Bootstrap if not available
+                console.log('TapGoods: Bootstrap not found, loading...');
+                const script = document.createElement('script');
+                script.src = (tg_public_vars?.plugin_url || '') + 'assets/js/bootstrap.bundle.min.js';
+                script.onload = function () {
+                    carousel = new bootstrap.Carousel(carouselElement);
+                    initCarouselEvents(carouselElement);
+                    setupThumbnailHandlers();
+                    console.log('TapGoods: Carousel initialized after loading Bootstrap');
+                };
+                script.onerror = function() {
+                    console.error('TapGoods: Failed to load Bootstrap');
+                    // Fallback: setup thumbnail handlers anyway
+                    setupThumbnailHandlers();
+                };
+                document.head.appendChild(script);
+            }
+        }
+        
+        // Start initialization
+        initBootstrapCarousel();
+    }
+    
+    // Start the process
+    findCarouselElement();
 }
