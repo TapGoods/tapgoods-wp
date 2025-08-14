@@ -98,9 +98,9 @@ class Tapgoods {
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
-		add_action( 'parse_request', 'tg_parse_request', 10, 1 );
-		add_action( 'parse_request', 'tg_empty_cart', 20, 1 );
-		add_filter( 'query_vars', 'tg_custom_query_vars' );
+		add_action( 'parse_request', 'tapgrein_parse_request', 10, 1 );
+		add_action( 'parse_request', 'tapgrein_empty_cart', 20, 1 );
+		add_filter( 'query_vars', 'tapgrein_custom_query_vars' );
 
 		$this->loader->add_action( 'wp_ajax_tapgoods_search', $plugin_public, 'tapgoods_search', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_nopriv_tapgoods_search', $plugin_public, 'tapgoods_search', 10, 1 );
@@ -143,7 +143,7 @@ class Tapgoods {
 	}
 
 	public function tapgoods_cron_exec() {
-		tg_write_log( 'tapgoods_cron_exec running at: ' . current_time( 'mysql' ) );
+		tapgrein_write_log( 'tapgoods_cron_exec running at: ' . current_time( 'mysql' ) );
 
 		if ( '1' === get_option( 'tg_api_connected', 0 ) ) {
 			$connection = Tapgoods_Connection::get_instance();

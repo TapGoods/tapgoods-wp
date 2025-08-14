@@ -49,14 +49,13 @@ echo '<link rel="stylesheet" href="' . esc_url($inline_styles_url) . '?v=0.1.124
 echo '<link rel="stylesheet" href="' . esc_url($custom_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
 
 // Add location-specific dynamic styles (colors, themes, etc.)
-if (function_exists('tg_location_styles')) {
-    $location_styles = tg_location_styles();
-    if (!empty($location_styles)) {
-        echo '<style type="text/css">';
-        echo wp_kses_post($location_styles);
-        echo '</style>';
-    }
+$location_styles = tapgrein_location_styles();
+if (!empty($location_styles)) {
+    echo '<style type="text/css">';
+    echo wp_kses_post($location_styles);
+    echo '</style>';
 }
+
 
 
 // Force enqueue jQuery and main script for tag pages

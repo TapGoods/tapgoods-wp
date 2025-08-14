@@ -12,7 +12,7 @@ class Tapgoods_Helpers {
 	}
 	public static function tgqm( $data ) {
 		if ( defined( 'TAPGOODS_DEV' ) && TAPGOODS_DEV ) {
-			do_action( 'qm/debug', $data );
+			//do_action( 'qm/debug', $data );
 		}
 	}
 

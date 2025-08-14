@@ -6,7 +6,7 @@ global $post;
 
 
 $product_post_id = ( isset( $atts['id'] ) ) ? $atts['id'] : $post->ID;
-$dimensions = tg_get_product_dimensions( $product_post_id );
+$dimensions = tapgrein_get_product_dimensions( $product_post_id );
 
 ?>
 <?php if ( is_array( $dimensions ) && count( $dimensions ) > 0 ) : ?>

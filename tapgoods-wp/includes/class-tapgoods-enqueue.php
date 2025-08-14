@@ -537,8 +537,8 @@ class Tapgoods_Enqueue {
      * Get location styles
      */
     private function get_location_styles() {
-        if (function_exists('tg_location_styles')) {
-            return tg_location_styles();
+        if (function_exists('tapgrein_location_styles')) {
+            return tapgrein_location_styles();
         }
         return '';
     }

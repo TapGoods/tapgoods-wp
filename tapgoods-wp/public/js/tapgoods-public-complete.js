@@ -462,7 +462,7 @@ function initCartHandlers(context) {
     // Update cart button href using data-target base and event params already in PHP
     const cartButton = document.getElementById('tg_cart');
     if (cartButton) {
-        // data-target comes from PHP using tg_get_cart_url($location)
+        // data-target comes from PHP using tapgrein_get_cart_url($location)
         const baseUrl = cartButton.getAttribute('data-target');
         if (baseUrl && savedLocation) {
             // keep as-is, PHP already builds correct URL using cookie

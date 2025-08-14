@@ -327,7 +327,7 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 	public function default_product_fields() {
 		return apply_filters(
-			'tg_default_product_fields',
+			'tapgrein_default_product_fields',
 			array(
 				'active',
 				'categoryId',
@@ -594,8 +594,8 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 	public function tgdev_login_admin() {
 		$endpoint = 'api/admin_auth/sign_in';
 
-		$user = getenv_docker( 'admin_user', false );
-		$pass = getenv_docker( 'admin_pass', false );
+		$user = tapgrein_getenv_docker( 'admin_user', false );
+		$pass = tapgrein_getenv_docker( 'admin_pass', false );
 		if ( false === $user || false === $pass ) {
 			return false;
 		}
@@ -652,8 +652,8 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 		$endpoint = 'api/auth/sign_in';
 
-		$user = getenv_docker( 'location_user', false );
-		$pass = getenv_docker( 'location_pass', false );
+		$user = tapgrein_getenv_docker( 'location_user', false );
+		$pass = tapgrein_getenv_docker( 'location_pass', false );
 		if ( false === $user || false === $pass ) {
 			return false;
 		}

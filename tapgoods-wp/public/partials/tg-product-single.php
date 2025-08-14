@@ -28,9 +28,9 @@ $tg_id = get_post_meta($post->ID, 'tg_id', true);
 $local_storage_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field(wp_unslash($_COOKIE['tg_user_location'])) : null;
 
 // Use the default location if no value is present
-$location_id = $local_storage_location ?: tg_get_wp_location_id();
+$location_id = $local_storage_location ?: tapgrein_get_wp_location_id();
 
-$date_format = tg_date_format();
+$date_format = tapgrein_date_format();
 $today       = wp_date($date_format);
 
 global $wp;
@@ -43,7 +43,7 @@ if (!empty($_SERVER['QUERY_STRING'])) {
 }
 
 // Get the base URL without adding the redirectUrl parameter
-$base_cart_url = tg_get_product_add_to_cart_url($post->ID);
+$base_cart_url = tapgrein_get_product_add_to_cart_url($post->ID);
 
 // Build the full URL by manually adding the redirectUrl parameter
 $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
@@ -65,7 +65,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                 <!-- Only show pricing if `nprice` is not present in the URL -->
                 <?php if (!$hide_price) : ?>
                     <div class="pricing">
-                        <?php $prices = tg_get_prices($post->ID); ?>
+                        <?php $prices = tapgrein_get_prices($post->ID); ?>
                         <?php foreach ($prices as $price_arr) : ?>
                             <span><?php echo '$' . wp_kses(current($price_arr), 'post'); ?></span>
                             <span><?php echo ' / ' . wp_kses(array_key_first($price_arr), 'post'); ?></span>
@@ -93,13 +93,13 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                     <div id="tg-dates-selector" class="dates-selector">
                         <div class="date-input-wrapper order-start">
                             <label><?php esc_html_e('Order Start', 'tapgoods'); ?></label>
-                            <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_start_date()); ?>" min="<?php echo esc_attr($today); ?>">
-                            <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_start_time()); ?>">
+                            <input type="date" name="eventStartDate" class="date-input form-control" value="<?php echo esc_attr(tapgrein_get_start_date()); ?>" min="<?php echo esc_attr($today); ?>">
+                            <input name="eventStartTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tapgrein_get_start_time()); ?>">
                         </div>
                         <div class="date-input-wrapper order-end">
                             <label><?php esc_html_e('Order End', 'tapgoods'); ?></label>
-                            <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr(tg_get_end_date()); ?>" min="<?php echo esc_attr($today); ?>">
-                            <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tg_get_end_time()); ?>">
+                            <input type="date" name="eventEndDate" class="date-input form-control" value="<?php echo esc_attr(tapgrein_get_end_date()); ?>" min="<?php echo esc_attr($today); ?>">
+                            <input name="eventEndTime" type="time" class="time-input form-control" value="<?php echo esc_attr(tapgrein_get_end_time()); ?>">
                         </div>
                     </div>
                 </div> -->

@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 // Generate location styles when needed
 if (!defined('DOING_AJAX') || !DOING_AJAX) {
     echo '<style>';
-    echo wp_kses_post( tg_location_styles() );
+    echo wp_kses_post( tapgrein_location_styles() );
     echo '</style>';
 }
 
@@ -45,19 +45,19 @@ $selected_location = $cookie_location !== '' ? $cookie_location : $default_locat
 add_action('wp_ajax_set_default_location', 'tg_set_default_location');
 add_action('wp_ajax_nopriv_set_default_location', 'tg_set_default_location');
 
-if (!function_exists('tg_set_default_location')) {
-    function tg_set_default_location() {
+
+function tg_set_default_location() {
 //        error_log("AJAX action 'set_default_location' triggered.");
-        if (isset($_POST['location_id'])) {
-            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : '';
+    if (isset($_POST['location_id'])) {
+        $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : '';
 
 //            error_log("Received location_id: $location_id");
-            wp_send_json_success("Location set to $location_id");
-        } else {
+        wp_send_json_success("Location set to $location_id");
+    } else {
 //            error_log("No location_id provided.");
-            wp_send_json_error('Location ID not provided.');
-        }
-        wp_die();
+        wp_send_json_error('Location ID not provided.');
     }
+    wp_die();
 }
+
 ?>

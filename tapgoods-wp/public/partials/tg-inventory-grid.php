@@ -39,7 +39,7 @@ $local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_te
 
 // Check the cookie 'tg_user_location'
 $cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
-$location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+$location_id = $cookie_location ?: ($local_storage_location ?: tapgrein_get_wp_location_id());
 
 // Location detection completed
 
@@ -127,13 +127,13 @@ $tg_pages = $query->max_num_pages;
 
         $product_id = get_the_ID();
         $tg_id      = get_post_meta($product_id, 'tg_id', true);
-        $price      = tg_get_single_display_price($product_id);
+        $price      = tapgrein_get_single_display_price($product_id);
 
         $url_params = array(
             'redirectUrl' => $current_url,
         );
 
-        $add_cart_url = tg_get_product_add_to_cart_url($product_id, $url_params);
+        $add_cart_url = tapgrein_get_product_add_to_cart_url($product_id, $url_params);
 
         $pictures = get_post_meta(get_the_ID(), 'tg_pictures', true);
 

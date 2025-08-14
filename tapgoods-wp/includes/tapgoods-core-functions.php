@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $name  Constant name.
  * @param mixed  $value Value.
  */
-function tg_maybe_define_constant( $name, $value ) {
+function tapgrein_maybe_define_constant( $name, $value ) {
 	if ( ! defined( $name ) ) {
 		define( $name, $value );
 	}
@@ -40,7 +40,7 @@ function tg_maybe_define_constant( $name, $value ) {
  * @since  0.1.0
  * @return array
  */
-function tg_get_permalink_structure() {
+function tapgrein_get_permalink_structure() {
 	$tg_permalinks = get_option( 'tapgoods_permalinks', array() );
 
 	$permalinks = wp_parse_args(
@@ -67,9 +67,9 @@ function tg_get_permalink_structure() {
 	return $permalinks;
 }
 
-function tg_fix_inventory_rewrite( $rules ) {
+function tapgrein_fix_inventory_rewrite( $rules ) {
 	global $wp_rewrite;
-	$permalinks = tg_get_permalink_structure();
+	$permalinks = tapgrein_get_permalink_structure();
 
 	Tapgoods_Helpers::tgqm( $permalinks );
 
@@ -110,22 +110,22 @@ function tg_fix_inventory_rewrite( $rules ) {
 	$new = array();
 	return $rules;
 }
-add_filter( 'rewrite_rules_array', 'tg_fix_inventory_rewrite' );
+add_filter( 'rewrite_rules_array', 'tapgrein_fix_inventory_rewrite' );
 
-function tg_empty_cart_rewrite() {
+function tapgrein_empty_cart_rewrite() {
 	add_rewrite_tag( '%empty-cart%', '([^&]+)' );
 	add_rewrite_rule( '^empty-cart/([^/]*)/?', 'index.php?empty-cart=$matches[1]', 'top' );
 }
-add_filter( 'init', 'tg_empty_cart_rewrite', 10, 0 );
+add_filter( 'init', 'tapgrein_empty_cart_rewrite', 10, 0 );
 
-function tg_get_product_dimensions( $product_id ) {
+function tapgrein_get_product_dimensions( $product_id ) {
 
 	$dimensions = array();
 
-	$height = tg_get_product_height( $product_id );
-	$length = tg_get_product_length( $product_id );
-	$width  = tg_get_product_width( $product_id );
-	$weight = tg_get_product_weight( $product_id );
+	$height = tapgrein_get_product_height( $product_id );
+	$length = tapgrein_get_product_length( $product_id );
+	$width  = tapgrein_get_product_width( $product_id );
+	$weight = tapgrein_get_product_weight( $product_id );
 
 	if ( $height ) {
 		$dimensions['Height'] = $height;
@@ -146,7 +146,7 @@ function tg_get_product_dimensions( $product_id ) {
 	return $dimensions;
 }
 
-function tg_get_product_height( $product_id ) {
+function tapgrein_get_product_height( $product_id ) {
 
 	$h_feet = get_post_meta( $product_id, 'tg_heightFt', true );
 	$h_inch = get_post_meta( $product_id, 'tg_height', true );
@@ -161,7 +161,7 @@ function tg_get_product_height( $product_id ) {
 	return $h_string;
 }
 
-function tg_get_product_length( $product_id ) {
+function tapgrein_get_product_length( $product_id ) {
 	$l_feet = get_post_meta( $product_id, 'tg_lengthFt', true );
 	$l_inch = get_post_meta( $product_id, 'tg_length', true );
 
@@ -175,7 +175,7 @@ function tg_get_product_length( $product_id ) {
 	return $l_string;
 }
 
-function tg_get_product_width( $product_id ) {
+function tapgrein_get_product_width( $product_id ) {
 	$w_feet = get_post_meta( $product_id, 'tg_widthFt', true );
 	$w_inch = get_post_meta( $product_id, 'tg_width', true );
 
@@ -189,14 +189,14 @@ function tg_get_product_width( $product_id ) {
 	return $w_string;
 }
 
-function tg_get_product_weight( $product_id ) {
+function tapgrein_get_product_weight( $product_id ) {
 	$weight = get_post_meta( $product_id, 'tg_weight', true );
 
 	$weight_string = ( '' !== $weight && false !== $weight ) ? $weight . ' lbs' : false;
 	return $weight_string;
 }
 
-function tg_write_log( $data ) {
+function tapgrein_write_log( $data ) {
 	if ( true === WP_DEBUG && true === WP_DEBUG_LOG ) {
 		if ( is_array( $data ) || is_object( $data ) ) {
 //			error_log( 'tgwpdev: ' . print_r( $data, true ) );
@@ -210,9 +210,9 @@ function tg_write_log( $data ) {
 }
 
 
-function tg_parse_request( $wp ) {
+function tapgrein_parse_request( $wp ) {
 
-	// tg_write_log( $wp );
+	// tapgrein_write_log( $wp );
 
 	Tapgoods_Helpers::tgqm( $wp );
 
@@ -232,9 +232,9 @@ function tg_parse_request( $wp ) {
 		Tapgoods_Helpers::tgqm( $args );
 		Tapgoods_Helpers::tgqm( $pre_query );
 
-		// If the term is found hook tg_term_template_redirect to ensure we get to the term permalink
+		// If the term is found hook tapgrein_term_template_redirect to ensure we get to the term permalink
 		if ( count( $pre_query ) !== 0 ) {
-			add_action( 'template_redirect', 'tg_term_template_redirect' );
+			add_action( 'template_redirect', 'tapgrein_term_template_redirect' );
 			return;
 		}
 
@@ -243,20 +243,20 @@ function tg_parse_request( $wp ) {
 			'post_type' => array( 'tg_inventory', 'page', 'post' ),
 			'name'      => $slug,
 		);
-		add_action( 'template_redirect', 'tg_template_redirect' );
+		add_action( 'template_redirect', 'tapgrein_template_redirect' );
 		return;
 	}
 }
 
-function tg_custom_query_vars( $vars ) {
+function tapgrein_custom_query_vars( $vars ) {
 	$vars[] = 'empty-cart';
 	$vars[] = 'set-location';
 	$vars[] = 'active-filters';
-	// tg_write_log( $vars );
+	// tapgrein_write_log( $vars );
 	return $vars;
 }
 
-function tg_empty_cart( $wp ) {
+function tapgrein_empty_cart( $wp ) {
 
 	$empty = get_query_var( 'empty-cart', false );
 	if ( isset( $_GET['empty-cart'] ) ) {
@@ -272,7 +272,7 @@ function tg_empty_cart( $wp ) {
  * Hooked when a tg_category query is modified to check tg_inventory, Pages and Posts
  * Checks the parsed query for a permalink and redirects to the permalink if different
  */
-function tg_template_redirect() {
+function tapgrein_template_redirect() {
 	if ( ! is_singular( 'tg_inventory' ) ) {
 		return;
 	}
@@ -289,7 +289,7 @@ function tg_template_redirect() {
 	}
 }
 
-function tg_term_template_redirect() {
+function tapgrein_term_template_redirect() {
 
 	// Load wp_query to get the queried object (term) ID to get the permalink, getting permalink by term slug from $wp is unreliable
 	global $wp_query;
@@ -318,7 +318,7 @@ function tg_term_template_redirect() {
 }
 
 
-function tg_get_prices( $id = false ) {
+function tapgrein_get_prices( $id = false ) {
 	if ( false === $id ) {
 		return false;
 	}
@@ -357,8 +357,8 @@ function tg_get_prices( $id = false ) {
 	return $prices;
 }
 
-function tg_get_single_display_price( $id ) {
-	$prices = tg_get_prices( $id );
+function tapgrein_get_single_display_price( $id ) {
+	$prices = tapgrein_get_prices( $id );
 	if ( is_array( $prices ) ) {
 		$price = reset( $prices );
 		if ( false == $price ) {
@@ -369,10 +369,10 @@ function tg_get_single_display_price( $id ) {
 	}
 }
 
-function tg_get_all_categories() {
+function tapgrein_get_all_categories() {
 
 	$args = apply_filters(
-		'tg_get_all_category_args',
+		'tapgrein_get_all_category_args',
 		array(
 			'taxonomy'   => 'tg_category',
 			'hide_empty' => false,
@@ -384,7 +384,7 @@ function tg_get_all_categories() {
 	return $categories;
 }
 
-function tg_get_subcategories( $term ) {
+function tapgrein_get_subcategories( $term ) {
 	$term = get_term( $term );
 
 	if ( ! term_exists( $term ) ) {
@@ -396,7 +396,7 @@ function tg_get_subcategories( $term ) {
 
 }
 
-function tg_get_locations() {
+function tapgrein_get_locations() {
 	$args = array(
 		'taxonomy'   => 'tg_location',
 		'hide_empty' => false,
@@ -406,13 +406,13 @@ function tg_get_locations() {
 	return $locations;
 }
 
-function tg_location_styles() {
+function tapgrein_location_styles() {
     // Obtener el location_id dinámicamente, por ejemplo, desde una cookie o configuración
     $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_location_id'] ) ) : get_option('tg_default_location');
 
     // Registrar un log si no se encontró el location_id
     if ( !$location_id ) {
-        tg_write_log('No location_id found. Skipping style generation.');
+        tapgrein_write_log('No location_id found. Skipping style generation.');
         return '';
     }
 
@@ -420,7 +420,7 @@ function tg_location_styles() {
     $location_settings = get_option( 'tg_location_settings', false );
 
     if ( false === $location_settings || ! isset( $location_settings[$location_id] ) ) {
-        tg_write_log( "TG styles: no location settings found for location ID $location_id" );
+        tapgrein_write_log( "TG styles: no location settings found for location ID $location_id" );
         return '';
     }
 
@@ -434,8 +434,8 @@ function tg_location_styles() {
     $dark_secondary  = $sf_settings['darkSecondaryColor'] ?? '#9c9c9c';
 
     // Log the retrieved settings for debugging
-    tg_write_log("Generating styles for Location ID: $location_id");
-    tg_write_log("Primary Color: $primary_color, Button Style: $button_style");
+    tapgrein_write_log("Generating styles for Location ID: $location_id");
+    tapgrein_write_log("Primary Color: $primary_color, Button Style: $button_style");
 
     // Generate CSS using :root for global variables
 	ob_start(); // Start output buffering
@@ -457,13 +457,13 @@ function tg_location_styles() {
 }
 
 
-add_action('wp_head', 'tg_output_location_styles');
+add_action('wp_head', 'tapgrein_output_location_styles');
 
-function tg_output_location_styles() {
+function tapgrein_output_location_styles() {
     // Re-enabled to ensure styles load when needed
     if (!defined('DOING_AJAX') || !DOING_AJAX) {
         echo '<style>';
-        echo wp_kses_post( tg_location_styles() );
+        echo wp_kses_post( tapgrein_location_styles() );
         echo '</style>';
     }
 }
@@ -473,7 +473,7 @@ function tg_output_location_styles() {
 
 
 
-function tg_get_categories() {
+function tapgrein_get_categories() {
 	$terms = get_terms(
 		array(
 			'taxonomy'   => 'tg_category',
@@ -483,7 +483,7 @@ function tg_get_categories() {
 	return $terms;
 }
 
-function tg_get_tg_location_id( $post_id = false ) {
+function tapgrein_get_tg_location_id( $post_id = false ) {
 
 	if ( false === $post_id ) {
 		$args = array(
@@ -508,8 +508,8 @@ function tg_get_tg_location_id( $post_id = false ) {
 	return false;
 }
 
-//function tg_get_wp_location_id( $post_id = false ) {
-    function tg_get_wp_location_id() {
+//function tapgrein_get_wp_location_id( $post_id = false ) {
+    function tapgrein_get_wp_location_id() {
         // Check if the value is provided via a cookie (set by JavaScript)
         if (isset($_COOKIE['tg_user_location']) && !empty($_COOKIE['tg_user_location'])) {
             return sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) );
@@ -528,7 +528,7 @@ function tg_get_tg_location_id( $post_id = false ) {
     
     
 
-function tg_locate_template( $template = '' ) {
+function tapgrein_locate_template( $template = '' ) {
 
 	if ( empty( $template ) ) {
 		return null;
@@ -551,17 +551,17 @@ function tg_locate_template( $template = '' ) {
 	return null;
 }
 
-function tg_get_sf_url($wp_location_id) {
+function tapgrein_get_sf_url($wp_location_id) {
     $location_data = get_option('tg_location_' . $wp_location_id);
     return isset($location_data['sf_url']) ? $location_data['sf_url'] : '#';
 }
 
 
-function tg_get_sf_domain( $wp_location_id ) {
+function tapgrein_get_sf_domain( $wp_location_id ) {
 	return get_term_meta( $wp_location_id, 'tg_subdomain', true );
 }
 
-function tg_get_cart_url($wp_location_id) {
+function tapgrein_get_cart_url($wp_location_id) {
     // Get location data from tg_location_{ID} option
     $location_data = get_option('tg_location_' . $wp_location_id);
 
@@ -572,8 +572,8 @@ function tg_get_cart_url($wp_location_id) {
 
     // Constructing the URL with the event parameters
     $url = $location_data['cart_url'];
-    $event_start = tg_get_start_date() . 'T' . tg_get_start_time();
-    $event_end = tg_get_end_date() . 'T' . tg_get_end_time();
+    $event_start = tapgrein_get_start_date() . 'T' . tapgrein_get_start_time();
+    $event_end = tapgrein_get_end_date() . 'T' . tapgrein_get_end_time();
     $params = array(
         'eventStart' => $event_start,
         'eventEnd'   => $event_end,
@@ -583,18 +583,18 @@ function tg_get_cart_url($wp_location_id) {
 }
 
 
-function tg_get_sign_in_url($wp_location_id) {
+function tapgrein_get_sign_in_url($wp_location_id) {
     $location_data = get_option('tg_location_' . $wp_location_id);
     return isset($location_data['login_url']) ? $location_data['login_url'] : '#';
 }
 
-function tg_get_sign_up_url($wp_location_id) {
+function tapgrein_get_sign_up_url($wp_location_id) {
     $location_data = get_option('tg_location_' . $wp_location_id);
     return isset($location_data['signup_url']) ? $location_data['signup_url'] : '#';
 }
 
 
-function tg_get_add_to_cart_url($wp_location_id) {
+function tapgrein_get_add_to_cart_url($wp_location_id) {
     $location_data = get_option('tg_location_' . $wp_location_id);
     $url = isset($location_data['add_to_cart']) ? $location_data['add_to_cart'] : '#';
     
@@ -605,7 +605,7 @@ function tg_get_add_to_cart_url($wp_location_id) {
 }
 
 
-function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
+function tapgrein_get_product_add_to_cart_url( $product_id, $params = array() ) {
     // First, try to get the user's location from cookie/localStorage
     $user_location_id = null;
     
@@ -641,8 +641,8 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
     }
     
     // Get the base URLs using the location_id
-    $base_url = tg_get_add_to_cart_url( $location_id );
-    $cart_url = tg_get_cart_url( $location_id );
+    $base_url = tapgrein_get_add_to_cart_url( $location_id );
+    $cart_url = tapgrein_get_cart_url( $location_id );
     
     // Verify that URLs are valid
     if ( $base_url === '#' || ! $cart_url ) {
@@ -675,20 +675,20 @@ function tg_get_product_add_to_cart_url( $product_id, $params = array() ) {
 
 
 
-function tg_date_format() {
+function tapgrein_date_format() {
 	return 'Y-m-d';
 }
 
-function tg_time_format() {
+function tapgrein_time_format() {
 	return 'H:i';
 }
 
-function tg_get_page_id( $page ) {
+function tapgrein_get_page_id( $page ) {
 	$page_id = get_option( $page, false );
 	return $page_id;
 }
 
-function tg_get_start_date() {
+function tapgrein_get_start_date() {
     // Get the start date of the cookie, if it exists
     $start_date = isset($_COOKIE['tg-eventStart']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) : '';
 
@@ -702,17 +702,17 @@ function tg_get_start_date() {
 }
 
 
-function tg_get_start_time() {
-	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 10:00 AM' ) );
+function tapgrein_get_start_time() {
+	return ( isset( $_COOKIE['tg-eventStart'] ) ) ? wp_date( tapgrein_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) ) ) : wp_date( tapgrein_time_format(), strtotime( 'tomorrow 10:00 AM' ) );
 }
 
-// function tg_get_end_date() {
-// 	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_date_format(), strtotime( '+1 day' ) );
+// function tapgrein_get_end_date() {
+// 	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tapgrein_date_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tapgrein_date_format(), strtotime( '+1 day' ) );
 // }
 
-function tg_get_end_date() {
+function tapgrein_get_end_date() {
     // Get the start date
-    $start_date = tg_get_start_date();
+    $start_date = tapgrein_get_start_date();
 
     // Get the cookie expiration date, if any
     $end_date = isset($_COOKIE['tg-eventEnd']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) : '';
@@ -727,11 +727,11 @@ function tg_get_end_date() {
 }
 
 
-function tg_get_end_time() {
-	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tg_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tg_time_format(), strtotime( 'tomorrow 15:00' ) );
+function tapgrein_get_end_time() {
+	return ( isset( $_COOKIE['tg-eventEnd'] ) ) ? wp_date( tapgrein_time_format(), strtotime( sanitize_text_field( wp_unslash( $_COOKIE['tg-eventEnd'] ) ) ) ) : wp_date( tapgrein_time_format(), strtotime( 'tomorrow 15:00' ) );
 }
 
-function tg_get_user_agent() {
+function tapgrein_get_user_agent() {
 	return isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 }
 
@@ -758,7 +758,7 @@ function tapgoods_disable_gutenberg_editing() {
 add_action( 'admin_enqueue_scripts', 'tapgoods_disable_gutenberg_editing' );
 
 // Function to remove the 'Quick Edit' option from the list view
-function remove_quick_edit( $actions, $post ) {
+function tapgrein_remove_quick_edit( $actions, $post ) {
     // Check if the post type is 'tg_inventory'
     if ( $post->post_type == 'tg_inventory' ) {
         // Remove the 'Quick Edit' option
@@ -766,11 +766,11 @@ function remove_quick_edit( $actions, $post ) {
     }
     return $actions;
 }
-add_filter( 'post_row_actions', 'remove_quick_edit', 10, 2 );
+add_filter( 'post_row_actions', 'tapgrein_remove_quick_edit', 10, 2 );
 
 
 // Function to clean up duplicate items
-function tg_clean_duplicate_items() {
+function tapgrein_clean_duplicate_items() {
     // Check if the 'clean_duplicates' parameter is in the URL
     if (isset($_GET['clean_duplicates']) && $_GET['clean_duplicates'] === 'true') {
         global $wpdb;
@@ -816,7 +816,7 @@ function tg_clean_duplicate_items() {
 }
 
 // Hook to clean duplicates when the admin page loads
-add_action('admin_init', 'tg_clean_duplicate_items');
+add_action('admin_init', 'tapgrein_clean_duplicate_items');
 
 
 add_action('pre_get_posts', function($query) {
@@ -847,8 +847,8 @@ add_action('template_redirect', function () {
 
 
 // Register the AJAX handlers for logged-in and logged-out users
-add_action('wp_ajax_tg_search_grid', 'handle_tg_search');
-add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
+add_action('wp_ajax_tg_search_grid', 'tapgrein_handle_tg_search');
+add_action('wp_ajax_nopriv_tg_search_grid', 'tapgrein_handle_tg_search');
 
 /**
  * Handles the AJAX search request for tg_inventory.
@@ -859,8 +859,8 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
  */
  
 
- function handle_tg_search() {
-   // error_log("TG_SEARCH_GRID handle_tg_search called with action: " . ($_POST['action'] ?? 'NO_ACTION') . " and data: " . print_r($_POST, true));
+ function tapgrein_handle_tg_search() {
+   // error_log("TG_SEARCH_GRID tapgrein_handle_tg_search called with action: " . ($_POST['action'] ?? 'NO_ACTION') . " and data: " . print_r($_POST, true));
 
     $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field( wp_unslash( $_POST['s'] ) ) : null;
     $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field( wp_unslash( $_POST['tg_location_id'] ) ) : '';
@@ -927,7 +927,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
     $row_open  = '<div class="tapgoods tapgoods-inventory row row-cols-2 row-cols-sm-2 row-cols-lg-3 g-3">';
     $row_close = '</div>';
     $items_html = '';
-    $base_url = tg_get_add_to_cart_url( $location_id );
+    $base_url = tapgrein_get_add_to_cart_url( $location_id );
     // Build current URL for proper redirect, can be overridden by POST
     $redirect_url = null;
     if ( isset($_POST['redirect_url']) && $_POST['redirect_url'] !== '' ) {
@@ -953,7 +953,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
             ];
             
             if ($show_pricing) {
-                $result_item['price'] = tg_get_single_display_price(get_the_ID());
+                $result_item['price'] = tapgrein_get_single_display_price(get_the_ID());
             }
             
             $results[] = $result_item;
@@ -966,7 +966,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
             if (!empty($pictures) && is_array($pictures) && isset($pictures[0]['imgixUrl'])) {
                 $img_tag = Tapgoods_Public::get_img_tag($pictures[0]['imgixUrl'], '254', '150');
             }
-            $price    = $show_pricing ? tg_get_single_display_price(get_the_ID()) : '';
+            $price    = $show_pricing ? tapgrein_get_single_display_price(get_the_ID()) : '';
             $item_url = get_permalink();
             
             // Add nprice=true parameter to URL when pricing is disabled
@@ -976,7 +976,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'handle_tg_search');
             }
             
             // Build add to cart URL using current page as redirect (like original template)
-            $add_url  = tg_get_product_add_to_cart_url(
+            $add_url  = tapgrein_get_product_add_to_cart_url(
                 get_the_ID(),
                 array('redirectUrl' => $redirect_url)
             );
@@ -1090,7 +1090,7 @@ add_action('wp_ajax_load_status_tab_content', function () {
 });
 
 
-function tg_get_default_location() {
+function tapgrein_get_default_location() {
     // Check if the value is provided via AJAX
     if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
         // Sanitize and return the value from localStorage
@@ -1102,22 +1102,22 @@ function tg_get_default_location() {
     return $default_location ?: null;
 }
 
-add_action('wp_ajax_tg_get_default_location', 'tg_get_default_location_ajax');
-add_action('wp_ajax_nopriv_tg_get_default_location', 'tg_get_default_location_ajax');
+add_action('wp_ajax_tapgrein_get_default_location', 'tapgrein_get_default_location_ajax');
+add_action('wp_ajax_nopriv_tapgrein_get_default_location', 'tapgrein_get_default_location_ajax');
 
-function tg_get_default_location_ajax() {
-    // Use the tg_get_default_location function to determine the value
-    $default_location = tg_get_default_location();
+function tapgrein_get_default_location_ajax() {
+    // Use the tapgrein_get_default_location function to determine the value
+    $default_location = tapgrein_get_default_location();
 
     // Return the value as JSON
     wp_send_json_success($default_location);
     wp_die(); // Required to terminate properly
 }
 
-add_action('wp_ajax_tg_set_local_storage_location', 'tg_set_local_storage_location');
-add_action('wp_ajax_nopriv_tg_set_local_storage_location', 'tg_set_local_storage_location');
+add_action('wp_ajax_tapgrein_set_local_storage_location', 'tapgrein_set_local_storage_location');
+add_action('wp_ajax_nopriv_tapgrein_set_local_storage_location', 'tapgrein_set_local_storage_location');
 
-function tg_set_local_storage_location() {
+function tapgrein_set_local_storage_location() {
     if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
         // Optionally store in a session or other server-side variable
         $_SESSION['tg_default_location'] = isset($_POST['local_storage_location']) ? sanitize_text_field( wp_unslash( $_POST['local_storage_location'] ) ) : '';
@@ -1132,11 +1132,11 @@ function tg_set_local_storage_location() {
 
 
 
-add_action('wp_ajax_get_item_image', 'get_item_image');
-add_action('wp_ajax_nopriv_get_item_image', 'get_item_image'); // For non-logged-in users
+add_action('wp_ajax_tapgrein_get_item_image', 'tapgrein_get_item_image');
+add_action('wp_ajax_nopriv_tapgrein_get_item_image', 'tapgrein_get_item_image'); // For non-logged-in users
 
-function get_item_image() {
-//    error_log('AJAX call received in get_item_image');
+function tapgrein_get_item_image() {
+//    error_log('AJAX call received in tapgrein_get_item_image');
 //    error_log('POST Data: ' . print_r($_POST, true));
 
     if (!isset($_POST['item_id']) || empty($_POST['item_id'])) {
@@ -1168,10 +1168,10 @@ function get_item_image() {
     }
 }
 
-add_action('wp_ajax_get_image_by_item_id', 'get_image_by_item_id');
-add_action('wp_ajax_nopriv_get_image_by_item_id', 'get_image_by_item_id');
+add_action('wp_ajax_tapgrein_get_image_by_item_id', 'tapgrein_get_image_by_item_id');
+add_action('wp_ajax_nopriv_tapgrein_get_image_by_item_id', 'tapgrein_get_image_by_item_id');
 
-function get_image_by_item_id() {
+function tapgrein_get_image_by_item_id() {
     if (!isset($_POST['item_id']) || empty($_POST['item_id'])) {
         wp_send_json_error(['message' => 'Invalid item_id provided.']);
     }
@@ -1208,7 +1208,7 @@ function get_image_by_item_id() {
 }
 
 
-function tg_update_inventory_grid() {
+function tapgrein_update_inventory_grid() {
     if (isset($_POST['category'])) {
         $category = isset($_POST['category']) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';
 //        error_log("AJAX received category: " . $category);
@@ -1224,15 +1224,15 @@ function tg_update_inventory_grid() {
     }
     wp_die();
 }
-add_action( 'wp_ajax_update_inventory_grid', 'tg_update_inventory_grid' );
-add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tg_update_inventory_grid' );
+add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
+add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 
-add_filter('template_include', 'tg_custom_tax_template');
-function tg_custom_tax_template($template) {
+add_filter('template_include', 'tapgrein_custom_tax_template');
+function tapgrein_custom_tax_template($template) {
     // Check if this is a taxonomy archive page for a custom taxonomy
     if (is_tax('tg_tags')) {
         // Define the correct custom template path
-        $custom_template = TAPGOODS_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
+        $custom_template = TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
 
         // Check if the custom template file exists
         if (file_exists($custom_template)) {
@@ -1291,25 +1291,25 @@ function tg_enqueue_tag_page_scripts() {
 
 
 // Ensure Yoast SEO metabox is added to tg_inventory
-function enable_yoast_seo_for_tg_inventory() {
+function tapgrein_enable_yoast_seo_for_tg_inventory() {
     // Verificar si Yoast SEO está activo antes de habilitar el soporte
     if (defined('WPSEO_VERSION')) {
         add_post_type_support('tg_inventory', 'wpseo-meta'); // Enable Yoast SEO support
     }
 }
-add_action('init', 'enable_yoast_seo_for_tg_inventory', 20);
+add_action('init', 'tapgrein_enable_yoast_seo_for_tg_inventory', 20);
 
 // Ensure Yoast metabox is added to the post edit screen
-function force_yoast_seo_metabox_on_tg_inventory() {
+function tapgrein_force_yoast_seo_metabox_on_tg_inventory() {
     // Verificar si Yoast SEO está activo antes de agregar el metabox
     if (defined('WPSEO_VERSION') && function_exists('wpseo_meta_box')) {
         add_meta_box('wpseo_meta', __('Yoast SEO', 'tapgoods'), 'wpseo_meta_box', 'tg_inventory', 'normal', 'high');
     }
 }
-add_action('add_meta_boxes', 'force_yoast_seo_metabox_on_tg_inventory');
+add_action('add_meta_boxes', 'tapgrein_force_yoast_seo_metabox_on_tg_inventory');
 
 // Ensure Yoast SEO scripts are properly enqueued
-function enqueue_yoast_seo_assets($hook) {
+function tapgrein_enqueue_yoast_seo_assets($hook) {
     global $post;
 
     // Solo verificar que estamos en la página correcta
@@ -1322,16 +1322,16 @@ function enqueue_yoast_seo_assets($hook) {
         }
     }
 }
-add_action('admin_enqueue_scripts', 'enqueue_yoast_seo_assets');
+add_action('admin_enqueue_scripts', 'tapgrein_enqueue_yoast_seo_assets');
 
 // Ensure REST API compatibility for Yoast SEO
-function enable_rest_api_for_tg_inventory($args, $post_type) {
+function tapgrein_enable_rest_api_for_tg_inventory($args, $post_type) {
     if ('tg_inventory' === $post_type) {
         $args['show_in_rest'] = true; // Ensure the post type supports REST API
     }
     return $args;
 }
-add_filter('register_post_type_args', 'enable_rest_api_for_tg_inventory', 10, 2);
+add_filter('register_post_type_args', 'tapgrein_enable_rest_api_for_tg_inventory', 10, 2);
 
 
 // Register the cron event if it does not exist

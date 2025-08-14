@@ -35,7 +35,7 @@ class Tapgoods_Shortcodes {
 		$tag = str_replace( 'tapgoods-', 'tg-', $tag );
 		$template_name = str_replace( '_', '-', $tag );
 
-		return tg_locate_template( $template_name );
+		return tapgrein_locate_template( $template_name );
 	}
 
 	// This function receives the arguments passed to the shortcode callback and loads the PHP template from /public/partials
@@ -169,8 +169,8 @@ class Tapgoods_Shortcodes {
 	 * Get location styles
 	 */
 	private function get_location_styles() {
-		if (function_exists('tg_location_styles')) {
-			return tg_location_styles();
+		if (function_exists('tapgrein_location_styles')) {
+			return tapgrein_location_styles();
 		}
 		return '';
 	}

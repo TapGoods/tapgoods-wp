@@ -95,7 +95,7 @@ if ($query->have_posts()) {
             <?php
             $product_id = get_the_ID();
             $tg_id = get_post_meta($product_id, 'tg_id', true);
-            $price = tg_get_single_display_price($product_id);
+            $price = tapgrein_get_single_display_price($product_id);
 
             // Build the complete base URL for adding to the cart
             $add_cart_base_url = "{$add_to_cart_base}?itemId={$tg_id}&itemType=items&quantity=1&redirectUrl={$cart_url}&eventStart={$event_start_formatted}&eventEnd={$event_end_formatted}";

@@ -149,7 +149,7 @@ class Tapgoods_Post_Types {
 			'', // Menu title (empty to not display it).
 			'edit_posts', // Required capability.
 			'custom-edit-page', // Unique slug for the page.
-			array( __CLASS__, 'render_custom_edit_page' ) // Callback that renders the page.
+			array( __CLASS__, 'tapgrein_render_custom_edit_page' ) // Callback that renders the page.
 		);
 	}
 	
@@ -350,7 +350,7 @@ class Tapgoods_Post_Types {
 
 		// Register TapGoods Categories
 		do_action( 'tg_register_categories' );
-		$permalinks = tg_get_permalink_structure();
+		$permalinks = tapgrein_get_permalink_structure();
 
 		$tg_category = register_taxonomy(
 			'tg_category',
@@ -548,7 +548,7 @@ class Tapgoods_Post_Types {
 			return;
 		}
 
-		$permalinks = tg_get_permalink_structure();
+		$permalinks = tapgrein_get_permalink_structure();
 		// IMPORTANTE: Elimina 'custom-fields' de supports para ocultar esa caja gigante
 		$supports = array( 'title', 'excerpt', 'thumbnail', 'publicize', 'wpcom-markdown', 'page-attributes' );
 		// NO incluyas 'editor' aquí si quieres ocultarlo
@@ -854,18 +854,18 @@ class Tapgoods_Post_Types {
 // Function to modify the number of 'tg_inventory' items displayed per page in the admin list view
 // The number of items per page can be controlled via a URL parameter 'items_per_page', defaulting to 20 if not set.
 
-function modify_tg_inventory_items_per_page( $per_page, $post_type ) {
+function tapgrein_modify_tg_inventory_items_per_page( $per_page, $post_type ) {
     if ( 'tg_inventory' === $post_type ) {
         // Check if a parameter is passed via URL, otherwise use 20 as the default value.
         $per_page = isset( $_GET['items_per_page'] ) ? (int) $_GET['items_per_page'] : 20;
     }
     return $per_page;
 }
-add_filter( 'edit_posts_per_page', 'modify_tg_inventory_items_per_page', 10, 2 );
+add_filter( 'edit_posts_per_page', 'tapgrein_modify_tg_inventory_items_per_page', 10, 2 );
 
 // Add 'Location' column to admin table for 'tg_inventory' before 'Date' column
-add_filter('manage_tg_inventory_posts_columns', 'add_location_column_to_inventory');
-function add_location_column_to_inventory($columns) {
+add_filter('manage_tg_inventory_posts_columns', 'tapgrein_add_location_column_to_inventory');
+function tapgrein_add_location_column_to_inventory($columns) {
     $new_columns = [];
 
     // Rearrange columns and insert 'Location' before 'Date'
@@ -881,8 +881,8 @@ function add_location_column_to_inventory($columns) {
 
 
 // Fill the 'Location' column with the ID and name of the specific location of the item
-add_action('manage_tg_inventory_posts_custom_column', 'fill_location_column_in_inventory', 10, 2);
-function fill_location_column_in_inventory($column, $post_id) {
+add_action('manage_tg_inventory_posts_custom_column', 'tapgrein_fill_location_column_in_inventory', 10, 2);
+function tapgrein_fill_location_column_in_inventory($column, $post_id) {
     if ($column === 'location') {
         // Get the ID of the location associated with the current item
         $location_id = get_post_meta($post_id, 'tg_locationId', true);

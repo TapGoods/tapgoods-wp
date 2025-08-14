@@ -83,7 +83,7 @@ $reset_done = get_option('tg_reset_done');
 wp_add_inline_script('tapgoods-admin-complete', '
 document.addEventListener("DOMContentLoaded", function () {
     const statusTab = document.querySelector("#nav-status-tab");
-    const statusContent = document.querySelector("#status-content");
+    const statusContent = document.querySelector("#tapgrein-status-content");
 
     if (statusTab) {
         statusTab.addEventListener("click", function () {

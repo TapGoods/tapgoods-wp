@@ -6,11 +6,11 @@ $local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_te
 
 // Check the cookie 'tg_user_location'
 $cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
-$location = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+$location = $cookie_location ?: ($local_storage_location ?: tapgrein_get_wp_location_id());
 
 
 // Generate the sign-in URL
-$url = tg_get_sign_in_url($location);
+$url = tapgrein_get_sign_in_url($location);
 ?>
 <a href="<?php echo esc_url($url); ?>" target="_self"><?php esc_html_e('Sign In', 'tapgoods'); ?></a>
 

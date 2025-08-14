@@ -23,7 +23,7 @@ $local_storage_location = isset( $_GET['local_storage_location'] ) ? sanitize_te
 
 // Check the cookie 'tg_user_location'
 $cookie_location = isset( $_COOKIE['tg_user_location'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : null;
-$location_id = $cookie_location ?: ($local_storage_location ?: tg_get_wp_location_id());
+$location_id = $cookie_location ?: ($local_storage_location ?: tapgrein_get_wp_location_id());
 
 // Get the value of show_pricing from the shortcode attributes
 
@@ -37,7 +37,7 @@ if (isset($atts['show_pricing'])) {
 
 
 // Get the base URL for adding items to the cart
-$base_url = tg_get_add_to_cart_url( $location_id );
+$base_url = tapgrein_get_add_to_cart_url( $location_id );
 
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
-                action: "get_image_by_item_id",
+                action: "tapgrein_get_image_by_item_id",
                 item_id: itemId,
             }),
         })

@@ -3,8 +3,8 @@
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 $tg_category_filter_class = 'col-sm-4 col-xs-12 p-0 tg-filter';
 
-$categories  = tg_get_categories();
-$date_format = tg_date_format();
+$categories  = tapgrein_get_categories();
+$date_format = tapgrein_date_format();
 $today       = wp_date( $date_format );
 
 ?>
@@ -15,13 +15,13 @@ $today       = wp_date( $date_format );
 <div id="tg-dates-selector" class="dates-selector px-4"  style="display: none;">
 	<div class="date-input-wrapper order-start">
         <label><?php esc_html_e( 'Order Start', 'tapgoods' ); ?></label>
-		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tg_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
-		<input id="eventStartTime" name="eventStartTime" type="time" value="<?php echo esc_attr( tg_get_start_time() ); ?>" class="time-input form-control">
+		<input id="eventStartDate" type="date" name="eventStartDate" value="<?php echo esc_attr( tapgrein_get_start_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
+		<input id="eventStartTime" name="eventStartTime" type="time" value="<?php echo esc_attr( tapgrein_get_start_time() ); ?>" class="time-input form-control">
 	</div>
 	<div class="date-input-wrapper order-end">
         <label><?php esc_html_e( 'Order End', 'tapgoods' ); ?></label>
-		<input id="eventEndDate" type="date" name="eventEndDate" value="<?php echo esc_attr( tg_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
-		<input id="eventEndTime" name="eventEndTime" type="time" value="<?php echo esc_attr( tg_get_end_time() ); ?>" class="time-input form-control">
+		<input id="eventEndDate" type="date" name="eventEndDate" value="<?php echo esc_attr( tapgrein_get_end_date() ); ?>" min="<?php echo esc_attr( $today ); ?>" class="date-input form-control round">
+		<input id="eventEndTime" name="eventEndTime" type="time" value="<?php echo esc_attr( tapgrein_get_end_time() ); ?>" class="time-input form-control">
 	</div>
 </div>
 <?php do_action( 'tg_after_date_filter' ); ?>

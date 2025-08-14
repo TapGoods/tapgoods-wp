@@ -33,7 +33,7 @@ class Tapgoods_Connection {
 
 	private function get_connection( $configs = array() ) {
 
-		$env = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
+		$env = ( defined( 'TG_ENV' ) ) ? TG_ENV : tapgrein_getenv_docker( 'tg_env', 'tapgoods.com' );
 		// Merge the passed conigs with defaults
 		$config = array_merge(
 			array(

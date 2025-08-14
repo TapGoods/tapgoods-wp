@@ -13,7 +13,7 @@ $connected    = false;
 $button_text  = 'CONNECT';
 $dev          = defined( 'TAPGOODS_DEV' ) && true === TAPGOODS_DEV;
 $form_action  = get_admin_url() . '?page=tapgoods';
-$tg_env       = getenv_docker( 'tg_env', 'tapgoods.com' );
+$tg_env       = tapgrein_getenv_docker( 'tg_env', 'tapgoods.com' );
 
 $enable_advanced = get_option( 'tg_enable_advanced', false );
 
@@ -66,13 +66,13 @@ $enable_advanced = get_option( 'tg_enable_advanced', false );
 		<!-- <div class="tab-pane fade bg-white p-4" id="styling" role="tabpanel" aria-labelledby="nav-styling-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-styling.php'; ?>
 		</div> -->
-		<div class="tab-pane fade bg-white p-4" id="shortcodes" role="tabpanel" aria-labelledby="nav-shortcodes-tab" tabindex="0">
+		<div class="tab-pane fade bg-white p-4" id="tapgrein-shortcodes" role="tabpanel" aria-labelledby="nav-shortcodes-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-admin-shortcodes.php'; ?>
 		</div>
-		<div class="tab-pane fade bg-white p-4" id="options" role="tabpanel" aria-labelledby="nav-options-tab" tabindex="0">
+		<div class="tab-pane fade bg-white p-4" id="tapgrein-options" role="tabpanel" aria-labelledby="nav-options-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-options.php'; ?>
 		</div>
-		<div class="tab-pane fade bg-white p-4" id="status" role="tabpanel" aria-labelledby="nav-options-tab" tabindex="0">
+		<div class="tab-pane fade bg-white p-4" id="tapgrein-status" role="tabpanel" aria-labelledby="nav-options-tab" tabindex="0">
 			<?php require_once TAPGOODS_PLUGIN_PATH . '/admin/partials/tapgoods-status.php'; ?>
 		</div>
 		<?php if ( $enable_advanced ) : ?>

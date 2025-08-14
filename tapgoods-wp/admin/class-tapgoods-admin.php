@@ -182,12 +182,12 @@ class Tapgoods_Admin {
 	
 
 	private static function connection_failed() {
-		tg_write_log( 'test_connection failed' );
+		tapgrein_write_log( 'test_connection failed' );
 		update_option( 'tg_api_connected', false );
 		$args = array(
 			'type' => 'error',
 		);
-		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : getenv_docker( 'tg_env', 'tapgoods.com' );
+		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : tapgrein_getenv_docker( 'tg_env', 'tapgoods.com' );
 
 		$notice = Tapgoods_Admin::tapgoods_admin_notice( 
 			// translators: %s is replaced with the environment name (e.g., 'production', 'staging').
@@ -206,7 +206,7 @@ class Tapgoods_Admin {
 		$client   = Tapgoods_Connection::get_instance();
 		$response = $client->sync_from_api();
 
-		// tg_write_log( $response );
+		// tapgrein_write_log( $response );
 		if ( true === $response['success'] ) {
 			wp_send_json_success( $response['message'] );
 		} else {
@@ -266,7 +266,7 @@ class Tapgoods_Admin {
 		if ( isset( $_REQUEST[ $nonce_name ] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST[ $nonce_name ] ) ), $action ) ) {
 
 			// Allow saving the file even if the content is empty
-			$custom_css = ( isset( $_REQUEST['tg-custom-css'] ) ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['tg-custom-css'] ) ) : '';
+			$custom_css = ( isset( $_REQUEST['tg-tapgrein_custom-css'] ) ) ? sanitize_textarea_field( wp_unslash( $_REQUEST['tg-tapgrein_custom-css'] ) ) : '';
 		
 			// Now we save even if the content is empty
 			$success = Tapgoods_Filesystem::put_file( $input_submit, $custom_css, TAPGOODS_PLUGIN_PATH . '/public/css/tapgoods-custom.css' , $action, $nonce_name );
@@ -300,9 +300,9 @@ class Tapgoods_Admin {
 
 		add_submenu_page( $this->plugin_name, $page_title . ' Connection Settings', 'Connection', $capability, $this->plugin_name, $function, 1 );
 		// add_submenu_page( $this->plugin_name, $page_title . ' Styling Settings', 'Styling', $capability, $this->plugin_name . '#styling', $function, 2 );
-		add_submenu_page( $this->plugin_name, $page_title . ' Shortcodes', 'Shortcodes', $capability, $this->plugin_name . '#shortcodes', $function, 3 );
-	    add_submenu_page( $this->plugin_name, $page_title . ' Multi Location', 'Multi Location', $capability, $this->plugin_name . '#options', $function, 4 );
-		add_submenu_page( $this->plugin_name, $page_title . ' Status', 'Status', $capability, $this->plugin_name . '#status', $function, 5 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Shortcodes', 'Shortcodes', $capability, $this->plugin_name . '#tapgrein-shortcodes', $function, 3 );
+	    add_submenu_page( $this->plugin_name, $page_title . ' Multi Location', 'Multi Location', $capability, $this->plugin_name . '#tapgrein-options', $function, 4 );
+		add_submenu_page( $this->plugin_name, $page_title . ' Status', 'Status', $capability, $this->plugin_name . '#tapgrein-status', $function, 5 );
 	}
 
 	// Add a link to this plugin to the action links.

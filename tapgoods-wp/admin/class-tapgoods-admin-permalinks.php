@@ -55,7 +55,7 @@ class TG_Admin_Permalink_Settings {
 			'optional'
 		);
 
-		$this->permalinks = tg_get_permalink_structure();
+		$this->permalinks = tapgrein_get_permalink_structure();
 	}
 
 	public function tg_category_slug_input() {
@@ -80,7 +80,7 @@ class TG_Admin_Permalink_Settings {
 		/* translators: %s: Home URL */
 		echo wp_kses_post( wpautop( sprintf( __( 'Customize URL structures for inventory here. For example, using <code>rentals</code> would make your product links like <code>%srendtals/sample-product/</code>. This setting affects item URLs only, not item categories or tags.', 'tapgoods' ), esc_url( home_url( '/' ) ) ) ) );
 
-		$shop_page_id = tg_get_page_id( 'shop' ); // TODO implement options for setting/getting default pages
+		$shop_page_id = tapgrein_get_page_id( 'shop' ); // TODO implement options for setting/getting default pages
 
 		$base_slug      = urldecode( ( $shop_page_id > 0 && get_post( $shop_page_id ) ) ? get_page_uri( $shop_page_id ) : _x( 'shop', 'default-slug', 'tapgoods' ) );
 		$inventory_base = _x( 'products', 'default-slug', 'tapgoods' );

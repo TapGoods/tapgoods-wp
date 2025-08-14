@@ -23,7 +23,7 @@ class Tapgoods_Public {
         }, 30 );
 
         add_action( 'wp_enqueue_scripts', function() {
-            wp_enqueue_style( $this->plugin_name . '-custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+            wp_enqueue_style( $this->plugin_name . '-tapgrein_custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
         }, 50 );
 
         // Optionally include additional global styles from the plugin
@@ -33,7 +33,7 @@ class Tapgoods_Public {
 
 
 
-		$sf_styles = tg_location_styles();
+		$sf_styles = tapgrein_location_styles();
 		wp_add_inline_style( $this->plugin_name . '-public-css', $sf_styles );
 		wp_enqueue_style( 'dashicons' );
 	}
@@ -44,8 +44,8 @@ class Tapgoods_Public {
 	}
 
 	public function enqueue_scripts() { 
-		$location = tg_get_wp_location_id();
-		$cart_url = tg_get_cart_url($location);
+		$location = tapgrein_get_wp_location_id();
+		$cart_url = tapgrein_get_cart_url($location);
 	
 		// Disabled - using tapgoods-public-complete.js instead
 		// wp_enqueue_script($this->plugin_name . '-public', plugin_dir_url(__FILE__) . 'js/tapgoods-public.js', array('jquery'), $this->version, false);
@@ -71,7 +71,7 @@ class Tapgoods_Public {
 	
 	
 
-	public static function tg_locate_template( $template = '' ) {
+	public static function tapgrein_locate_template( $template = '' ) {
 
 		if ( empty( $template ) ) {
 			return;
@@ -149,7 +149,7 @@ class Tapgoods_Public {
 			return $template;
 		}
 
-		$template = tg_locate_template( 'tg-search-results' );
+		$template = tapgrein_locate_template( 'tg-search-results' );
 		return $template;
 	}
 
@@ -292,7 +292,7 @@ class Tapgoods_Public {
 			$tg_classes[] = 'product-' . $tg_id;
 		}
 
-		$location_id    = tg_get_tg_location_id();
+		$location_id    = tapgrein_get_tg_location_id();
 		$location_class = 'location-' . $location_id;
 
 		$tg_classes[] = $location_class;

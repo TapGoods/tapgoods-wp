@@ -129,8 +129,8 @@ class Tapgoods_API_Request {
 			$this->last_request_time = current_time( 'U' );
 		}
 
-		// tg_write_log( 'Remote Request: ' . $url );
-		// tg_write_log( $args );
+		// tapgrein_write_log( 'Remote Request: ' . $url );
+		// tapgrein_write_log( $args );
 
 		$response = wp_remote_request( $url, $args );
 

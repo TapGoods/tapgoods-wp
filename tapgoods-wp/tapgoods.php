@@ -35,7 +35,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 define( 'TAPGOODS_PLUGIN_FILE', __FILE__ );
 define( 'TAPGOODSWP_VERSION', '0.1.2' );
-define( 'TAPGOODS_PLUGIN_DIR',  plugin_dir_path( TAPGOODS_PLUGIN_FILE ) );
+define( 'TAPGREIN_PLUGIN_DIR',  plugin_dir_path( TAPGOODS_PLUGIN_FILE ) );
 
 
 
@@ -66,17 +66,17 @@ function tapgoods_deactivate() {
 register_activation_hook( __FILE__, 'tapgoods_activate' );
 register_deactivation_hook( __FILE__, 'tapgoods_deactivate' );
 
-function init_tapgoods_wp() {
+function tapgrein_init_tapgoods_wp() {
 
 	require_once TAPGOODS_PLUGIN_PATH . 'includes/class-tapgoods-wp.php';
 	$tapgoods = Tapgoods::get_instance();
 	$tapgoods->init();
 }
 
-add_action( 'plugins_loaded', 'init_tapgoods_wp' );
+add_action( 'plugins_loaded', 'tapgrein_init_tapgoods_wp' );
 
-if ( ! function_exists( 'getenv_docker' ) ) {
-	function getenv_docker( $env, $default ) {
+if ( ! function_exists( 'tapgrein_getenv_docker' ) ) {
+	function tapgrein_getenv_docker( $env, $default ) {
 		if ( $fileEnv = getenv( $env . '_FILE' ) ) {
 			return rtrim( file_get_contents( $fileEnv ), "\r\n" );
 		} elseif ( ( $val = getenv( $env ) ) !== false ) {

@@ -39,21 +39,21 @@
 
             // Initialize the CSS editors with debugging
             const editorList = [];
-            const tgCustomCss = $('#tg-custom-css');
+            const tgCustomCss = $('#tg-tapgrein_custom-css');
             const tgCss = $('#tg-css');
 
-            console.log('tg-custom-css element:', tgCustomCss);
+            console.log('tg-tapgrein_custom-css element:', tgCustomCss);
             console.log('tg-css element:', tgCss);
 
             if (tgCustomCss.length) {
                 try {
                     editorList.push(wp.codeEditor.initialize(tgCustomCss, tg_editor_settings));
-                    console.log('tg-custom-css editor initialized successfully.');
+                    console.log('tg-tapgrein_custom-css editor initialized successfully.');
                 } catch (error) {
-                    console.error('Error initializing tg-custom-css editor:', error);
+                    console.error('Error initializing tg-tapgrein_custom-css editor:', error);
                 }
             } else {
-                console.error('tg-custom-css element not found!');
+                console.error('tg-tapgrein_custom-css element not found!');
             }
 
             if (tgCss.length) {

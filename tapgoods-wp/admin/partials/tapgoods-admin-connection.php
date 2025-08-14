@@ -93,7 +93,7 @@ if (isset($_POST['confirm_reset'])) {
 <!-- Reset confirmation popup -->
 <div id="popup" class="overlay" style="display: none;">
     <div class="popup">
-        <h1 style="color: white;">Are you sure you want to reset to default?</h1>
+        <h1>Are you sure you want to reset to default?</h1>
         <p>This will disconnect your website from TapGoods and delete all inventory from your website. This action cannot be undone.</p>
         <form method="post">
             <button type="submit" name="confirm_reset" class="btn btn-danger">Yes, Reset to Default</button>
@@ -106,12 +106,3 @@ if (isset($_POST['confirm_reset'])) {
     <a href="javascript:void(0);" onclick="openPopup()">Reset to Default</a>
 </p>
 
-<?php
-// Scripts are now handled by Tapgoods_Enqueue class
-// No inline scripts needed here
-?>
-
-<?php
-// Styles are now handled by Tapgoods_Enqueue class using wp_add_inline_style()
-// No inline styles needed here
-?>
