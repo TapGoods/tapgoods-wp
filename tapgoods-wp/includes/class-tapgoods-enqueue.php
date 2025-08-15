@@ -47,7 +47,7 @@ class Tapgoods_Enqueue {
         $screen = get_current_screen();
         
         // Enqueue for TapGoods admin pages
-        if ($this->is_tapgoods_admin_page($screen, $hook)) {
+        if ($this->is_tapgrein_admin_page($screen, $hook)) {
             
             // Enqueue complete admin script
             wp_enqueue_script(
@@ -61,7 +61,7 @@ class Tapgoods_Enqueue {
             // Localize script with necessary data
             wp_localize_script('tapgoods-admin-complete', 'tg_admin_vars', array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'sync_nonce' => wp_create_nonce('tg_sync_nonce'),
+                'sync_nonce' => wp_create_nonce('tapgrein_sync_nonce'),
                 'is_mobile' => wp_is_mobile(),
                 'plugin_url' => plugin_dir_url(dirname(__FILE__))
             ));
@@ -77,7 +77,7 @@ class Tapgoods_Enqueue {
     public function enqueue_admin_styles($hook) {
         $screen = get_current_screen();
         
-        if ($this->is_tapgoods_admin_page($screen, $hook)) {
+        if ($this->is_tapgrein_admin_page($screen, $hook)) {
             
             // Enqueue complete styles (includes all inline styles refactored)
             wp_enqueue_style(
@@ -181,7 +181,7 @@ class Tapgoods_Enqueue {
     /**
      * Check if current page is a TapGoods admin page
      */
-    private function is_tapgoods_admin_page($screen, $hook) {
+    private function is_tapgrein_admin_page($screen, $hook) {
         if (!$screen) return false;
         
         $tapgoods_screens = array(

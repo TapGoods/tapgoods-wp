@@ -137,7 +137,7 @@ function initTagFocus() {
  * Sync Button Functionality - from admin connection
  */
 function initSyncButton() {
-    const syncButton = document.querySelector('#tg_api_sync');
+    const syncButton = document.querySelector('#tapgrein_api_sync');
     if (syncButton) {
         syncButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -238,7 +238,7 @@ function performInventorySync() {
         }
     };
     
-    const params = 'action=tg_api_sync';
+    const params = 'action=tapgrein_api_sync';
     xhr.send(params);
 }
 

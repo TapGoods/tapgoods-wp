@@ -740,7 +740,7 @@ function tapgrein_get_user_agent() {
 
 
 // Function to enqueue a script that disables editing in the Gutenberg editor
-function tapgoods_disable_gutenberg_editing() {
+function tapgrein_disable_gutenberg_editing() {
     global $post;
     
     // Check if the post type is 'tg_inventory' and if we are on the edit screen
@@ -755,7 +755,7 @@ function tapgoods_disable_gutenberg_editing() {
         
     }
 }
-add_action( 'admin_enqueue_scripts', 'tapgoods_disable_gutenberg_editing' );
+add_action( 'admin_enqueue_scripts', 'tapgrein_disable_gutenberg_editing' );
 
 // Function to remove the 'Quick Edit' option from the list view
 function tapgrein_remove_quick_edit( $actions, $post ) {
@@ -1244,12 +1244,12 @@ function tapgrein_custom_tax_template($template) {
 }
 
 // Force enqueue scripts for tag pages - using wp_head to ensure proper timing
-add_action('wp_head', 'tg_enqueue_tag_page_scripts', 1);
-function tg_enqueue_tag_page_scripts() {
+add_action('wp_head', 'tapgrein_enqueue_tag_page_scripts', 1);
+function tapgrein_enqueue_tag_page_scripts() {
     global $wp_query;
     
     // Debug: Check what WordPress thinks we are
-    error_log('TapGoods: tg_enqueue_tag_page_scripts called');
+    error_log('TapGoods: tapgrein_enqueue_tag_page_scripts called');
     error_log('TapGoods: is_tax(): ' . (is_tax() ? 'true' : 'false'));
     error_log('TapGoods: is_tax(tg_tags): ' . (is_tax('tg_tags') ? 'true' : 'false'));
     error_log('TapGoods: get_queried_object: ' . print_r(get_queried_object(), true));
@@ -1415,7 +1415,7 @@ add_action('init', function() {
 
 
 // Build up to 150 chars of your own “tg_description” or fallback
-function tapgoods_get_default_meta_description() {
+function tapgrein_get_default_meta_description() {
     if ( ! is_singular( 'tg_inventory' ) ) {
         return '';
     }
@@ -1429,13 +1429,13 @@ function tapgoods_get_default_meta_description() {
 }
 
 // Only if Yoast is NOT active, print your fallback in <head>
-add_action( 'wp_head', 'tapgoods_print_fallback_meta_description', 1 );
-function tapgoods_print_fallback_meta_description() {
+add_action( 'wp_head', 'tapgrein_print_fallback_meta_description', 1 );
+function tapgrein_print_fallback_meta_description() {
     // Bail if Yoast is active or not on a single inventory item
     if ( defined( 'WPSEO_VERSION' ) || ! is_singular( 'tg_inventory' ) ) {
         return;
     }
-    $desc = tapgoods_get_default_meta_description();
+    $desc = tapgrein_get_default_meta_description();
     if ( $desc ) {
         echo '<meta name="description" content="' . esc_attr( $desc ) . "\" />\n";
     }
@@ -1448,30 +1448,30 @@ function tapgoods_print_fallback_meta_description() {
  */
 
 // Fix pagination URL format and query handling
-function tg_fix_pagination_urls() {
+function tapgrein_fix_pagination_urls() {
     // Only run on frontend
     if (is_admin()) {
         return;
     }
     
     // Fix paged query var detection
-    add_action('init', 'tg_fix_paged_query_var');
+    add_action('init', 'tapgrein_fix_paged_query_var');
     
     // Fix pagination links format
-    add_filter('paginate_links', 'tg_force_pagination_format');
+    add_filter('paginate_links', 'tapgrein_force_pagination_format');
     
     // Handle URL redirects for problematic formats
-    add_action('template_redirect', 'tg_redirect_pagination_urls');
+    add_action('template_redirect', 'tapgrein_redirect_pagination_urls');
     
     // Ensure paged parameter is recognized
-    add_action('pre_get_posts', 'tg_fix_main_query_paged');
+    add_action('pre_get_posts', 'tapgrein_fix_main_query_paged');
 }
-add_action('wp', 'tg_fix_pagination_urls');
+add_action('wp', 'tapgrein_fix_pagination_urls');
 
 /**
  * Fix paged query var detection
  */
-function tg_fix_paged_query_var() {
+function tapgrein_fix_paged_query_var() {
     global $wp;
     
     // Add 'paged' to public query vars if not already present
@@ -1488,7 +1488,7 @@ function tg_fix_paged_query_var() {
 /**
  * Force pagination links to use ?paged=X format
  */
-function tg_force_pagination_format($link) {
+function tapgrein_force_pagination_format($link) {
     // Check if this is a pagination link with /page/X/ format
     if (preg_match('/\/page\/(\d+)\/?(\?.*)?$/', $link, $matches)) {
         $page_num = $matches[1];
@@ -1517,7 +1517,7 @@ function tg_force_pagination_format($link) {
 /**
  * Redirect problematic pagination URLs to correct format
  */
-function tg_redirect_pagination_urls() {
+function tapgrein_redirect_pagination_urls() {
     if (isset($_SERVER['REQUEST_URI'])) {
         $request_uri = $_SERVER['REQUEST_URI'];
         
@@ -1553,7 +1553,7 @@ function tg_redirect_pagination_urls() {
 /**
  * Fix main query to properly handle paged parameter
  */
-function tg_fix_main_query_paged($query) {
+function tapgrein_fix_main_query_paged($query) {
     // Only modify main query on frontend
     if (is_admin() || !$query->is_main_query()) {
         return;
@@ -1581,18 +1581,18 @@ function tg_fix_main_query_paged($query) {
 /**
  * Fix canonical redirect that might interfere with pagination
  */
-function tg_disable_canonical_redirect_for_pagination() {
+function tapgrein_disable_canonical_redirect_for_pagination() {
     // Check if we have paged parameter
     if (get_query_var('paged') || (isset($_GET['paged']) && !empty($_GET['paged']))) {
         remove_action('template_redirect', 'redirect_canonical');
     }
 }
-add_action('template_redirect', 'tg_disable_canonical_redirect_for_pagination', 1);
+add_action('template_redirect', 'tapgrein_disable_canonical_redirect_for_pagination', 1);
 
 /**
  * Ensure WordPress recognizes custom pagination parameters
  */
-function tg_add_pagination_rewrite_rules() {
+function tapgrein_add_pagination_rewrite_rules() {
     // Add rewrite rule for pages with paged parameter
     add_rewrite_rule(
         '(.+?)/page/([0-9]{1,})/?$',
@@ -1600,23 +1600,23 @@ function tg_add_pagination_rewrite_rules() {
         'top'
     );
 }
-add_action('init', 'tg_add_pagination_rewrite_rules');
+add_action('init', 'tapgrein_add_pagination_rewrite_rules');
 
 /**
  * Add custom query vars for pagination
  */
-function tg_add_pagination_query_vars($vars) {
+function tapgrein_add_pagination_query_vars($vars) {
     $vars[] = 'paged';
     return $vars;
 }
-add_filter('query_vars', 'tg_add_pagination_query_vars');
+add_filter('query_vars', 'tapgrein_add_pagination_query_vars');
 
 /**
  * Debug function
  * Uncomment to debug pagination issues
  */
 /*
-function tg_debug_pagination() {
+function tapgrein_debug_pagination() {
     if (isset($_GET['debug_pagination'])) {
         echo '<div class="tapgoods-debug-info">';
         echo '<strong>Pagination Debug Info:</strong><br>';
@@ -1627,5 +1627,5 @@ function tg_debug_pagination() {
         echo '</div>';
     }
 }
-add_action('wp_head', 'tg_debug_pagination');
+add_action('wp_head', 'tapgrein_debug_pagination');
 */

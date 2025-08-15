@@ -24,7 +24,7 @@ class Tapgoods_Helpers {
 		}
 	}
 
-	public static function tg_delete_inventory() {
+	public static function tapgrein_delete_inventory() {
 		$items = get_pages( 'post_type=tg_inventory' );
 		self::tgdd( $items );
 		foreach ( $items as $item ) {

@@ -76,7 +76,7 @@ if (!empty($selected_location)) {
             <div class="col col-sm-3">
                 <button type="submit" name="set_default_location" 
                         class="btn btn-primary w-100 round" 
-                        id="tg_api_sync2">
+                        id="tapgrein_api_sync2">
                     SET DEFAULT
                 </button>
             </div>

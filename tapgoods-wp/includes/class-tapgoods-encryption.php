@@ -13,7 +13,7 @@ class Tapgoods_Encryption {
 		$this->salt = $this->get_default_salt();
 	}
 
-	public function tg_encrypt( $value ) {
+	public function tapgrein_encrypt( $value ) {
 		if ( ! extension_loaded( 'openssl' ) ) {
 			return $value;
 		}
@@ -29,7 +29,7 @@ class Tapgoods_Encryption {
 		return base64_encode( $iv . $raw_value ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
-	public function tg_decrypt( $raw_value ) {
+	public function tapgrein_decrypt( $raw_value ) {
 		if ( ! extension_loaded( 'openssl' ) ) {
 			return $value;
 		}

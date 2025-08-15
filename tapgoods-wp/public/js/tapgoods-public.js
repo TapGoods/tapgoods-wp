@@ -22,7 +22,7 @@
             const suggestionList = $('#suggestion-list');
             let shouldBlur = false;
 
-            searchForm.on('submit', { input: searchInput }, tapgoods_search);
+            searchForm.on('submit', { input: searchInput }, tapgrein_search);
 
             $('#tg-search').on('focus', function() { 
                 suggestionList.parent('div').show();
@@ -57,7 +57,7 @@
                     }
 
                     suggestionList.parent('div').show();
-                    let data = searchForm.serialize() + '&action=tapgoods_search';
+                    let data = searchForm.serialize() + '&action=tapgrein_search';
 
                     $.ajax({
                         type: "POST",
@@ -254,7 +254,7 @@
         }
         
 
-        function tapgoods_search(event) {
+        function tapgrein_search(event) {
             // event.preventDefault();
             // console.log(event);
         }

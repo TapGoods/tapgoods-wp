@@ -43,7 +43,7 @@ class TG_Admin_Permalink_Settings {
 		add_settings_field(
 			'tg_category_rewrite_slug',
 			__( 'Inventory category base', 'tapgoods' ),
-			array( $this, 'tg_category_slug_input' ),
+			array( $this, 'tapgrein_category_slug_input' ),
 			'permalink',
 			'optional'
 		);
@@ -58,7 +58,7 @@ class TG_Admin_Permalink_Settings {
 		$this->permalinks = tapgrein_get_permalink_structure();
 	}
 
-	public function tg_category_slug_input() {
+	public function tapgrein_category_slug_input() {
 		?>
 		<input name="tapgoods_product_category_slug" type="text" class="regular-text code" value="<?php echo esc_attr( $this->permalinks['tg_category_base'] ); ?>" placeholder="<?php echo esc_attr_x( 'categories', 'slug', 'tapgoods' ); ?>" />
 		<?php

@@ -38,7 +38,7 @@ class Tapgoods_Public {
 		wp_enqueue_style( 'dashicons' );
 	}
 
-	public function tapgoods_sf_css() {
+	public function tapgrein_sf_css() {
 		header( 'Content-type: text/css; charset: UTF-8' );
 		require TAPGOODS_PLUGIN_PATH . 'public/css/tapgoods-sf-styles.php';
 	}
@@ -141,7 +141,7 @@ class Tapgoods_Public {
 		return $template;
 	}
 
-	public function tg_get_search_template( $template ) {
+	public function tapgrein_get_search_template( $template ) {
 		global $wp_query;
 		$post_type = get_query_var( 'post_type' );
 
@@ -153,7 +153,7 @@ class Tapgoods_Public {
 		return $template;
 	}
 
-	public function tapgoods_search( $data ) {
+	public function tapgrein_search( $data ) {
 		// error_log("TAPGOODS_SEARCH method called with action: " . ($_POST['action'] ?? 'NO_ACTION') . " and data: " . print_r($_POST, true));
 		//check_ajax_referer( 'search', '_tgnonce_search' );
 
@@ -282,7 +282,7 @@ class Tapgoods_Public {
 		}
 	}
 
-	public function tg_add_body_classes( $classes ) {
+	public function tapgrein_add_body_classes( $classes ) {
 		$tg_classes = array();
 
 		global $post;

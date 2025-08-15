@@ -18,13 +18,13 @@
       box-sizing: border-box;
     }
 
-    & button#tg_update_connection {
+    & button#tapgrein_update_connection {
         font-size: 1em;
         border-color: transparent;
         &:disabled { background-color: #7194AC; }
     }
     
-    & button#tg_api_sync {
+    & button#tapgrein_api_sync {
         font-size: 1em;
     }
 

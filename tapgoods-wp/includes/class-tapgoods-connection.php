@@ -64,7 +64,7 @@ class Tapgoods_Connection {
 		if ( '' === $api_key ) {
 			$encryption    = new Tapgoods_Encryption();
 			$encrypted_key = get_option( 'tg_key' );
-			$api_key       = ( $encrypted_key ) ? $encryption->tg_decrypt( $encrypted_key ) : '';
+			$api_key       = ( $encrypted_key ) ? $encryption->tapgrein_decrypt( $encrypted_key ) : '';
 		}
 
 		return $api_key;
@@ -120,13 +120,13 @@ class Tapgoods_Connection {
 
 		do_action( 'tg_start_api_sync', $this->u_sync_start );
 
-		set_transient( 'tg_sync_active', 1, 300 );
+		set_transient( 'tapgrein_sync_active', 1, 300 );
 		set_transient( 'tg_u_sync_start', $this->u_sync_start, 60 );
 	}
 
 	public function is_active() {
 		if ( null === $this->is_active ) {
-			$this->is_active = get_transient( 'tg_sync_active' );
+			$this->is_active = get_transient( 'tapgrein_sync_active' );
 		}
 		return $this->is_active;
 	}
@@ -134,7 +134,7 @@ class Tapgoods_Connection {
 	public function stop_sync( $error = false, $message = '' ) {
 
 		$this->is_active = 0;
-		set_transient( 'tg_sync_active', 0 );
+		set_transient( 'tapgrein_sync_active', 0 );
 
 		$this->u_sync_end = current_time( 'timestamp' ); // phpcs:ignore
 
@@ -167,7 +167,7 @@ class Tapgoods_Connection {
 		}
 	
 		// Check if the synchronization is in progress
-		if (get_transient('tg_sync_lock')) {
+		if (get_transient('tapgrein_sync_lock')) {
 			return 'Sync in progress. Please wait...';
 		}
 	
@@ -182,8 +182,8 @@ class Tapgoods_Connection {
 		// Calculate elapsed time and duration
 		$time = current_time('timestamp'); // phpcs:ignore
 		$time_ago = $time - $sync_info['last_sync_end'];
-		$time_ago_str = tg_seconds_to_string($time_ago);
-		$duration_str = tg_seconds_to_string($sync_info['last_sync_duration']);
+		$time_ago_str = tapgrein_seconds_to_string($time_ago);
+		$duration_str = tapgrein_seconds_to_string($sync_info['last_sync_duration']);
 	
 		// Build the last synchronization message
 		$message = 'The last sync finished ' . $time_ago_str . " ago and took {$duration_str} seconds to run";
@@ -198,7 +198,7 @@ class Tapgoods_Connection {
 		// Handle API key change
 		if ($current_key !== $stored_key) {
 			$this->console_log('API Key has changed. Clearing previous data...');
-			$this->tg_delete_data();
+			$this->tapgrein_delete_data();
 			update_option('tg_last_api_key', $current_key);
 		}
 	
@@ -206,17 +206,17 @@ class Tapgoods_Connection {
 		$client = $this->get_connection();
 	
 		// Prevent concurrent syncs
-		if (get_transient('tg_sync_lock')) {
+		if (get_transient('tapgrein_sync_lock')) {
 			$this->console_log('Sync is locked. Another process is running.');
 			return array('success' => false, 'message' => '');
 		}
 	
 		// Lock the sync process
-		set_transient('tg_sync_lock', true, 900);
+		set_transient('tapgrein_sync_lock', true, 900);
 	
 		$location_ids = $client->get_location_ids();
 		if (false === $location_ids) {
-			delete_transient('tg_sync_lock');
+			delete_transient('tapgrein_sync_lock');
 			$this->console_log('Failed to retrieve location IDs.');
 			return array('success' => false, 'message' => '');
 		}
@@ -264,7 +264,7 @@ class Tapgoods_Connection {
 			foreach ($synced_items as $tg_id) {
 				$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
 				if ($item) {
-					$this->tg_assign_terms($item->ID);
+					$this->tapgrein_assign_terms($item->ID);
 				}
 			}
 		} else {
@@ -279,7 +279,7 @@ class Tapgoods_Connection {
 		$this->update_sync_info($start_time);
 	
 		// Unlock the process
-        delete_transient('tg_sync_lock');
+        delete_transient('tapgrein_sync_lock');
 	
 		return array('success' => true, 'message' => '');
 	}
@@ -534,14 +534,14 @@ class Tapgoods_Connection {
 					$this->console_log('Updating/inserting item with token: ' . $data['token']);
 	
 					// We update or insert the inventory
-					$update = $this->tg_update_inventory($data, $tg_order);
+					$update = $this->tapgrein_update_inventory($data, $tg_order);
 	
 					// Assign locations to the item
 					$this->console_log('Assigning location for item: ' . $data['token']);
-					$this->tg_assign_location($update, $lid);  // <-- New feature to assign location
+					$this->tapgrein_assign_location($update, $lid);  // <-- New feature to assign location
 	
 					// Assign terms (categories, tags)
-					$this->tg_assign_terms($update);
+					$this->tapgrein_assign_terms($update);
 	
 					++$count;
 				}
@@ -551,7 +551,7 @@ class Tapgoods_Connection {
 		return $count;
 	}
 	
-	public function tg_assign_location($post_id, $location_id) {
+	public function tapgrein_assign_location($post_id, $location_id) {
 		// Get location details from 'tg_locationIds'
 		$location_details = get_option('tg_location_' . $location_id);
 	
@@ -590,7 +590,7 @@ class Tapgoods_Connection {
 	
 	
 
-	public function tg_update_inventory($product, $tg_order) {
+	public function tapgrein_update_inventory($product, $tg_order) {
 		$args = array(
 			'post_type' => 'tg_inventory',
 			'posts_per_page' => 1,
@@ -639,7 +639,7 @@ class Tapgoods_Connection {
 		}
 	
 		if ($post_id) {
-			$this->tg_assign_terms($post_id);
+			$this->tapgrein_assign_terms($post_id);
 		} else {
 			$this->console_log('Failed to assign terms: post ID is invalid');
 		}
@@ -802,7 +802,7 @@ class Tapgoods_Connection {
 	
 	
 
-	public function tg_assign_terms($post_id) {
+	public function tapgrein_assign_terms($post_id) {
 		// Fetch categories and subcategories (tags) from post meta
 		$categories = get_post_meta($post_id, 'tg_sfCategories', true);
 		$tags = get_post_meta($post_id, 'tg_sfSubCategories', true);
@@ -977,7 +977,7 @@ class Tapgoods_Connection {
 	}
 	
 
-	public function tg_async_sync_from_api( $action = 'tg_api_sync' ) {
+	public function tapgrein_async_sync_from_api( $action = 'tapgrein_api_sync' ) {
 
 		$url = admin_url( "admin-ajax.php?action={$action}" );
 
@@ -991,7 +991,7 @@ class Tapgoods_Connection {
 		return;
 	}
 
-	public function tg_delete_data() {
+	public function tapgrein_delete_data() {
 		$post_args = array(
 			'post_type'   => 'tg_inventory',
 			'numberposts' => -1,
@@ -1003,7 +1003,7 @@ class Tapgoods_Connection {
 			wp_delete_post( $pid, true );
 		}
 
-		$taxonomies = Tapgoods_Post_Types::tg_get_taxonomies();
+		$taxonomies = Tapgoods_Post_Types::tapgrein_get_taxonomies();
 		foreach ( $taxonomies as $tax ) {
 			$tax_args = array(
 				'taxonomy'   => $tax,
@@ -1020,7 +1020,7 @@ class Tapgoods_Connection {
 
 	// Function to delete items that have been previously added but no longer exist
 	// Works by finding items that weren't signed with the latest API sync hash value
-	public function tg_remove_deleted_inventory() {
+	public function tapgrein_remove_deleted_inventory() {
 
 		// If there's no hash, bail
 		if ( is_null( $this->hash ) ) {
@@ -1065,7 +1065,7 @@ class Tapgoods_Connection {
 
 	// Function to delete terms that have been previously added but no longer exist
 	// Works by finding items that weren't signed with the latest API sync hash value
-	public function tg_remove_deleted_terms() {
+	public function tapgrein_remove_deleted_terms() {
 
 		// If there's no hash, bail
 		if ( is_null( $this->hash ) ) {
@@ -1074,7 +1074,7 @@ class Tapgoods_Connection {
 
 		$count = 0;
 
-		$taxonomies = Tapgoods_Post_Types::tg_get_taxonomies();
+		$taxonomies = Tapgoods_Post_Types::tapgrein_get_taxonomies();
 		foreach ( $taxonomies as $tax ) {
 			$tax_args = array(
 				'taxonomy'     => $tax,
@@ -1102,10 +1102,10 @@ class Tapgoods_Connection {
 		return $client;
 	}
 
-	public function tg_get_colors_from_rest() {
+	public function tapgrein_get_colors_from_rest() {
 	}
 
-	public function tg_get_departments_from_api() {
+	public function tapgrein_get_departments_from_api() {
 	}
 
 
@@ -1135,11 +1135,11 @@ class Tapgoods_Connection {
 				$this->update_inventory_item($existing_item_by_id->ID, $item);
 			} else {
 				$this->console_log('Inserting new item: ' . $item['name']);
-				$this->tg_insert_inventory($item);
+				$this->tapgrein_insert_inventory($item);
 			}
 	
 			// Assign categories and tags to the item.
-			$this->tg_assign_terms($existing_item_by_id ? $existing_item_by_id->ID : $item['id']);
+			$this->tapgrein_assign_terms($existing_item_by_id ? $existing_item_by_id->ID : $item['id']);
 		} catch (Exception $e) {
 			$this->console_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
 		}
@@ -1253,7 +1253,7 @@ class Tapgoods_Connection {
 			$this->console_log('Error updating item: ' . $item['id'] . ' - ' . $update->get_error_message());
 		} else {
 			$this->console_log('Post updated successfully with ID: ' . $post_id);
-			$this->tg_assign_terms($post_id); // Assign categories and tags after updating the post
+			$this->tapgrein_assign_terms($post_id); // Assign categories and tags after updating the post
 		}
 	}
 	
@@ -1282,7 +1282,7 @@ class Tapgoods_Connection {
 		}
 	}
 	
-	public function tg_insert_inventory($product) {
+	public function tapgrein_insert_inventory($product) {
 		$tg_id = $product['id'];
 		if (!$tg_id) {
 			$this->console_log("Skipping item: No tg_id found");
@@ -1358,7 +1358,7 @@ class Tapgoods_Connection {
 
 }
 	// Add action for synchronization via AJAX
-	add_action('wp_ajax_tg_api_sync', array(Tapgoods_Connection::get_instance(), 'manual_sync_trigger'));
+	add_action('wp_ajax_tapgrein_api_sync', array(Tapgoods_Connection::get_instance(), 'manual_sync_trigger'));
 	
 // Create an endpoint to manually execute synchronization without using cron
 add_action('wp_ajax_tapgoods_manual_sync', [Tapgoods_Connection::get_instance(), 'manual_sync_trigger']);

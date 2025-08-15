@@ -115,7 +115,7 @@ class Tapgoods_Admin {
 	 *
 	 * @return void
 	 */
-	public static function tg_update_connection() {
+	public static function tapgrein_update_connection() {
 
 		check_ajax_referer( 'save', '_tgnonce_connection' );
 		// if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
@@ -153,7 +153,7 @@ class Tapgoods_Admin {
 			$submitted_api_key = sanitize_text_field( wp_unslash( $_POST['tapgoods_api_key'] ) );
 
 		//	error_log('Captured API Key: ' . $submitted_api_key);
-			$api_key           = $encryption->tg_encrypt( $submitted_api_key );
+			$api_key           = $encryption->tapgrein_encrypt( $submitted_api_key );
 		}
 	
 		$success = update_option( 'tg_key', $api_key );
@@ -173,7 +173,7 @@ class Tapgoods_Admin {
 	
 		if ( $success ) {
 			update_option( 'tg_api_connected', true );
-			$notice = Tapgoods_Admin::tapgoods_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
+			$notice = Tapgoods_Admin::tapgrein_admin_notice( __( 'Company Key Updated.', 'tapgoods' ), [], false );
 			wp_send_json_success( $notice );
 		}
 	
@@ -189,7 +189,7 @@ class Tapgoods_Admin {
 		);
 		$env1 = ( defined( 'TG_ENV' ) ) ? TG_ENV : tapgrein_getenv_docker( 'tg_env', 'tapgoods.com' );
 
-		$notice = Tapgoods_Admin::tapgoods_admin_notice( 
+		$notice = Tapgoods_Admin::tapgrein_admin_notice( 
 			// translators: %s is replaced with the environment name (e.g., 'production', 'staging').
 			sprintf( __( 'Unable to Connect, %s. Make sure your API Key is entered correctly.', 'tapgoods' ), $env1 ), 
 			$args, 
@@ -200,7 +200,7 @@ class Tapgoods_Admin {
 		die();
 	}
 
-	public static function tg_api_sync() {
+	public static function tapgrein_api_sync() {
 		// check_ajax_referer( 'save', '_tgnonce_connection' );
 
 		$client   = Tapgoods_Connection::get_instance();
@@ -232,7 +232,7 @@ class Tapgoods_Admin {
 		//Tapgoods_Helpers::tgqm( $_POST );
 	}
 
-	public function tg_save_dev() {
+	public function tapgrein_save_dev() {
 
 		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 			return false;
@@ -242,7 +242,7 @@ class Tapgoods_Admin {
 			return false;
 		}
 
-		//Tapgoods_Helpers::tgqm( 'tg_save_dev' );
+		//Tapgoods_Helpers::tgqm( 'tapgrein_save_dev' );
 		//Tapgoods_Helpers::tgqm( '$_REQUEST:' );
 		//Tapgoods_Helpers::tgqm( $_REQUEST );
 
@@ -250,7 +250,7 @@ class Tapgoods_Admin {
 		//Tapgoods_Helpers::tgqm( $_POST );
 	}
 
-	public function tg_save_styles( $input_submit ) {
+	public function tapgrein_save_styles( $input_submit ) {
 		// exit if we're not handling a post request.
 		if ( empty( $_POST ) ) {
 			return false;
@@ -288,12 +288,12 @@ class Tapgoods_Admin {
 		return $args;
 	}
 
-	public function tapgoods_admin_menu() {
+	public function tapgrein_admin_menu() {
 		$page_title = 'TapGoods';
 		$menu_title = 'TapGoods';
 		$capability = 'manage_options';
 		$menu_slug  = $this->plugin_name;
-		$function   = array( $this, 'tapgoods_admin_page' );
+		$function   = array( $this, 'tapgrein_admin_page' );
 		$icon       = TAPGOODS_PLUGIN_URL . 'assets/img/tg-icon.png';
 		$icon       = '';
 		add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $function, $icon, 65 );
@@ -314,12 +314,12 @@ class Tapgoods_Admin {
 	}
 
 	// Render the admin page
-	public function tapgoods_admin_page() {
+	public function tapgrein_admin_page() {
 		include_once 'partials/tapgoods-admin-page.php';
 	}
 
 	// Used to print admin notices
-	public static function tapgoods_admin_notice( string $message, $args = [], $output = true ) {
+	public static function tapgrein_admin_notice( string $message, $args = [], $output = true ) {
 
 		$args = array_merge(
 			array(

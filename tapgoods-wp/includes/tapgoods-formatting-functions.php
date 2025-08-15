@@ -27,7 +27,7 @@ function tg_string_to_bool( $str ) {
  * @param bool|string $boolean Bool to convert. If a string is passed it will first be converted to a bool.
  * @return string
  */
-function tg_bool_to_string( $boolean ) {
+function tapgrein_bool_to_string( $boolean ) {
 	if ( ! is_bool( $boolean ) ) {
 		$boolean = tg_string_to_bool( $boolean );
 	}
@@ -42,7 +42,7 @@ function tg_bool_to_string( $boolean ) {
  * @param string $delimiter Delimiter, defaults to ','.
  * @return array
  */
-function tg_string_to_array( $str, $delimiter = ',' ) {
+function tapgrein_string_to_array( $str, $delimiter = ',' ) {
 	$str = $str ?? '';
 	return is_array( $str ) ? $str : array_filter( explode( $delimiter, $str ) );
 }
@@ -54,7 +54,7 @@ function tg_string_to_array( $str, $delimiter = ',' ) {
  * @param  string $value Permalink.
  * @return string
  */
-function tg_sanitize_permalink( $value ) {
+function tapgrein_sanitize_permalink( $value ) {
 	global $wpdb;
 
 	$value = $wpdb->strip_invalid_text_for_column( $wpdb->options, 'option_value', $value ?? '' );
@@ -74,7 +74,7 @@ function tg_sanitize_permalink( $value ) {
  * @param  float $float Float value to format.
  * @return string
  */
-function tg_float_to_string( $float ) {
+function tapgrein_float_to_string( $float ) {
 	if ( ! is_float( $float ) ) {
 		return $float;
 	}
@@ -86,7 +86,7 @@ function tg_float_to_string( $float ) {
 	return $string;
 }
 
-function tg_seconds_to_string( $seconds ) {
+function tapgrein_seconds_to_string( $seconds ) {
 	$seconds_per_minute = 60;
 	$seconds_per_hour   = 60 * $seconds_per_minute;
 	$seconds_per_day    = 24 * $seconds_per_hour;

@@ -8,7 +8,7 @@
 function initSyncButton() {
     jQuery(document).ready(function($) {
         // Sync button para admin connection
-        $('#tg_api_sync').on('click', function() {
+        $('#tapgrein_api_sync').on('click', function() {
             $(this).prop('disabled', true).text('Syncing...');
 
             $.ajax({
@@ -20,11 +20,11 @@ function initSyncButton() {
                 },
                 success: function(response) {
                     alert('Synchronization completed.');
-                    $('#tg_api_sync').prop('disabled', false).text('SYNC');
+                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
                 },
                 error: function() {
                     alert('Synchronization failed.');
-                    $('#tg_api_sync').prop('disabled', false).text('SYNC');
+                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
                 }
             });
         });
@@ -44,7 +44,7 @@ function closePopup() {
 function initInventorySync() {
     jQuery(function($) {
         function syncInventory() {
-            $('#tg_api_sync').prop('disabled', true).text('WORKING');
+            $('#tapgrein_api_sync').prop('disabled', true).text('WORKING');
             $.ajax({
                 url: ajaxurl,
                 method: 'POST',
@@ -55,22 +55,22 @@ function initInventorySync() {
                     $('#tapgoods_sync_status').text(response.message);
                     if (response.success && response.continue) {
                         setTimeout(function() {
-                            $('#tg_api_sync').click();
+                            $('#tapgrein_api_sync').click();
                         }, 1000);
                     } else {
-                        $('#tg_api_sync').prop('disabled', false).text('SYNC');
+                        $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error during sync: ' + error);
                     $('#tapgoods_sync_status').text('Error during sync: ' + error);
-                    $('#tg_api_sync').prop('disabled', false).text('SYNC');
+                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
                 }
             });
         }
 
         // Start synchronization when the button is clicked
-        $('#tg_api_sync').on('click', function() {
+        $('#tapgrein_api_sync').on('click', function() {
             syncInventory();
         });
     });

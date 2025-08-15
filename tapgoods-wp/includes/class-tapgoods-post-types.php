@@ -23,7 +23,7 @@ class Tapgoods_Post_Types {
 
 	public static function init() {
     // Register Taxonomy first so that URL rewrites behave as expected.
-    add_action( 'init', array( __CLASS__, 'tg_register_taxonomies' ), 5 );
+    add_action( 'init', array( __CLASS__, 'tapgrein_register_taxonomies' ), 5 );
     add_action( 'init', array( __CLASS__, 'register_post_types' ), 5 );
     
     // Metaboxes
@@ -36,12 +36,12 @@ class Tapgoods_Post_Types {
     // Force classic editor for `tg_inventory`
     add_filter( 'use_block_editor_for_post_type', array( __CLASS__, 'disable_gutenberg' ), 10, 2 );
     
-    add_filter( 'post_type_link', array( __CLASS__, 'tg_filter_post_type_link' ), 10, 2 );
+    add_filter( 'post_type_link', array( __CLASS__, 'tapgrein_filter_post_type_link' ), 10, 2 );
 
     // Taxonomies
-    add_action( 'tg_tags_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
-    add_action( 'tg_category_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
-    add_action( 'tg_location_edit_form', array( __CLASS__, 'tg_tags_metaboxes' ), 1, 1 );
+    add_action( 'tg_tags_edit_form', array( __CLASS__, 'tapgrein_tags_metaboxes' ), 1, 1 );
+    add_action( 'tg_category_edit_form', array( __CLASS__, 'tapgrein_tags_metaboxes' ), 1, 1 );
+    add_action( 'tg_location_edit_form', array( __CLASS__, 'tapgrein_tags_metaboxes' ), 1, 1 );
     add_action( 'add_meta_boxes_tg_location', array( __CLASS__, 'add_taxonomy_metabox' ) );
 	}
 
@@ -230,7 +230,7 @@ class Tapgoods_Post_Types {
 	public static function render_inventory_metabox() {
 		global $post;
 		$meta = get_post_meta( $post->ID );
-		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tg_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
+		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tapgrein_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
 
 		?>
 		<div class="tg-inventory-info">
@@ -326,7 +326,7 @@ class Tapgoods_Post_Types {
 		}
 	}
 	
-	public static function tg_get_taxonomies() {
+	public static function tapgrein_get_taxonomies() {
 		$tg_taxonomies = array(
 			'tg_category',
 			'tg_tags',
@@ -337,7 +337,7 @@ class Tapgoods_Post_Types {
 		return $tg_taxonomies;
 	}
 
-	public static function tg_register_taxonomies() {
+	public static function tapgrein_register_taxonomies() {
 
 		if ( ! is_blog_installed() ) {
 			return false;
@@ -632,7 +632,7 @@ class Tapgoods_Post_Types {
 
 	
 	
-	public static function tg_filter_post_type_link( $link, $post ) {
+	public static function tapgrein_filter_post_type_link( $link, $post ) {
 		if ( 'tg_inventory' === $post->post_type ) {
 			// Try Yoast Primary Category First
 			if ( function_exists( 'yoast_get_primary_term_id' ) ) {
@@ -664,27 +664,27 @@ class Tapgoods_Post_Types {
 		add_meta_box(
 			'taxonomy_info',
 			'TapGoods Fields',
-			__CLASS__ . '::tg_tags_metaboxes',
+			__CLASS__ . '::tapgrein_tags_metaboxes',
 			'edit-tg_location',
 			'normal',
 			'low',
 		);
 	}	
 
-	public static function tg_get_inventory_meta() {
+	public static function tapgrein_get_inventory_meta() {
 		global $post;
 		$meta = get_post_meta( $post->ID );
-		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tg_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
+		$tg_meta = array_filter( $meta, array( 'Tapgoods_Post_Types', 'tapgrein_filter_postmeta' ), ARRAY_FILTER_USE_KEY );
 	}
 
-	public static function tg_filter_postmeta( $key ) {
+	public static function tapgrein_filter_postmeta( $key ) {
 		if ( 0 === strpos( $key, 'tg_' ) ) {
 			return true;
 		}
 		return false;
 	}
 
-	public static function tg_handle_postmeta( $k, $values ) {
+	public static function tapgrein_handle_postmeta( $k, $values ) {
 		if ( null === $values[0] ) {
 			return false;
 		}
@@ -712,7 +712,7 @@ class Tapgoods_Post_Types {
 			}
 			if ( 'tg_pictures' === $k ) {
 				echo '</p>';
-				self::tg_print_image_preview( $value );
+				self::tapgrein_print_image_preview( $value );
 				continue;
 			}
 			if ( is_array( $value ) && ! empty( $value ) ) {
@@ -750,7 +750,7 @@ class Tapgoods_Post_Types {
 		echo ob_get_clean(); //phpcs:ignore
 	}
 
-	public static function tg_print_image_preview( $images ) {
+	public static function tapgrein_print_image_preview( $images ) {
 		foreach ( $images as $img ) {
 			if ( isset( $img['id'] ) ) {
 				echo '<li><a href="' . esc_url( $img['url'] ) . '" target="_blank">';
@@ -768,7 +768,7 @@ class Tapgoods_Post_Types {
 		$wp_rewrite->add_rewrite_tag( '%tg_category%', '([^&]+)', 'tg_category=' );
 	}
 
-	public static function tg_tags_metaboxes( $term ) {
+	public static function tapgrein_tags_metaboxes( $term ) {
 		$meta = get_term_meta( $term->term_id );
 		do_meta_boxes( 'edit-tg_location', 'normal', $term );
 		?>
@@ -776,7 +776,7 @@ class Tapgoods_Post_Types {
 			<?php // Tapgoods_Helpers::tgpp( $meta ); ?>
 			<ul>
 			<?php foreach ( $meta as $k => $v ) : ?>
-				<?php echo esc_html( self::tg_handle_postmeta( $k, $v ) ); ?>
+				<?php echo esc_html( self::tapgrein_handle_postmeta( $k, $v ) ); ?>
 			<?php endforeach; ?>
 			</ul>
 		</div>

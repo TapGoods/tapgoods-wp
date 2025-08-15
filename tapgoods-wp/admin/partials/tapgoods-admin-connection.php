@@ -52,7 +52,7 @@ if (isset($_POST['confirm_reset'])) {
 ?>
 
 <h2>Connect to your TapGoods account</h2>
-<form name="tapgoods_connection" id="tg_connection_form" method="post" action="">
+<form name="tapgoods_connection" id="tapgrein_connection_form" method="post" action="">
     <input type="hidden" name="tapgoods_hidden" value="1">
     <?php wp_nonce_field( 'save', '_tgnonce_connection' ); ?>
     <div class="row">
@@ -60,12 +60,12 @@ if (isset($_POST['confirm_reset'])) {
             <input type="password" id="tapgoods_api_key" name="tapgoods_api_key" value="<?php echo esc_attr( $api_key ); ?>" size="60" class="form-control round api-key" <?php echo esc_attr( $key_disabled ); ?>>
         </div>
         <div class="col col-sm-3">
-            <button type="submit" name="submit" id="tg_update_connection" value="tg_update_connection" class="btn btn-primary bg-blue w-100 round" <?php echo esc_attr( $button_disabled ); ?>>
+            <button type="submit" name="submit" id="tapgrein_update_connection" value="tapgrein_update_connection" class="btn btn-primary bg-blue w-100 round" <?php echo esc_attr( $button_disabled ); ?>>
                 <?php echo esc_html( $button_text ); ?>
             </button>
         </div>
         <div class="col col-sm-3">
-            <button type="button" name="tg_sync" id="tg_api_sync" value="tg_api_sync" class="btn btn-primary w-100 round" <?php echo esc_attr( $sync_hidden ); ?>>SYNC</button>
+            <button type="button" name="tapgrein_sync" id="tapgrein_api_sync" value="tapgrein_api_sync" class="btn btn-primary w-100 round" <?php echo esc_attr( $sync_hidden ); ?>>SYNC</button>
         </div>
     </div>
 
@@ -81,7 +81,7 @@ if (isset($_POST['confirm_reset'])) {
 </form>
 
 <!-- Sync Status Message -->
-<div id="tg_connection_test">
+<div id="tapgrein_connection_test">
     <?php 
     $sync_message = $tg_api->last_sync_message();
     if ($sync_message && get_option('tg_api_connected')) :

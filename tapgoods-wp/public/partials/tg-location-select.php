@@ -42,11 +42,11 @@ $selected_location = $cookie_location !== '' ? $cookie_location : $default_locat
 
 <?php
 // AJAX handler to set the default location (optional if required for server sync)
-add_action('wp_ajax_set_default_location', 'tg_set_default_location');
-add_action('wp_ajax_nopriv_set_default_location', 'tg_set_default_location');
+add_action('wp_ajax_set_default_location', 'tapgrein_set_default_location');
+add_action('wp_ajax_nopriv_set_default_location', 'tapgrein_set_default_location');
 
 
-function tg_set_default_location() {
+function tapgrein_set_default_location2() {
 //        error_log("AJAX action 'set_default_location' triggered.");
     if (isset($_POST['location_id'])) {
         $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : '';

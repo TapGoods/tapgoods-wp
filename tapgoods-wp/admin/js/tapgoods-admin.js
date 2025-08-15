@@ -68,9 +68,9 @@
             }
 
             // Setup the inputs for the connection form
-            const connectButton = $('#tg_update_connection');
+            const connectButton = $('#tapgrein_update_connection');
             const connectInput = $('#tapgoods_api_key');
-            const syncButton = $('#tg_api_sync');
+            const syncButton = $('#tapgrein_api_sync');
 
             console.log('Captured Input Element:', connectInput); // Debugging log
 
@@ -95,25 +95,25 @@
             });
 
             // Form submission event
-            $('#tg_connection_form').on('submit', { btn: connectButton, input: connectInput }, tg_connect);
-            syncButton.on('click', tg_sync);
+            $('#tapgrein_connection_form').on('submit', { btn: connectButton, input: connectInput }, tapgrein_connect);
+            syncButton.on('click', tapgrein_sync);
         });
     }
 
-    function tg_connect(event) {
+    function tapgrein_connect(event) {
         event.preventDefault();
         let connectButton = event.data.btn;
         let connectInput = event.data.input;
-        const syncButton = $('#tg_api_sync');
+        const syncButton = $('#tapgrein_api_sync');
         const el = document.getElementById("tg_ajax_connection");
 
         connectButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> CONNECTING');
 
         // Debugging: Log API key and serialized form data
         console.log('API Key Value:', connectInput.val());
-        console.log('Serialized Form Data:', $('#tg_connection_form').serialize());
+        console.log('Serialized Form Data:', $('#tapgrein_connection_form').serialize());
 
-        let data = $('#tg_connection_form').serialize() + '&action=tg_update_connection';
+        let data = $('#tapgrein_connection_form').serialize() + '&action=tapgrein_update_connection';
 
         $.ajax({
             url: tg_ajax.ajaxurl,
@@ -144,14 +144,14 @@
         });
     }
 
-    function tg_sync(event) {
+    function tapgrein_sync(event) {
         event.preventDefault();
 
         const nonce = $('#_tgnonce_connection').val();
-        const syncBtn = $('#tg_api_sync');
+        const syncBtn = $('#tapgrein_api_sync');
         syncBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> WORKING');
-        const url = tg_ajax.ajaxurl + '?action=tg_api_sync&_tgnonce_connection=' + nonce;
-        const statusEl = document.getElementById('tg_connection_test');
+        const url = tg_ajax.ajaxurl + '?action=tapgrein_api_sync&_tgnonce_connection=' + nonce;
+        const statusEl = document.getElementById('tapgrein_connection_test');
 
         $.ajax({
             url: url,
@@ -182,7 +182,7 @@
         const template = document.createElement('div');
         template.innerHTML = notice;
         if (template.firstChild && template.firstChild.classList.contains('is-dismissible')) {
-            template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tg_dismiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
+            template.firstChild.insertAdjacentHTML('beforeend', '<button type="button" class="notice-dismiss" onclick="javascript: return tapgrein_dismiss_notice(this);"><span class="screen-reader-text">Dismiss this notice.</span></button>');
         }
         el.innerHTML = notice;
         $(el).removeAttr('hidden');
@@ -193,7 +193,7 @@
 
 })(jQuery, window, document);
 
-function tg_dismiss_notice(notice) {
+function tapgrein_dismiss_notice(notice) {
     jQuery(notice).parent().slideUp("normal", function () { jQuery(this).remove(); });
     return false;
 }

@@ -51,20 +51,20 @@ $uploads = wp_upload_dir();
 define( 'TAPGOODS_UPLOADS', trailingslashit( $uploads['basedir'] . '/tapgoods' ) );
 
 // TODO: register activate hook
-function tapgoods_activate() {
+function tapgrein_activate() {
 
 	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-activator.php';
 	Tapgoods_Activator::activate();
 }
 
-function tapgoods_deactivate() {
+function tapgrein_deactivate() {
 
 	require_once plugin_dir_path( __FILE__ ) . 'includes/class-tapgoods-deactivator.php';
 	Tapgoods_Deactivator::deactivate();
 }
 
-register_activation_hook( __FILE__, 'tapgoods_activate' );
-register_deactivation_hook( __FILE__, 'tapgoods_deactivate' );
+register_activation_hook( __FILE__, 'tapgrein_activate' );
+register_deactivation_hook( __FILE__, 'tapgrein_deactivate' );
 
 function tapgrein_init_tapgoods_wp() {
 
@@ -88,7 +88,7 @@ if ( ! function_exists( 'tapgrein_getenv_docker' ) ) {
 }
 
 // AJAX function to set default location
-function tapgoods_set_default_location() {
+function tapgrein_set_default_location() {
     if (!isset($_POST['location_id']) || !is_numeric($_POST['location_id'])) {
         wp_send_json_error();
     }
@@ -99,5 +99,5 @@ function tapgoods_set_default_location() {
 }
 
 // Adds AJAX actions for authenticated and unauthenticated users
-add_action('wp_ajax_set_default_location', 'tapgoods_set_default_location');
-add_action('wp_ajax_nopriv_set_default_location', 'tapgoods_set_default_location');
+add_action('wp_ajax_set_default_location', 'tapgrein_set_default_location');
+add_action('wp_ajax_nopriv_set_default_location', 'tapgrein_set_default_location');
