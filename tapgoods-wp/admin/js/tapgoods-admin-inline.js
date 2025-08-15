@@ -4,31 +4,11 @@
  * Centralizado script handling para el área de administración
  */
 
-// Manejo del botón de sincronización
+// Manejo del botón de sincronización - DEPRECATED
 function initSyncButton() {
-    jQuery(document).ready(function($) {
-        // Sync button para admin connection
-        $('#tapgrein_api_sync').on('click', function() {
-            $(this).prop('disabled', true).text('Syncing...');
-
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'execute_manual_sync',
-                    nonce: tg_admin_vars.sync_nonce
-                },
-                success: function(response) {
-                    alert('Synchronization completed.');
-                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
-                },
-                error: function() {
-                    alert('Synchronization failed.');
-                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
-                }
-            });
-        });
-    });
+    // This function is now handled in tapgoods-admin-complete.js
+    // Keeping empty to avoid conflicts
+    console.log('TapGoods: Sync button handling moved to complete.js');
 }
 
 // Funciones para popup de confirmación
@@ -40,40 +20,11 @@ function closePopup() {
     document.getElementById('popup').style.display = 'none';
 }
 
-// Sync inventory functionality
+// Sync inventory functionality - DEPRECATED
 function initInventorySync() {
-    jQuery(function($) {
-        function syncInventory() {
-            $('#tapgrein_api_sync').prop('disabled', true).text('WORKING');
-            $.ajax({
-                url: ajaxurl,
-                method: 'POST',
-                data: {
-                    action: 'tapgoods_manual_sync'
-                },
-                success: function(response) {
-                    $('#tapgoods_sync_status').text(response.message);
-                    if (response.success && response.continue) {
-                        setTimeout(function() {
-                            $('#tapgrein_api_sync').click();
-                        }, 1000);
-                    } else {
-                        $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error during sync: ' + error);
-                    $('#tapgoods_sync_status').text('Error during sync: ' + error);
-                    $('#tapgrein_api_sync').prop('disabled', false).text('SYNC');
-                }
-            });
-        }
-
-        // Start synchronization when the button is clicked
-        $('#tapgrein_api_sync').on('click', function() {
-            syncInventory();
-        });
-    });
+    // This function is now handled in tapgoods-admin-complete.js
+    // Keeping empty to avoid conflicts
+    console.log('TapGoods: Inventory sync handling moved to complete.js');
 }
 
 // Focus en form de tags

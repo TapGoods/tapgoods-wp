@@ -215,6 +215,77 @@ class Tapgoods_Admin {
 		die();
 	}
 
+	/**
+	 * AJAX handler to load location details
+	 */
+	public function load_location_details() {
+		// Verify nonce for security
+		if (!wp_verify_nonce($_POST['nonce'] ?? '', 'tapgrein_sync_nonce')) {
+			wp_send_json_error('Invalid nonce');
+			return;
+		}
+
+		$location_id = sanitize_text_field($_POST['location_id'] ?? '');
+		
+		if (empty($location_id)) {
+			wp_send_json_error('No location ID provided');
+			return;
+		}
+
+		// Get location data from database
+		$location_data = get_option('tg_location_' . $location_id);
+		$location_data = maybe_unserialize($location_data);
+
+		if (!$location_data) {
+			wp_send_json_error('Location not found');
+			return;
+		}
+
+		// Get default location for comparison
+		$default_location = get_option('tapgreino_default_location');
+		$is_default = ($default_location == $location_id);
+
+		// Prepare response data
+		$response_data = array(
+			'location_id' => $location_id,
+			'location_data' => $location_data,
+			'is_default' => $is_default,
+			'html' => $this->render_location_details_html($location_data, $location_id, $is_default)
+		);
+
+		wp_send_json_success($response_data);
+		die();
+	}
+
+	/**
+	 * Render location details HTML
+	 */
+	private function render_location_details_html($location_data, $location_id, $is_default) {
+		ob_start();
+		?>
+		<h2 class="mb-4 pt-4 mt-5">Location Details</h2>
+		
+		<?php if ($is_default): ?>
+			<p id="default_message">This is the current default location.</p>
+		<?php endif; ?>
+
+		<ul>
+			<?php foreach ($location_data as $key => $value): ?>
+				<li><strong><?php echo esc_html($key); ?>:</strong> 
+					<?php 
+					if (is_array($value)) {
+						echo esc_html(json_encode($value));
+					} else {
+						echo esc_html((string)$value);
+					}
+					?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+		<?php
+		return ob_get_clean();
+	}
+
 	public function tg_save_advanced() {
 		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 			return false;

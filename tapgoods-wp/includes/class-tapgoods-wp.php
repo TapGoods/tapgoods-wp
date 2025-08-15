@@ -84,6 +84,7 @@ class Tapgoods {
 		$this->loader->add_action( 'wp_ajax_tapgrein_update_connection', $this->plugin_admin, 'tapgrein_update_connection', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_nopriv_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
+		$this->loader->add_action( 'wp_ajax_load_location_details', $this->plugin_admin, 'load_location_details', 10, 1 );
 
 		$this->loader->add_action( 'tg_save_custom_css', $this->plugin_admin, 'tapgrein_save_styles', 10, 1 );
 		$this->loader->add_action( 'tg_save_advanced', $this->plugin_admin, 'tg_save_advanced', 10, 0 );

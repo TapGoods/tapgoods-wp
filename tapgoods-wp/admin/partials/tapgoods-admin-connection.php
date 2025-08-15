@@ -10,7 +10,7 @@ $connected       = ( ! empty( get_option( 'tg_api_connected', false ) ) );
 $button_text     = ( $connected ) ? 'CONNECTED' : 'CONNECT';
 $key_disabled    = ( defined( 'TAPGOODS_KEY' ) ) ? 'disabled' : '';
 $button_disabled = ( defined( 'TAPGOODS_KEY' ) || '' !== $api_key ) ? 'disabled' : '';
-$sync_hidden     = ( $connected ) ? '' : 'hidden style="display: none;"';
+$sync_hidden     = ( $connected ) ? '' : 'hidden style="display: none !important;"';
 
 // Check if a reset occurred
 $reset_done = get_option('tapgreino_reset_done', false);
@@ -88,6 +88,30 @@ if (isset($_POST['confirm_reset'])) {
         echo wp_kses(wpautop($sync_message), 'post');
     endif;
     ?>
+</div>
+
+<!-- Sync progress modal -->
+<div id="syncProgressModal" class="overlay" style="display: none;">
+    <div class="popup sync-popup">
+        <div class="sync-icon">
+            <span class="spinner-border spinner-border-lg text-primary" role="status" aria-hidden="true"></span>
+        </div>
+        <h2>Synchronization in Progress</h2>
+        <p>Please wait while we sync your inventory and locations from TapGoods. This process may take several minutes depending on the amount of data.</p>
+        <div class="sync-details">
+            <p><strong>What we're doing:</strong></p>
+            <ul>
+                <li>✓ Fetching categories and tags</li>
+                <li>✓ Updating inventory items</li>
+                <li>✓ Syncing location data</li>
+                <li>✓ Processing images and metadata</li>
+            </ul>
+        </div>
+        <p class="sync-warning"><strong>Important:</strong> Please do not close this window or navigate away until synchronization is complete.</p>
+        <div id="syncProgressStatus" class="sync-status">
+            <p>Initializing synchronization...</p>
+        </div>
+    </div>
 </div>
 
 <!-- Reset confirmation popup -->

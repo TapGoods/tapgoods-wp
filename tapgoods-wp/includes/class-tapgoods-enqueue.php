@@ -79,11 +79,19 @@ class Tapgoods_Enqueue {
         
         if ($this->is_tapgrein_admin_page($screen, $hook)) {
             
+            // Enqueue admin specific styles (connection modal, etc.)
+            wp_enqueue_style(
+                'tapgoods-admin',
+                plugin_dir_url(dirname(__FILE__)) . 'admin/css/tapgoods-admin.css',
+                array(),
+                TAPGOODSWP_VERSION
+            );
+            
             // Enqueue complete styles (includes all inline styles refactored)
             wp_enqueue_style(
                 'tapgoods-complete-styles',
                 plugin_dir_url(dirname(__FILE__)) . 'assets/css/tapgoods-complete-styles.css',
-                array(),
+                array('tapgoods-admin'),
                 TAPGOODSWP_VERSION
             );
             
@@ -488,49 +496,15 @@ class Tapgoods_Enqueue {
             wp_add_inline_style('tapgoods-complete-styles', $this->get_admin_post_type_styles());
         }
         
-        // Add connection page styles
-        if (get_current_screen() && strpos(get_current_screen()->id, 'tapgoods_page_tapgoods-connection') !== false) {
-            wp_add_inline_style('tapgoods-complete-styles', $this->get_admin_connection_styles());
-        }
+        // Connection styles are now in tapgoods-admin.css
     }
     
     /**
      * Get admin connection styles
      */
     private function get_admin_connection_styles() {
-        return '
-            .tapgoods-success {
-                background: #d4edda;
-                border: 1px solid #c3e6cb;
-                color: #155724;
-                padding: 15px;
-                margin: 10px 0;
-                border-radius: 4px;
-                display: block;
-            }
-            
-            .overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: none;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            }
-            
-            .overlay .popup {
-                background: white;
-                padding: 20px;
-                border-radius: 8px;
-                text-align: center;
-                max-width: 400px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            }
-        ';
+        // Styles are now in admin/css/tapgoods-admin.css
+        return '';
     }
 
     /**

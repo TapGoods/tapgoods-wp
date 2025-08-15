@@ -11,6 +11,9 @@ if (!is_array($locations)) {
 
 $selected_location = isset($_POST['selected_location']) ? sanitize_text_field( wp_unslash( $_POST['selected_location'] ) ) : null;
 
+// Check if this is an auto-load request (when dropdown changes)
+$is_auto_load = isset($_POST['auto_load_location']);
+
 // Get the current default location if no selection exists
 $default_location = get_option('tapgreino_default_location');
 if (empty($selected_location)) {

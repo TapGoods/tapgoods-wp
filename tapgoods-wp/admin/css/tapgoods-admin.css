@@ -125,3 +125,110 @@
     border: 1px solid #ddd;
     border-radius: 8px;
 }
+
+/* Connection Styles */
+.tapgoods-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    display: block;
+}
+
+/* Modal and Overlay Styles */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.overlay .popup {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Sync Progress Modal Styles */
+.sync-popup {
+    max-width: 600px !important;
+    text-align: left !important;
+    padding: 30px !important;
+}
+
+.sync-icon {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.sync-popup h2 {
+    color: #2271b1;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.sync-popup p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    color: #333;
+}
+
+.sync-details {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin: 20px 0;
+    border-left: 4px solid #2271b1;
+}
+
+.sync-details ul {
+    margin: 10px 0 0 20px;
+    color: #555;
+}
+
+.sync-details li {
+    margin-bottom: 5px;
+    color: #28a745;
+}
+
+.sync-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 12px;
+    color: #856404;
+    margin: 20px 0;
+}
+
+.sync-status {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 20px;
+    text-align: center;
+}
+
+.sync-status p {
+    margin: 0;
+    font-weight: 500;
+    color: #2271b1;
+}
+
+.spinner-border-lg {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3em;
+}
