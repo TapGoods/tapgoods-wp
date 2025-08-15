@@ -13,14 +13,14 @@ $button_disabled = ( defined( 'TAPGOODS_KEY' ) || '' !== $api_key ) ? 'disabled'
 $sync_hidden     = ( $connected ) ? '' : 'hidden style="display: none;"';
 
 // Check if a reset occurred
-$reset_done = get_option('tg_reset_done', false);
+$reset_done = get_option('tapgreino_reset_done', false);
 
 // Handle the "Reset to Default" action
 if (isset($_POST['confirm_reset'])) {
     delete_option('tg_key'); 
     delete_option('tg_api_connected');
     delete_option('tg_location_settings'); 
-    delete_option('tg_default_location');
+    delete_option('tapgreino_default_location');
     delete_option('tg_locationIds');
     delete_option('tg_businessId');
     delete_option('tg_last_api_key');
@@ -43,7 +43,7 @@ if (isset($_POST['confirm_reset'])) {
         wp_delete_post($post_id, true);
     }
 
-    update_option('tg_reset_done', true);
+    update_option('tapgreino_reset_done', true);
     $connected = false;
     echo '<p class="tapgoods-success">All data has been successfully deleted.</p>';
     wp_add_inline_script('tapgoods-admin-complete', 'showSuccessMessage();');
@@ -74,7 +74,7 @@ if (isset($_POST['confirm_reset'])) {
         <p class="help-text"> Generate an API key in your <a href="https://business.tapgoods.com/admin/storefront/wordpress" target="_blank">TapGoods WordPress Settings</a> </p>
         <p> <span style="font-weight: bold; color: #d63638; margin: 0;">Important note:</span> This key is only generated once and won't be displayed again. <br>
         Make sure to copy and save it immediately in a secure place.</p>       
-        <?php if ($reset_done) delete_option('tg_reset_done'); ?>
+        <?php if ($reset_done) delete_option('tapgreino_reset_done'); ?>
     <?php } elseif ($connected) { ?>
         <p class="help-text">Your site is connected to TapGoods. To generate a new API key, please contact <a href="mailto:support@tapgoods.com">support@tapgoods.com</a>.</p>
     <?php } ?>

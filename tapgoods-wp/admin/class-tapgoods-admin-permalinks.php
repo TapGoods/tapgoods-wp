@@ -163,7 +163,7 @@ class TG_Admin_Permalink_Settings {
 		}
 
 		// Need to save the options b/c settings API does not trigger on permalinks save
-		$permalinks = get_option( 'tapgoods_permalinks', array() );
+		$permalinks = get_option( 'tapgreino_permalinks', array() );
 
 		$permalinks['tg_category_base'] = ( isset( $_POST['tapgoods_product_category_slug'] ) ) ? sanitize_text_field( wp_unslash( $_POST['tapgoods_product_category_slug'] ) ) : $permalinks['tg_category_base']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$permalinks['tg_tag_base']      = ( isset( $_POST['tapgoods_product_tag_slug'] ) ) ? sanitize_text_field( wp_unslash( $_POST['tapgoods_product_tag_slug'] ) ) : $permalinks['tg_tag_base']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
@@ -172,7 +172,7 @@ class TG_Admin_Permalink_Settings {
 
 		$permalinks['tg_inventory_base'] = $product_base;
 
-		$update = update_option( 'tapgoods_permalinks', $permalinks );
+		$update = update_option( 'tapgreino_permalinks', $permalinks );
 		Tapgoods_Helpers::tgqm( 'update option permalinks' );
 		Tapgoods_Helpers::tgqm( $update );
 

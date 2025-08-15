@@ -71,7 +71,7 @@ wp_enqueue_script(
 // Localize script with necessary data
 wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
     'ajaxurl' => admin_url('admin-ajax.php'),
-    'default_location' => get_option('tg_default_location'),
+    'default_location' => get_option('tapgreino_default_location'),
     'plugin_url' => plugin_dir_url(dirname(dirname(__FILE__)))
 ));
 

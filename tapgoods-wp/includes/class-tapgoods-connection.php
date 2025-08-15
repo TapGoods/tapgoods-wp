@@ -445,12 +445,12 @@ class Tapgoods_Connection {
 		$this->console_log('Updated tg_location_settings option.');
 	
 		// Verifica y actualiza el valor por defecto si es necesario
-		$default_location = get_option('tg_default_location', false);
+		$default_location = get_option('tapgreino_default_location', false);
 		if (empty($default_location) || !in_array($default_location, $location_ids)) {
 			$this->console_log('Default location is not set or invalid. Setting to the first location_id.');
 			$new_default_location = reset($location_ids);
-			update_option('tg_default_location', $new_default_location);
-			$this->console_log('Updated tg_default_location to: ' . $new_default_location);
+			update_option('tapgreino_default_location', $new_default_location);
+			$this->console_log('Updated tapgreino_default_location to: ' . $new_default_location);
 		}
 	
 		$this->console_log('Completed sync_location_settings function.');

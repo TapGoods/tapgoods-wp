@@ -41,7 +41,7 @@ function tapgrein_maybe_define_constant( $name, $value ) {
  * @return array
  */
 function tapgrein_get_permalink_structure() {
-	$tg_permalinks = get_option( 'tapgoods_permalinks', array() );
+	$tg_permalinks = get_option( 'tapgreino_permalinks', array() );
 
 	$permalinks = wp_parse_args(
 		array_filter( $tg_permalinks ),
@@ -57,7 +57,7 @@ function tapgrein_get_permalink_structure() {
 		Tapgoods_Helpers::tgqm( 'get permalinks updating: ' );
 		Tapgoods_Helpers::tgqm( $tg_permalinks );
 		Tapgoods_Helpers::tgqm( $permalinks );
-		update_option( 'tapgoods_permalinks', $permalinks );
+		update_option( 'tapgreino_permalinks', $permalinks );
 	}
 
 	$permalinks['tg_inventory_rewrite_slug'] = untrailingslashit( $permalinks['tg_inventory_base'] );
@@ -408,7 +408,7 @@ function tapgrein_get_locations() {
 
 function tapgrein_location_styles() {
     // Obtener el location_id dinámicamente, por ejemplo, desde una cookie o configuración
-    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_location_id'] ) ) : get_option('tg_default_location');
+    $location_id = isset($_COOKIE['tg_location_id']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_location_id'] ) ) : get_option('tapgreino_default_location');
 
     // Registrar un log si no se encontró el location_id
     if ( !$location_id ) {
@@ -521,7 +521,7 @@ function tapgrein_get_tg_location_id( $post_id = false ) {
         }
     
         // Fallback to WordPress option
-        $default_location = get_option('tg_default_location');
+        $default_location = get_option('tapgreino_default_location');
         return $default_location ?: null;
     }
     
@@ -632,7 +632,7 @@ function tapgrein_get_product_add_to_cart_url( $product_id, $params = array() ) 
         
         // If the product has no location, use the default location
         if ( ! $location_id ) {
-            $location_id = get_option('tg_default_location');
+            $location_id = get_option('tapgreino_default_location');
             if ( ! $location_id ) {
                 error_log("Location not found for product_id: $product_id and no default location set.");
                 return '#';
@@ -1022,7 +1022,7 @@ add_action('wp_ajax_load_status_tab_content', function () {
     $api_connected = get_option('tg_api_connected');
     $key_defined = defined('TAPGOODS_KEY');
     $location_settings = maybe_unserialize(get_option('tg_location_settings'));
-    $reset_done = get_option('tg_reset_done');
+    $reset_done = get_option('tapgreino_reset_done');
 
     ?>
     <div class="container">
@@ -1098,7 +1098,7 @@ function tapgrein_get_default_location() {
     }
 
     // Otherwise, return the value from the WordPress options
-    $default_location = get_option('tg_default_location');
+    $default_location = get_option('tapgreino_default_location');
     return $default_location ?: null;
 }
 
@@ -1120,8 +1120,8 @@ add_action('wp_ajax_nopriv_tapgrein_set_local_storage_location', 'tapgrein_set_l
 function tapgrein_set_local_storage_location() {
     if (isset($_POST['local_storage_location']) && !empty($_POST['local_storage_location'])) {
         // Optionally store in a session or other server-side variable
-        $_SESSION['tg_default_location'] = isset($_POST['local_storage_location']) ? sanitize_text_field( wp_unslash( $_POST['local_storage_location'] ) ) : '';
-        wp_send_json_success( isset($_SESSION['tg_default_location']) ? sanitize_text_field( wp_unslash( $_SESSION['tg_default_location'] ) ) : '' );
+        $_SESSION['tapgreino_default_location'] = isset($_POST['local_storage_location']) ? sanitize_text_field( wp_unslash( $_POST['local_storage_location'] ) ) : '';
+        wp_send_json_success( isset($_SESSION['tapgreino_default_location']) ? sanitize_text_field( wp_unslash( $_SESSION['tapgreino_default_location'] ) ) : '' );
     } else {
         wp_send_json_error('No location provided');
     }
@@ -1279,7 +1279,7 @@ function tapgrein_enqueue_tag_page_scripts() {
         // Localize script with necessary data
         wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
-            'default_location' => get_option('tg_default_location'),
+            'default_location' => get_option('tapgreino_default_location'),
             'plugin_url' => plugin_dir_url(dirname(__FILE__))
         ));
         

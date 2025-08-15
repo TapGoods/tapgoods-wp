@@ -11,7 +11,7 @@ $key_defined = defined('TAPGOODS_KEY');
 $location_settings = maybe_unserialize(get_option('tg_location_settings'));
 
 // Check if reset has been done
-$reset_done = get_option('tg_reset_done');
+$reset_done = get_option('tapgreino_reset_done');
 ?>
 
 <?php

@@ -132,7 +132,7 @@ class Tapgoods_Shortcodes {
 			// Localize script with necessary data
 			wp_localize_script('tapgoods-public-inline', 'tg_public_vars', array(
 				'ajaxurl' => admin_url('admin-ajax.php'),
-				'default_location' => get_option('tg_default_location'),
+				'default_location' => get_option('tapgreino_default_location'),
 				'plugin_url' => plugin_dir_url(dirname(__FILE__))
 			));
 		}

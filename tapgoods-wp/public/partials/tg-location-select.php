@@ -11,7 +11,7 @@ if (!defined('DOING_AJAX') || !DOING_AJAX) {
 
 // Retrieve location IDs and default location
 $location_ids = maybe_unserialize(get_option('tg_locationIds', []));
-$default_location = get_option('tg_default_location'); // Default location in options
+$default_location = get_option('tapgreino_default_location'); // Default location in options
 // Prefer user-selected location from cookie, if present
 $cookie_location = isset($_COOKIE['tg_user_location']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg_user_location'] ) ) : '';
 $selected_location = $cookie_location !== '' ? $cookie_location : $default_location;

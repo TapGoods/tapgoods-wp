@@ -126,7 +126,7 @@ class Tapgoods_Enqueue {
             // Localize script with necessary data
             wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'default_location' => get_option('tg_default_location'),
+                'default_location' => get_option('tapgreino_default_location'),
                 'plugin_url' => plugin_dir_url(dirname(__FILE__))
             ));
 
@@ -352,7 +352,7 @@ class Tapgoods_Enqueue {
      * Get location selector inline script
      */
     private function get_location_selector_inline_script() {
-        $default_location = get_option('tg_default_location');
+        $default_location = get_option('tapgreino_default_location');
         return "
         // Ensure tg_public_vars is available for location selector
         if (typeof tg_public_vars === 'undefined') {

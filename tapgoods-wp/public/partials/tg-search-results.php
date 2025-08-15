@@ -53,7 +53,7 @@ $event_end_formatted = $event_end->format('Y-m-d\TH:i');
 $paged = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
 $posts_per_page = isset($_GET['per-page']) ? intval($_GET['per-page']) : 12;
 $search_query = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
-$location_id = isset( $_GET['tg_location_id'] ) ? sanitize_text_field( wp_unslash( $_GET['tg_location_id'] ) ) : get_option( 'tg_default_location' );
+$location_id = isset( $_GET['tg_location_id'] ) ? sanitize_text_field( wp_unslash( $_GET['tg_location_id'] ) ) : get_option( 'tapgreino_default_location' );
 
 // Retrieve location data based on location_id
 $location_option = get_option("tg_location_{$location_id}");

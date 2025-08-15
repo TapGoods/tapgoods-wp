@@ -94,7 +94,7 @@ function tapgrein_set_default_location() {
     }
 
     $location_id = intval($_POST['location_id']);
-    update_option('tg_default_location', $location_id); // Save location as default in WP options
+    update_option('tapgreino_default_location', $location_id); // Save location as default in WP options
     wp_send_json_success();
 }
 

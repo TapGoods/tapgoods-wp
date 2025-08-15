@@ -12,7 +12,7 @@ if (!is_array($locations)) {
 $selected_location = isset($_POST['selected_location']) ? sanitize_text_field( wp_unslash( $_POST['selected_location'] ) ) : null;
 
 // Get the current default location if no selection exists
-$default_location = get_option('tg_default_location');
+$default_location = get_option('tapgreino_default_location');
 if (empty($selected_location)) {
     $selected_location = $default_location;
 }
@@ -20,7 +20,7 @@ if (empty($selected_location)) {
 // Save default location when "Set as Default" button is pressed
 if (isset($_POST['set_default_location']) && $selected_location) {
     // Update the default location in the database
-    update_option('tg_default_location', $selected_location);
+    update_option('tapgreino_default_location', $selected_location);
 
     // Assign the selected location to the variable
     $default_location = $selected_location;
