@@ -156,7 +156,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 				<form>
 					<div class="input-group mb-3">
 						<input type="text" id="tapgoods-sign-in-input" class="form-control" disabled value="[tapgoods-sign-in]">
-						<button type="button" onClick="copyText('tapgoods-sign-in]-input')" 
+						<button type="button" onClick="copyText('tapgoods-sign-in-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
 								class="btn btn-outline-secondary">
@@ -220,43 +220,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 
 
 <?php
-// Add shortcode copy functionality using wp_add_inline_script
-wp_add_inline_script('tapgoods-admin-complete', '
-function copyText(inputId) {
-    const input = document.getElementById(inputId);
-    if (input) {
-        navigator.clipboard.writeText(input.value).then(() => {
-            console.log("TapGoods Admin: Copied to clipboard: " + input.value);
-            
-            // Show visual feedback
-            const button = document.querySelector("button[onclick=\"copyText(\'" + inputId + "\')\"]");
-            if (button) {
-                const originalText = button.innerHTML;
-                button.innerHTML = "Copied!";
-                button.style.background = "#28a745";
-                setTimeout(function() {
-                    button.innerHTML = originalText;
-                    button.style.background = "";
-                }, 1500);
-            }
-        }).catch(err => {
-            console.error("TapGoods Admin: Failed to copy: ", err);
-            
-            // Fallback for older browsers
-            try {
-                input.select();
-                input.setSelectionRange(0, 99999);
-                document.execCommand("copy");
-                console.log("TapGoods Admin: Copied using fallback method");
-            } catch (fallbackErr) {
-                console.error("TapGoods Admin: Fallback copy also failed: ", fallbackErr);
-            }
-        });
-    } else {
-        console.error("TapGoods Admin: Input element not found with ID: " + inputId);
-    }
-}
-');
+// Copy functionality is now handled by tapgoods-admin-complete.js
 ?>
 
 

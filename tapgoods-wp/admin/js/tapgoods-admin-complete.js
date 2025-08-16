@@ -378,22 +378,72 @@ function showSuccessMessage(message = null, type = 'success') {
 function initAdminShortcodes() {
     // Copy shortcode to clipboard function
     window.copyText = function(elementId) {
-        const copyText = document.getElementById(elementId);
-        if (copyText) {
-            copyText.select();
-            copyText.setSelectionRange(0, 99999); // For mobile devices
-            document.execCommand("copy");
-            
-            // Show feedback
-            const button = document.querySelector(`button[onclick="copyText('${elementId}')"]`);
+        const input = document.getElementById(elementId);
+        if (!input) {
+            console.error("TapGoods Admin: Input element not found with ID: " + elementId);
+            return;
+        }
+        
+        const button = document.querySelector(`button[onclick*="${elementId}"]`);
+        const originalButtonContent = button ? button.innerHTML : null;
+        
+        // Function to show visual feedback
+        function showCopyFeedback(success = true) {
             if (button) {
-                const originalText = button.innerHTML;
-                button.innerHTML = 'Copied!';
-                button.style.background = '#28a745';
+                button.innerHTML = success ? "Copied!" : "Failed";
+                button.style.background = success ? "#28a745" : "#dc3545";
+                button.style.color = "#fff";
                 setTimeout(function() {
-                    button.innerHTML = originalText;
-                    button.style.background = '';
+                    button.innerHTML = originalButtonContent;
+                    button.style.background = "";
+                    button.style.color = "";
                 }, 1500);
+            }
+        }
+        
+        // Try modern clipboard API first
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(input.value).then(() => {
+                console.log("TapGoods Admin: Copied to clipboard: " + input.value);
+                showCopyFeedback(true);
+            }).catch(err => {
+                console.error("TapGoods Admin: Modern clipboard failed: ", err);
+                // Fall back to legacy method
+                fallbackCopy();
+            });
+        } else {
+            // Use fallback method directly
+            fallbackCopy();
+        }
+        
+        function fallbackCopy() {
+            try {
+                // Create a temporary textarea element
+                const tempTextarea = document.createElement('textarea');
+                tempTextarea.value = input.value;
+                tempTextarea.style.position = 'fixed';
+                tempTextarea.style.left = '-999999px';
+                tempTextarea.style.top = '-999999px';
+                document.body.appendChild(tempTextarea);
+                
+                // Select and copy
+                tempTextarea.focus();
+                tempTextarea.select();
+                const successful = document.execCommand('copy');
+                
+                // Remove temporary element
+                document.body.removeChild(tempTextarea);
+                
+                if (successful) {
+                    console.log("TapGoods Admin: Copied using fallback method: " + input.value);
+                    showCopyFeedback(true);
+                } else {
+                    console.error("TapGoods Admin: Fallback copy command failed");
+                    showCopyFeedback(false);
+                }
+            } catch (fallbackErr) {
+                console.error("TapGoods Admin: Fallback copy also failed: ", fallbackErr);
+                showCopyFeedback(false);
             }
         }
     };
