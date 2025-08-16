@@ -168,7 +168,8 @@ class Tapgoods_Connection {
 	
 		// Check if the synchronization is in progress
 		if (get_transient('tapgrein_sync_lock')) {
-			return 'Sync in progress. Please wait...';
+			//return 'Sync in progress. Please wait...';
+			return '';
 		}
 	
 		// Get the last synchronization information
