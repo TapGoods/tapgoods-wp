@@ -750,7 +750,7 @@ class Tapgoods_Connection {
 	public function tg_insert_or_update_term($term, $tax) {
 		$tg_id = $term['id']; // The unique ID of the term from the external source.
 		$name = $term['name']; // The name of the term.
-		$slug = str_replace('_', '-', $term['slug'] ?? sanitize_title($term['name'])); // Generate a sanitized slug.
+		$slug = $term['slug'] ?? sanitize_title($term['name']); // Use original slug from API
 	
 		$term_args = array('slug' => $slug);
 	
