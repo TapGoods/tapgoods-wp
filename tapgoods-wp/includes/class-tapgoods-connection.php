@@ -766,8 +766,47 @@ class Tapgoods_Connection {
 		]);
 	
 		if (!empty($existing_term)) {
-			$this->console_log("Term exists for tg_id: $tg_id (ID: {$existing_term[0]})");
-			return $existing_term[0]; // Return the existing term ID.
+			$term_id = $existing_term[0];
+			$existing_term_obj = get_term($term_id, $tax);
+			
+			if (is_wp_error($existing_term_obj)) {
+				$this->console_log("Error getting existing term: {$existing_term_obj->get_error_message()}");
+				return false;
+			}
+			
+			// Check if name or slug has changed
+			$name_changed = $existing_term_obj->name !== $name;
+			$slug_changed = $existing_term_obj->slug !== $slug;
+			
+			if ($name_changed || $slug_changed) {
+				$this->console_log("Term exists for tg_id: $tg_id (ID: {$term_id}), changes detected - updating...");
+				
+				if ($name_changed) {
+					$this->console_log("Name changed from '{$existing_term_obj->name}' to '{$name}'");
+				}
+				if ($slug_changed) {
+					$this->console_log("Slug changed from '{$existing_term_obj->slug}' to '{$slug}'");
+				}
+				
+				// Update the existing term with new name and slug
+				$update_result = wp_update_term($term_id, $tax, array(
+					'name' => $name,
+					'slug' => $slug
+				));
+				
+				if (is_wp_error($update_result)) {
+					$this->console_log("Error updating term: {$update_result->get_error_message()}");
+				} else {
+					$this->console_log("Successfully updated term: $name with slug: $slug");
+				}
+			} else {
+				$this->console_log("Term exists for tg_id: $tg_id (ID: {$term_id}), no changes detected - skipping update");
+			}
+			
+			// Always update metadata hash
+			update_term_meta($term_id, 'tg_hash', $this->hash);
+			
+			return $term_id; // Return the term ID.
 		}
 	
 		// Attempt to insert the new term.
