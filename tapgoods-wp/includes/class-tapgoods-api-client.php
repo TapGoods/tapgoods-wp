@@ -180,7 +180,13 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 		$env = $this->get_config( 'tg_env' );
 
-		$storefront_url = 'https://' . $data['subdomain'] . '.' . $env;
+		$domains_array = $response['data']['getLocationDetails']['storefrontSetting']['domains'];
+
+		if (!empty($domains_array) && isset($domains_array[0]['name'])) {
+		    $storefront_url = 'https://' . $domains_array[0]['name'];
+		} else {
+		    $storefront_url = 'https://' . $data['subdomain'] . '.' . $env;
+		}
 
 		$data['sf_url']      = trailingslashit( $storefront_url );
 		$data['cart_url']    = trailingslashit( $storefront_url ) . 'cart?externalRedirect=true';
