@@ -453,7 +453,7 @@ if ( true ) {
 	<?php wp_nonce_field( 'add-tag', '_wpnonce_add-tag' ); ?>
 
 <div class="form-field form-required term-name-wrap">
-	<label for="tag-name"><?php esc_html_ex( 'Name', 'term name', 'tapgoods' ); ?></label>
+	<label for="tag-name"><?php echo esc_html_x( 'Name', 'term name', 'tapgoods' ); ?></label>
 	<input name="tag-name" id="tag-name" type="text" value="" size="40" aria-required="true" aria-describedby="name-description" />
 	<p id="name-description"><?php echo esc_html( $tax->labels->name_field_description ); ?></p>
 </div>
