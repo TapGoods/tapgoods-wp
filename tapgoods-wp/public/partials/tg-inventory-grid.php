@@ -67,15 +67,30 @@ if (false !== $tg_search) {
     $args['s'] = $tg_search;
 }
 
-$categories = get_query_var('tg_category', false);
-$tg_tags    = get_query_var('tg_tags', false);
-
+// Get categories from query var 'category' or shortcode attribute
+$categories = get_query_var('category', false);
+if (false === $categories) {
+    $categories = get_query_var('tg_category', false);
+}
 if (!empty($atts['category'])) {
     $categories = explode(',', $atts['category']);
 }
+// Convert to array if it's a string
+if (is_string($categories) && !empty($categories)) {
+    $categories = explode(',', $categories);
+}
 
+// Get tags from query var 'tags' or shortcode attribute
+$tg_tags = get_query_var('tags', false);
+if (false === $tg_tags) {
+    $tg_tags = get_query_var('tg_tags', false);
+}
 if (!empty($atts['tags'])) {
     $tg_tags = explode(',', $atts['tags']);
+}
+// Convert to array if it's a string
+if (is_string($tg_tags) && !empty($tg_tags)) {
+    $tg_tags = explode(',', $tg_tags);
 }
 
 $tax_args = array();
@@ -110,12 +125,11 @@ if (false !== $tg_tags) {
 
 if (count($tax_args) === 1) {
     $args['tax_query'] = $tax_args;
-}
-
-if (count($tax_args) > 1) {
-    $args['tax_query'] = array(
-        'relation' => 'OR',
-        $tax_args,
+} elseif (count($tax_args) > 1) {
+    // When filtering by both category AND tag, use AND relation
+    $args['tax_query'] = array_merge(
+        array('relation' => 'AND'),
+        $tax_args
     );
 }
 

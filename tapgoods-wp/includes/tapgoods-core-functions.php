@@ -252,9 +252,12 @@ function tapgrein_custom_query_vars( $vars ) {
 	$vars[] = 'empty-cart';
 	$vars[] = 'set-location';
 	$vars[] = 'active-filters';
+	$vars[] = 'category';
+	$vars[] = 'tags';
 	// tapgrein_write_log( $vars );
 	return $vars;
 }
+add_filter('query_vars', 'tapgrein_custom_query_vars');
 
 function tapgrein_empty_cart( $wp ) {
 

@@ -61,7 +61,7 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 					// Get subcategories (tags) for this category
 					$subcategories = get_terms( array(
 						'taxonomy'   => 'tg_tags',
-						'hide_empty' => true,
+						'hide_empty' => false, // Changed to false to see all tags
 						'meta_query' => array(
 							array(
 								'key'     => 'tg_parent_category',
@@ -71,6 +71,16 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 						)
 					) );
 					$has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
+
+					// Debug: Log subcategories found
+					if (defined('WP_DEBUG') && WP_DEBUG) {
+						error_log("Category: {$category->name} (ID: {$category->term_id}) - Subcategories found: " . count($subcategories));
+						if (!empty($subcategories)) {
+							foreach ($subcategories as $sub) {
+								error_log("  - Subcategory: {$sub->name} (slug: {$sub->slug})");
+							}
+						}
+					}
 				?>
 					<div class="category-item">
 						<div class="category-header">
