@@ -128,9 +128,95 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
 
+<script>
+// TEMPORARY: Inline script to test subcategory functionality
+// This will be moved back to tapgoods-public-complete.js once working
+console.log('TapGoods Filter: Inline script loaded');
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('TapGoods Filter: DOM ready, initializing subcategory toggles');
+
+    const subcategoryToggles = document.querySelectorAll(".subcategory-toggle");
+    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+    const categoryLinks = document.querySelectorAll(".category-link");
+
+    console.log('TapGoods Filter: Found', subcategoryToggles.length, 'toggles');
+    console.log('TapGoods Filter: Found', subcategoryLinks.length, 'subcategory links');
+    console.log('TapGoods Filter: Found', categoryLinks.length, 'category links');
+
+    // Handle subcategory toggle clicks
+    subcategoryToggles.forEach(function(toggle) {
+        toggle.addEventListener("click", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const categoryId = this.getAttribute("data-category-id");
+            const subcategoryList = document.querySelector('.subcategory-list[data-parent-category="' + categoryId + '"]');
+            const toggleIcon = this.querySelector(".toggle-icon");
+
+            console.log('TapGoods Filter: Toggle clicked for category', categoryId);
+
+            if (subcategoryList) {
+                const isVisible = subcategoryList.style.display !== "none" && subcategoryList.style.display !== "";
+                subcategoryList.style.display = isVisible ? "none" : "block";
+                toggleIcon.textContent = isVisible ? "▶" : "▼";
+                console.log('TapGoods Filter: Subcategory list toggled to', subcategoryList.style.display);
+            } else {
+                console.log('TapGoods Filter: No subcategory list found for category', categoryId);
+            }
+        });
+    });
+
+    // Handle subcategory clicks
+    subcategoryLinks.forEach(function(link) {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const selectedTag = this.getAttribute("data-tag-id");
+            if (!selectedTag) return;
+
+            console.log('TapGoods Filter: Subcategory clicked:', selectedTag);
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const cleanTag = selectedTag.startsWith('tag-') ? selectedTag.substring(4) : selectedTag;
+            urlParams.set('tags', cleanTag);
+            urlParams.delete('category');
+            urlParams.delete('paged');
+
+            window.location.search = urlParams.toString();
+        });
+    });
+
+    // Handle category clicks
+    categoryLinks.forEach(function(link) {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const selectedCategory = this.getAttribute("data-category-id");
+            console.log('TapGoods Filter: Category clicked:', selectedCategory);
+
+            if (selectedCategory === null || selectedCategory === "") {
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.delete('category');
+                urlParams.delete('tags');
+                urlParams.delete('paged');
+                window.location.search = urlParams.toString();
+                return;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('category', selectedCategory);
+            urlParams.delete('tags');
+            urlParams.delete('paged');
+
+            window.location.search = urlParams.toString();
+        });
+    });
+});
+</script>
+
 <?php
-// Script functionality moved to Tapgoods_Enqueue class and tapgoods-public-complete.js
-// Inline script removed for WordPress best practices compliance
+// Original script removed - now using inline script above temporarily
 /*<script>
 document.addEventListener("DOMContentLoaded", function() {
     var accordionCollapse = document.getElementById("collapseOne");

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c \"c:\\docker\\tapgoods-wp\\tapgoods-wp\\public\\js\\tapgoods-public-complete.js\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
