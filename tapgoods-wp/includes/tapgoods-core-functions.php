@@ -1281,27 +1281,42 @@ function tapgrein_update_inventory_grid() {
 add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 
-// Redirect category archive pages to shop page with category filter
-add_action('template_redirect', 'tapgrein_redirect_category_archives');
-function tapgrein_redirect_category_archives() {
+// Redirect category and tag archive pages to shop page with filters
+add_action('template_redirect', 'tapgrein_redirect_taxonomy_archives');
+function tapgrein_redirect_taxonomy_archives() {
+    $term = get_queried_object();
+
+    if (!$term || is_wp_error($term)) {
+        return;
+    }
+
+    $shop_url = home_url('/shop/');
+    $redirect_url = null;
+
     // Check if this is a tg_category taxonomy archive page
     if (is_tax('tg_category')) {
-        $term = get_queried_object();
+        // Use category slug as-is (no prefix to remove)
+        $category_slug = $term->slug;
 
-        if ($term && !is_wp_error($term)) {
-            // Get the shop page URL (you may need to adjust this to match your shop page slug)
-            $shop_url = home_url('/shop/');
-
-            // Use category slug as-is (no prefix to remove)
-            $category_slug = $term->slug;
-
-            // Build redirect URL with category parameter
-            $redirect_url = add_query_arg('category', $category_slug, $shop_url);
-
-            // Perform 301 redirect
-            wp_safe_redirect($redirect_url, 301);
-            exit;
+        // Build redirect URL with category parameter
+        $redirect_url = add_query_arg('category', $category_slug, $shop_url);
+    }
+    // Check if this is a tg_tags taxonomy archive page
+    elseif (is_tax('tg_tags')) {
+        // Remove 'tag-' prefix from slug if present for cleaner URL
+        $tag_slug = $term->slug;
+        if (strpos($tag_slug, 'tag-') === 0) {
+            $tag_slug = substr($tag_slug, 4); // Remove 'tag-' prefix
         }
+
+        // Build redirect URL with tags parameter
+        $redirect_url = add_query_arg('tags', $tag_slug, $shop_url);
+    }
+
+    // Perform redirect if URL was set
+    if ($redirect_url) {
+        wp_safe_redirect($redirect_url, 301);
+        exit;
     }
 }
 

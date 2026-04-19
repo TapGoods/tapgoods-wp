@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.TG.initProductSingle();
     initSearchHandlers();
     initSearchResults();
+    // Initialize category menu with subcategories (independent of inventory grid)
+    initCategoryMenu();
     initSignInHandlers();
     initSignUpHandlers();
     initTagResults();
@@ -684,13 +686,17 @@ function setupInventorySearch() {
 }
 
 /**
- * Setup inventory pagination functionality
+ * Initialize category menu with subcategories
  */
-function setupInventoryPagination() {
-    const categoryLinks = document.querySelectorAll(".category-link");
-    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+function initCategoryMenu() {
+    console.log('TapGoods: Initializing category menu');
     const subcategoryToggles = document.querySelectorAll(".subcategory-toggle");
-    const paginationLinks = document.querySelectorAll(".pagination a");
+    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+    const categoryLinks = document.querySelectorAll(".category-link");
+
+    console.log('TapGoods: Found', subcategoryToggles.length, 'subcategory toggles');
+    console.log('TapGoods: Found', subcategoryLinks.length, 'subcategory links');
+    console.log('TapGoods: Found', categoryLinks.length, 'category links');
 
     // Handle subcategory toggle clicks
     subcategoryToggles.forEach(toggle => {
@@ -702,10 +708,13 @@ function setupInventoryPagination() {
             const subcategoryList = document.querySelector(`.subcategory-list[data-parent-category="${categoryId}"]`);
             const toggleIcon = this.querySelector(".toggle-icon");
 
+            console.log('TapGoods: Toggle clicked for category', categoryId);
+
             if (subcategoryList) {
-                const isVisible = subcategoryList.style.display !== "none";
+                const isVisible = subcategoryList.style.display !== "none" && subcategoryList.style.display !== "";
                 subcategoryList.style.display = isVisible ? "none" : "block";
                 toggleIcon.textContent = isVisible ? "▶" : "▼";
+                console.log('TapGoods: Subcategory list toggled to', subcategoryList.style.display);
             }
         });
     });
@@ -718,10 +727,13 @@ function setupInventoryPagination() {
             const selectedTag = this.getAttribute("data-tag-id");
             if (!selectedTag) return;
 
+            console.log('TapGoods: Subcategory clicked:', selectedTag);
+
             const urlParams = new URLSearchParams(window.location.search);
             // Remove 'tag-' prefix if present for cleaner URL
             const cleanTag = selectedTag.startsWith('tag-') ? selectedTag.substring(4) : selectedTag;
             urlParams.set('tags', cleanTag);
+            urlParams.delete('category'); // Clear category filter when selecting tag
             urlParams.delete('paged'); // Reset pagination
 
             window.location.search = urlParams.toString();
@@ -729,6 +741,46 @@ function setupInventoryPagination() {
     });
 
     // Handle category clicks
+    categoryLinks.forEach(link => {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const selectedCategory = this.getAttribute("data-category-id");
+            console.log('TapGoods: Category clicked:', selectedCategory);
+
+            // If All Categories or empty category is clicked, reset filters to show all
+            if (selectedCategory === null || selectedCategory === "") {
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.delete('category');
+                urlParams.delete('tags');
+                urlParams.delete('paged');
+                window.location.search = urlParams.toString();
+                return;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('category', selectedCategory);
+            urlParams.delete('tags'); // Clear tag filter when selecting category
+            urlParams.delete('paged'); // Reset pagination
+
+            window.location.search = urlParams.toString();
+        });
+    });
+}
+
+/**
+ * Setup inventory pagination functionality
+ */
+function setupInventoryPagination() {
+    const categoryLinks = document.querySelectorAll(".category-link");
+    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+    const subcategoryToggles = document.querySelectorAll(".subcategory-toggle");
+    const paginationLinks = document.querySelectorAll(".pagination a");
+
+    // Category and subcategory functionality is now handled by initCategoryMenu()
+    // This function now only handles pagination
+
+    // Handle category clicks (keeping for backward compatibility)
     categoryLinks.forEach(link => {
         link.addEventListener("click", function(event) {
             event.preventDefault();
