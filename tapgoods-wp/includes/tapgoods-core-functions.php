@@ -1420,6 +1420,47 @@ function tapgrein_enqueue_yoast_seo_assets($hook) {
 }
 add_action('admin_enqueue_scripts', 'tapgrein_enqueue_yoast_seo_assets');
 
+// Add custom column to show parent category for tags in admin
+add_filter('manage_edit-tg_tags_columns', 'tapgrein_add_parent_category_column');
+function tapgrein_add_parent_category_column($columns) {
+    // Add new column after the 'name' column
+    $new_columns = array();
+    foreach ($columns as $key => $value) {
+        $new_columns[$key] = $value;
+        if ($key === 'name') {
+            $new_columns['parent_category'] = __('Parent Category', 'tapgoods');
+        }
+    }
+    return $new_columns;
+}
+
+// Populate the parent category column
+add_filter('manage_tg_tags_custom_column', 'tapgrein_populate_parent_category_column', 10, 3);
+function tapgrein_populate_parent_category_column($content, $column_name, $term_id) {
+    if ($column_name === 'parent_category') {
+        $parent_category_id = get_term_meta($term_id, 'tg_parent_category', true);
+
+        if ($parent_category_id) {
+            $parent_category = get_term($parent_category_id, 'tg_category');
+            if ($parent_category && !is_wp_error($parent_category)) {
+                $content = esc_html($parent_category->name);
+            } else {
+                $content = '<span style="color: #999;">—</span>';
+            }
+        } else {
+            $content = '<span style="color: #999;">No parent</span>';
+        }
+    }
+    return $content;
+}
+
+// Make the parent category column sortable
+add_filter('manage_edit-tg_tags_sortable_columns', 'tapgrein_make_parent_category_sortable');
+function tapgrein_make_parent_category_sortable($columns) {
+    $columns['parent_category'] = 'parent_category';
+    return $columns;
+}
+
 // Ensure REST API compatibility for Yoast SEO
 function tapgrein_enable_rest_api_for_tg_inventory($args, $post_type) {
     if ('tg_inventory' === $post_type) {

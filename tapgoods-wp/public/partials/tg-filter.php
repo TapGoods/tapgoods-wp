@@ -73,19 +73,16 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 					) );
 
 					// TEMPORARY: If no subcategories found with parent relationship,
-					// get ALL tags (this will be removed after sync is working)
+					// show ALL tags so user can see what tags exist
+					// This will be removed after sync establishes proper relationships
 					if (empty($subcategories) || is_wp_error($subcategories)) {
-						// Get location ID to filter tags
-						$location_id = tapgrein_get_wp_location_id();
-
-						// For now, just get first 5 tags to test functionality
+						// Get ALL tags (no limit) to see what exists
 						$subcategories = get_terms( array(
 							'taxonomy'   => 'tg_tags',
 							'hide_empty' => false,
-							'number'     => 5,
 						) );
 
-						error_log("TEMP: Category {$category->name} - Using all tags temporarily. Found: " . count($subcategories));
+						error_log("TEMP: Category {$category->name} - No parent relationships found. Showing all tags: " . count($subcategories));
 					}
 
 					$has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
