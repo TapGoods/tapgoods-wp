@@ -125,7 +125,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initSearchHandlers();
     initSearchResults();
     // Initialize category menu with subcategories (independent of inventory grid)
-    initCategoryMenu();
+    console.log('TapGoods: About to call initCategoryMenu');
+    try {
+        initCategoryMenu();
+        console.log('TapGoods: initCategoryMenu completed successfully');
+    } catch(e) {
+        console.error('TapGoods: Error in initCategoryMenu:', e);
+    }
     initSignInHandlers();
     initSignUpHandlers();
     initTagResults();

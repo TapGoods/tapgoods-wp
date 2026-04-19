@@ -59,9 +59,10 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 
 				<?php foreach ( $categories as $category ) :
 					// Get subcategories (tags) for this category
+					// First try to get tags with parent relationship
 					$subcategories = get_terms( array(
 						'taxonomy'   => 'tg_tags',
-						'hide_empty' => false, // Changed to false to see all tags
+						'hide_empty' => false,
 						'meta_query' => array(
 							array(
 								'key'     => 'tg_parent_category',
@@ -70,15 +71,30 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 							)
 						)
 					) );
+
+					// TEMPORARY: If no subcategories found with parent relationship,
+					// get ALL tags (this will be removed after sync is working)
+					if (empty($subcategories) || is_wp_error($subcategories)) {
+						// Get location ID to filter tags
+						$location_id = tapgrein_get_wp_location_id();
+
+						// For now, just get first 5 tags to test functionality
+						$subcategories = get_terms( array(
+							'taxonomy'   => 'tg_tags',
+							'hide_empty' => false,
+							'number'     => 5,
+						) );
+
+						error_log("TEMP: Category {$category->name} - Using all tags temporarily. Found: " . count($subcategories));
+					}
+
 					$has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
 
 					// Debug: Log subcategories found
-					if (defined('WP_DEBUG') && WP_DEBUG) {
-						error_log("Category: {$category->name} (ID: {$category->term_id}) - Subcategories found: " . count($subcategories));
-						if (!empty($subcategories)) {
-							foreach ($subcategories as $sub) {
-								error_log("  - Subcategory: {$sub->name} (slug: {$sub->slug})");
-							}
+					error_log("Category: {$category->name} (ID: {$category->term_id}) - Subcategories found: " . (is_array($subcategories) ? count($subcategories) : 0));
+					if (!empty($subcategories) && is_array($subcategories)) {
+						foreach ($subcategories as $sub) {
+							error_log("  - Subcategory: {$sub->name} (slug: {$sub->slug})");
 						}
 					}
 				?>
