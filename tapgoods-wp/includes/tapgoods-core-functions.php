@@ -473,13 +473,55 @@ function tapgrein_output_location_styles() {
 
 
 
-function tapgrein_get_categories() {
+function tapgrein_get_categories( $location_id = null ) {
+	// If no location is specified, try to get the current user's location
+	if ( null === $location_id ) {
+		$location_id = tapgrein_get_wp_location_id();
+	}
+
+	// If we still don't have a location, return all categories
+	if ( empty( $location_id ) ) {
+		$terms = get_terms(
+			array(
+				'taxonomy'   => 'tg_category',
+				'hide_empty' => false,
+			)
+		);
+		return $terms;
+	}
+
+	// Get all items for this location
+	$items_query = new WP_Query(
+		array(
+			'post_type'      => 'tg_inventory',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_query'     => array(
+				array(
+					'key'     => 'tg_locationId',
+					'value'   => $location_id,
+					'compare' => '=',
+				),
+			),
+		)
+	);
+
+	// If no items found for this location, return empty array
+	if ( empty( $items_query->posts ) ) {
+		wp_reset_postdata();
+		return array();
+	}
+
+	// Get categories that are assigned to these items
 	$terms = get_terms(
 		array(
 			'taxonomy'   => 'tg_category',
-			'hide_empty' => false,
+			'hide_empty' => true, // Only show categories with items
+			'object_ids' => $items_query->posts, // Filter by items in this location
 		)
 	);
+
+	wp_reset_postdata();
 	return $terms;
 }
 
@@ -872,9 +914,21 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'tapgrein_handle_tg_search');
     $show_pricing = isset($_POST['show_pricing']) ? $_POST['show_pricing'] === 'true' : true;
     
 
+    // Decode HTML entities in category names
     $categories = array_map(function($category) {
         return htmlspecialchars_decode($category);
     }, $categories);
+
+    // Add 'tag-' prefix to tag slugs if not already present
+    // Categories don't need prefix
+    if (!empty($tags)) {
+        $tags = array_map(function($tag_slug) {
+            if (strpos($tag_slug, 'tag-') !== 0) {
+                return 'tag-' . $tag_slug;
+            }
+            return $tag_slug;
+        }, $tags);
+    }
 
     $args = [
         'post_type'      => 'tg_inventory',
@@ -1226,6 +1280,30 @@ function tapgrein_update_inventory_grid() {
 }
 add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
+
+// Redirect category archive pages to shop page with category filter
+add_action('template_redirect', 'tapgrein_redirect_category_archives');
+function tapgrein_redirect_category_archives() {
+    // Check if this is a tg_category taxonomy archive page
+    if (is_tax('tg_category')) {
+        $term = get_queried_object();
+
+        if ($term && !is_wp_error($term)) {
+            // Get the shop page URL (you may need to adjust this to match your shop page slug)
+            $shop_url = home_url('/shop/');
+
+            // Use category slug as-is (no prefix to remove)
+            $category_slug = $term->slug;
+
+            // Build redirect URL with category parameter
+            $redirect_url = add_query_arg('category', $category_slug, $shop_url);
+
+            // Perform 301 redirect
+            wp_safe_redirect($redirect_url, 301);
+            exit;
+        }
+    }
+}
 
 add_filter('template_include', 'tapgrein_custom_tax_template');
 function tapgrein_custom_tax_template($template) {

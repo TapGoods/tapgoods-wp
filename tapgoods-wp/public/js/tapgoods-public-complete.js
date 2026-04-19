@@ -688,8 +688,46 @@ function setupInventorySearch() {
  */
 function setupInventoryPagination() {
     const categoryLinks = document.querySelectorAll(".category-link");
+    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+    const subcategoryToggles = document.querySelectorAll(".subcategory-toggle");
     const paginationLinks = document.querySelectorAll(".pagination a");
-    
+
+    // Handle subcategory toggle clicks
+    subcategoryToggles.forEach(toggle => {
+        toggle.addEventListener("click", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const categoryId = this.getAttribute("data-category-id");
+            const subcategoryList = document.querySelector(`.subcategory-list[data-parent-category="${categoryId}"]`);
+            const toggleIcon = this.querySelector(".toggle-icon");
+
+            if (subcategoryList) {
+                const isVisible = subcategoryList.style.display !== "none";
+                subcategoryList.style.display = isVisible ? "none" : "block";
+                toggleIcon.textContent = isVisible ? "▶" : "▼";
+            }
+        });
+    });
+
+    // Handle subcategory clicks
+    subcategoryLinks.forEach(link => {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            const selectedTag = this.getAttribute("data-tag-id");
+            if (!selectedTag) return;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            // Remove 'tag-' prefix if present for cleaner URL
+            const cleanTag = selectedTag.startsWith('tag-') ? selectedTag.substring(4) : selectedTag;
+            urlParams.set('tags', cleanTag);
+            urlParams.delete('paged'); // Reset pagination
+
+            window.location.search = urlParams.toString();
+        });
+    });
+
     // Handle category clicks
     categoryLinks.forEach(link => {
         link.addEventListener("click", function(event) {

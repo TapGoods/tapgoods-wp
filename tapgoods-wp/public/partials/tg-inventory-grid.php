@@ -80,6 +80,7 @@ if (!empty($atts['tags'])) {
 
 $tax_args = array();
 if (false !== $categories) {
+    // Categories use original slug without prefix
     $tax_args[] = array(
         'taxonomy' => 'tg_category',
         'terms'    => $categories,
@@ -89,9 +90,19 @@ if (false !== $categories) {
 }
 
 if (false !== $tg_tags) {
+    // Add 'tag-' prefix to tag slugs if not already present
+    $prefixed_tags = array();
+    foreach ($tg_tags as $tag_slug) {
+        if (strpos($tag_slug, 'tag-') !== 0) {
+            $prefixed_tags[] = 'tag-' . $tag_slug;
+        } else {
+            $prefixed_tags[] = $tag_slug;
+        }
+    }
+
     $tax_args[] = array(
         'taxonomy' => 'tg_tags',
-        'terms'    => $tg_tags,
+        'terms'    => $prefixed_tags,
         'field'    => 'slug',
         'operator' => 'IN',
     );

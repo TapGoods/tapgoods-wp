@@ -11275,6 +11275,54 @@ a > .tapgoods code {
 .tapgoods#tg-shop .category-links {
   background-color: var(--tg-dark-secondary);
 }
+.tapgoods#tg-shop .category-item {
+  position: relative;
+}
+.tapgoods#tg-shop .category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+.tapgoods#tg-shop .category-header .category-link {
+  flex: 1;
+}
+.tapgoods#tg-shop .subcategory-toggle {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 1rem 60px 1rem 10px;
+  font-size: 0.9em;
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+}
+.tapgoods#tg-shop .subcategory-toggle:hover {
+  opacity: 0.7;
+}
+.tapgoods#tg-shop .toggle-icon {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+.tapgoods#tg-shop .subcategory-list {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding-left: 20px;
+}
+.tapgoods#tg-shop .subcategory-link {
+  display: block;
+  padding: 0.75rem 60px;
+  text-decoration: none;
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+.tapgoods#tg-shop .subcategory-link:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+}
 .tapgoods#tg-shop .accordion-button::after {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");
 }

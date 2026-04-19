@@ -57,10 +57,42 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 					<?php esc_html_e( 'All Categories', 'tapgoods' ); ?>
 				</a>
 
-				<?php foreach ( $categories as $category ) : ?>
-					<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
-						<?php echo esc_html( $category->name ); ?>
-					</a>
+				<?php foreach ( $categories as $category ) :
+					// Get subcategories (tags) for this category
+					$subcategories = get_terms( array(
+						'taxonomy'   => 'tg_tags',
+						'hide_empty' => true,
+						'meta_query' => array(
+							array(
+								'key'     => 'tg_parent_category',
+								'value'   => $category->term_id,
+								'compare' => '='
+							)
+						)
+					) );
+					$has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
+				?>
+					<div class="category-item">
+						<div class="category-header">
+							<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
+								<?php echo esc_html( $category->name ); ?>
+							</a>
+							<?php if ( $has_subcategories ) : ?>
+								<button class="subcategory-toggle" data-category-id="<?php echo esc_attr( $category->term_id ); ?>" aria-label="Toggle subcategories">
+									<span class="toggle-icon">▶</span>
+								</button>
+							<?php endif; ?>
+						</div>
+						<?php if ( $has_subcategories ) : ?>
+							<div class="subcategory-list" data-parent-category="<?php echo esc_attr( $category->term_id ); ?>" style="display: none;">
+								<?php foreach ( $subcategories as $subcategory ) : ?>
+									<a class="subcategory-link" href="#" data-tag-id="<?php echo esc_attr( $subcategory->slug ); ?>">
+										<?php echo esc_html( $subcategory->name ); ?>
+									</a>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
+					</div>
 				<?php endforeach; ?>
 			</div>
 		</div>

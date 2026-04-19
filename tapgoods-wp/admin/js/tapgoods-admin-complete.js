@@ -197,17 +197,35 @@ function handleSync(syncButton) {
     .then(response => response.json())
     .then(response => {
         console.log('TapGoods: Sync response:', response);
-        
+
         if (response.success) {
-            updateSyncStatus('Synchronization completed successfully!');
-            setTimeout(() => {
-                disableSyncProtection(); // Remove page close protection
-                
-                // Reload page with success parameter to show all updated data
-                const url = new URL(window.location.href);
-                url.searchParams.set('sync_success', '1');
-                window.location.href = url.toString();
-            }, 1500);
+            // Get the message from response.data (wp_send_json_success format)
+            const message = response.data || '';
+
+            // Check if there's a message indicating nothing to sync
+            if (message && message.includes('Nothing to sync')) {
+                updateSyncStatus(message);
+                setTimeout(() => {
+                    hideSyncProgressModal();
+                    disableSyncProtection();
+                    syncButton.disabled = false;
+                    syncButton.textContent = 'SYNC';
+
+                    if (statusEl) {
+                        showConnectionNotice(message, 'success');
+                    }
+                }, 1500);
+            } else {
+                updateSyncStatus('Synchronization completed successfully!');
+                setTimeout(() => {
+                    disableSyncProtection(); // Remove page close protection
+
+                    // Reload page with success parameter to show all updated data
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('sync_success', '1');
+                    window.location.href = url.toString();
+                }, 1500);
+            }
         } else {
             const errorMessage = response.data || 'Synchronization failed. Please try again.';
             updateSyncStatus('Synchronization failed: ' + errorMessage);
@@ -216,7 +234,7 @@ function handleSync(syncButton) {
                 disableSyncProtection(); // Remove page close protection
                 syncButton.disabled = false;
                 syncButton.textContent = 'SYNC';
-                
+
                 if (statusEl) {
                     showConnectionNotice(errorMessage, 'error');
                 }

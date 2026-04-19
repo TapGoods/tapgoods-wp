@@ -195,31 +195,31 @@ class Tapgoods_Connection {
 	public function sync_inventory_in_batches($manual_trigger = false) {
 		$current_key = $this->get_key();
 		$stored_key = get_option('tg_last_api_key');
-	
+
 		// Handle API key change
 		if ($current_key !== $stored_key) {
 			$this->console_log('API Key has changed. Clearing previous data...');
 			$this->tapgrein_delete_data();
 			update_option('tg_last_api_key', $current_key);
 		}
-	
+
         $batch_size = 50;
 		$client = $this->get_connection();
-	
+
 		// Prevent concurrent syncs
 		if (get_transient('tapgrein_sync_lock')) {
 			$this->console_log('Sync is locked. Another process is running.');
-			return array('success' => false, 'message' => '');
+			return array('success' => false, 'message' => 'Sync in progress. Please wait...');
 		}
-	
+
 		// Lock the sync process
 		set_transient('tapgrein_sync_lock', true, 900);
-	
+
 		$location_ids = $client->get_location_ids();
 		if (false === $location_ids) {
 			delete_transient('tapgrein_sync_lock');
 			$this->console_log('Failed to retrieve location IDs.');
-			return array('success' => false, 'message' => '');
+			return array('success' => false, 'message' => 'Failed to retrieve location information.');
 		}
 	
 		$total_items = 0;
@@ -278,10 +278,15 @@ class Tapgoods_Connection {
 		$this->remove_unused_terms('tg_tags');
 		$this->remove_duplicate_items();
 		$this->update_sync_info($start_time);
-	
+
 		// Unlock the process
         delete_transient('tapgrein_sync_lock');
-	
+
+		// Check if anything was actually synced
+		if ($total_items === 0) {
+			return array('success' => true, 'message' => 'Everything is up to date. Nothing to sync.');
+		}
+
 		return array('success' => true, 'message' => '');
 	}
 	
@@ -675,17 +680,18 @@ class Tapgoods_Connection {
 			}
 	
 			foreach ($categories as $category) {
-				$category_term = $this->tg_insert_or_update_term($category, 'tg_category');
-				if ($category_term) {
-					$valid_category_ids[] = $category_term;
-				}
-	
-				// Process subcategories as tags.
-				if (!empty($category['sfSubCategories'])) {
-					foreach ($category['sfSubCategories'] as $tag) {
-						$tag_term = $this->tg_insert_or_update_term($tag, 'tg_tags');
-						if ($tag_term) {
-							$valid_tag_ids[] = $tag_term;
+				$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
+				if ($category_term_id) {
+					$valid_category_ids[] = $category_term_id;
+
+					// Process subcategories as tags and link them to their parent category
+					if (!empty($category['sfSubCategories'])) {
+						foreach ($category['sfSubCategories'] as $tag) {
+							// Pass the parent category term ID to establish the relationship
+							$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
+							if ($tag_term_id) {
+								$valid_tag_ids[] = $tag_term_id;
+							}
 						}
 					}
 				}
@@ -747,11 +753,20 @@ class Tapgoods_Connection {
 
 	
 
-	public function tg_insert_or_update_term($term, $tax) {
+	public function tg_insert_or_update_term($term, $tax, $parent_category_id = null) {
 		$tg_id = $term['id']; // The unique ID of the term from the external source.
 		$name = $term['name']; // The name of the term.
-		$slug = $term['slug'] ?? sanitize_title($term['name']); // Use original slug from API
-	
+		$original_slug = $term['slug'] ?? sanitize_title($term['name']); // Use original slug from API
+
+		// Add taxonomy prefix to prevent WordPress from sharing term_id between taxonomies
+		// Only tags get 'tag-' prefix to differentiate from categories
+		if ($tax === 'tg_tags') {
+			$slug = 'tag-' . $original_slug;
+		} else {
+			// Categories use original slug without prefix
+			$slug = $original_slug;
+		}
+
 		$term_args = array('slug' => $slug);
 	
 		// Check if a term already exists using the tg_id meta.
@@ -805,7 +820,13 @@ class Tapgoods_Connection {
 			
 			// Always update metadata hash
 			update_term_meta($term_id, 'tg_hash', $this->hash);
-			
+
+			// If this is a tag and has a parent category, update the relationship
+			if ($tax === 'tg_tags' && $parent_category_id) {
+				update_term_meta($term_id, 'tg_parent_category', $parent_category_id);
+				$this->console_log("Updated parent category link for tag $name (ID: $term_id) to category ID: $parent_category_id");
+			}
+
 			return $term_id; // Return the term ID.
 		}
 	
@@ -828,8 +849,15 @@ class Tapgoods_Connection {
 		// Save metadata for the term.
 		update_term_meta($term_id, 'tg_id', $tg_id);
 		update_term_meta($term_id, 'tg_hash', $this->hash);
+
+		// If this is a tag and has a parent category, save the relationship
+		if ($tax === 'tg_tags' && $parent_category_id) {
+			update_term_meta($term_id, 'tg_parent_category', $parent_category_id);
+			$this->console_log("Linked tag $name (ID: $term_id) to parent category ID: $parent_category_id");
+		}
+
 		$this->console_log("Inserted term: $name with tg_id: $tg_id and taxonomy: $tax");
-	
+
 		return $term_id; // Return the new term ID.
 	}
 	
@@ -1377,15 +1405,21 @@ class Tapgoods_Connection {
 	// }
 	
 	public function manual_sync_trigger() {
-		$this->console_log('Manual sync:1205'); 
+		$this->console_log('Manual sync:1205');
 		$location_info = $this->sync_location_settings(true);
 //		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
-	
+
 		if (current_user_can('manage_options')) {
 			$result = $this->sync_inventory_in_batches(true);
-			wp_send_json($result);
+
+			// Ensure we're sending the correct response format
+			if ($result['success']) {
+				wp_send_json_success($result['message']);
+			} else {
+				wp_send_json_error($result['message']);
+			}
 		} else {
-			wp_send_json(array('success' => false, 'message' => 'You do not have permission to access this endpoint.'));
+			wp_send_json_error('You do not have permission to access this endpoint.');
 		}
 	}
 	
