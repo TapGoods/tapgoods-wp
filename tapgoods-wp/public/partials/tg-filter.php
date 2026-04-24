@@ -58,64 +58,37 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 				</a>
 
 				<?php foreach ( $categories as $category ) :
-					// Get subcategories (tags) for this category
-					// First try to get tags with parent relationship
-					$subcategories = get_terms( array(
-						'taxonomy'   => 'tg_tags',
-						'hide_empty' => false,
-						'meta_query' => array(
-							array(
-								'key'     => 'tg_parent_category',
-								'value'   => $category->term_id,
-								'compare' => '='
-							)
-						)
-					) );
+					// COMMENTED: Subcategories temporarily disabled per client request
+					// Get subcategories (tags) for this category based on parent relationship
+					// $subcategories = get_terms( array(
+					// 	'taxonomy'   => 'tg_tags',
+					// 	'hide_empty' => false,
+					// 	'meta_query' => array(
+					// 		array(
+					// 			'key'     => 'tg_parent_category',
+					// 			'value'   => $category->term_id,
+					// 			'compare' => '='
+					// 		)
+					// 	)
+					// ) );
 
-					// TEMPORARY: If no subcategories found with parent relationship,
-					// show ALL tags so user can see what tags exist
-					// This will be removed after sync establishes proper relationships
-					if (empty($subcategories) || is_wp_error($subcategories)) {
-						// Get ALL tags (no limit) to see what exists
-						$subcategories = get_terms( array(
-							'taxonomy'   => 'tg_tags',
-							'hide_empty' => false,
-						) );
-
-						error_log("TEMP: Category {$category->name} - No parent relationships found. Showing all tags: " . count($subcategories));
-					}
-
-					$has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
-
-					// Debug: Log subcategories found
-					error_log("Category: {$category->name} (ID: {$category->term_id}) - Subcategories found: " . (is_array($subcategories) ? count($subcategories) : 0));
-					if (!empty($subcategories) && is_array($subcategories)) {
-						foreach ($subcategories as $sub) {
-							error_log("  - Subcategory: {$sub->name} (slug: {$sub->slug})");
-						}
-					}
+					// $has_subcategories = !empty($subcategories) && !is_wp_error($subcategories);
 				?>
-					<div class="category-item">
-						<div class="category-header">
-							<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
-								<?php echo esc_html( $category->name ); ?>
-							</a>
-							<?php if ( $has_subcategories ) : ?>
-								<button class="subcategory-toggle" data-category-id="<?php echo esc_attr( $category->term_id ); ?>" aria-label="Toggle subcategories">
-									<span class="toggle-icon">▶</span>
-								</button>
-							<?php endif; ?>
-						</div>
-						<?php if ( $has_subcategories ) : ?>
-							<div class="subcategory-list" data-parent-category="<?php echo esc_attr( $category->term_id ); ?>" style="display: none;">
-								<?php foreach ( $subcategories as $subcategory ) : ?>
-									<a class="subcategory-link" href="#" data-tag-id="<?php echo esc_attr( $subcategory->slug ); ?>">
-										<?php echo esc_html( $subcategory->name ); ?>
-									</a>
-								<?php endforeach; ?>
-							</div>
-						<?php endif; ?>
-					</div>
+					<a class="category-link" href="#" data-category-id="<?php echo esc_attr( $category->slug ); ?>">
+						<?php echo esc_html( $category->name ); ?>
+					</a>
+					<?php
+					// COMMENTED: Subcategory display temporarily disabled
+					// if ( $has_subcategories ) :
+					?>
+						<!-- <div class="subcategory-list" data-parent-category="<?php echo esc_attr( $category->term_id ); ?>"> -->
+							<?php // foreach ( $subcategories as $subcategory ) : ?>
+								<!-- <a class="subcategory-link" href="#" data-tag-id="<?php echo esc_attr( $subcategory->slug ); ?>"> -->
+									<?php // echo esc_html( $subcategory->name ); ?>
+								<!-- </a> -->
+							<?php // endforeach; ?>
+						<!-- </div> -->
+					<?php // endif; ?>
 				<?php endforeach; ?>
 			</div>
 		</div>
@@ -126,63 +99,25 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 </aside>
 
 <script>
-// TEMPORARY: Inline script to test subcategory functionality
-// This will be moved back to tapgoods-public-complete.js once working
-console.log('TapGoods Filter: Inline script loaded');
-
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('TapGoods Filter: DOM ready, initializing subcategory toggles');
-
-    const subcategoryToggles = document.querySelectorAll(".subcategory-toggle");
-    const subcategoryLinks = document.querySelectorAll(".subcategory-link");
+    // COMMENTED: Subcategory handlers temporarily disabled
+    // const subcategoryLinks = document.querySelectorAll(".subcategory-link");
     const categoryLinks = document.querySelectorAll(".category-link");
 
-    console.log('TapGoods Filter: Found', subcategoryToggles.length, 'toggles');
-    console.log('TapGoods Filter: Found', subcategoryLinks.length, 'subcategory links');
-    console.log('TapGoods Filter: Found', categoryLinks.length, 'category links');
-
-    // Handle subcategory toggle clicks
-    subcategoryToggles.forEach(function(toggle) {
-        toggle.addEventListener("click", function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const categoryId = this.getAttribute("data-category-id");
-            const subcategoryList = document.querySelector('.subcategory-list[data-parent-category="' + categoryId + '"]');
-            const toggleIcon = this.querySelector(".toggle-icon");
-
-            console.log('TapGoods Filter: Toggle clicked for category', categoryId);
-
-            if (subcategoryList) {
-                const isVisible = subcategoryList.style.display !== "none" && subcategoryList.style.display !== "";
-                subcategoryList.style.display = isVisible ? "none" : "block";
-                toggleIcon.textContent = isVisible ? "▶" : "▼";
-                console.log('TapGoods Filter: Subcategory list toggled to', subcategoryList.style.display);
-            } else {
-                console.log('TapGoods Filter: No subcategory list found for category', categoryId);
-            }
-        });
-    });
-
-    // Handle subcategory clicks
-    subcategoryLinks.forEach(function(link) {
-        link.addEventListener("click", function(event) {
-            event.preventDefault();
-
-            const selectedTag = this.getAttribute("data-tag-id");
-            if (!selectedTag) return;
-
-            console.log('TapGoods Filter: Subcategory clicked:', selectedTag);
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const cleanTag = selectedTag.startsWith('tag-') ? selectedTag.substring(4) : selectedTag;
-            urlParams.set('tags', cleanTag);
-            urlParams.delete('category');
-            urlParams.delete('paged');
-
-            window.location.search = urlParams.toString();
-        });
-    });
+    // COMMENTED: Handle subcategory clicks - temporarily disabled
+    // subcategoryLinks.forEach(function(link) {
+    //     link.addEventListener("click", function(event) {
+    //         event.preventDefault();
+    //         const selectedTag = this.getAttribute("data-tag-id");
+    //         if (!selectedTag) return;
+    //         const urlParams = new URLSearchParams(window.location.search);
+    //         const cleanTag = selectedTag.startsWith('tag-') ? selectedTag.substring(4) : selectedTag;
+    //         urlParams.set('tags', cleanTag);
+    //         urlParams.delete('category');
+    //         urlParams.delete('paged');
+    //         window.location.search = urlParams.toString();
+    //     });
+    // });
 
     // Handle category clicks
     categoryLinks.forEach(function(link) {
@@ -190,7 +125,6 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
 
             const selectedCategory = this.getAttribute("data-category-id");
-            console.log('TapGoods Filter: Category clicked:', selectedCategory);
 
             if (selectedCategory === null || selectedCategory === "") {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -211,55 +145,3 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-<?php
-// Original script removed - now using inline script above temporarily
-/*<script>
-document.addEventListener("DOMContentLoaded", function() {
-    var accordionCollapse = document.getElementById("collapseOne");
-    var accordionButton = document.querySelector(".accordion-button");
-
-    // Toggle accordion
-    function toggleAccordion() {
-        if (window.innerWidth >= 1200) {
-            accordionCollapse.classList.add("show");
-            accordionButton.classList.remove("collapsed");
-            accordionButton.setAttribute("aria-expanded", "true");
-        } else {
-            accordionCollapse.classList.remove("show");
-            accordionButton.classList.add("collapsed");
-            accordionButton.setAttribute("aria-expanded", "false");
-        }
-    }
-
-    // Run function on page load and on window resize
-    toggleAccordion();
-    window.addEventListener("resize", toggleAccordion);
-
-    // Handle category clicks
-    const categoryLinks = document.querySelectorAll('.category-link');
-
-    categoryLinks.forEach(link => {
-        link.addEventListener('click', function(event) {
-            event.preventDefault();
-
-            const selectedCategory = this.getAttribute('data-category-id');
-
-            // If All Categories or empty category is clicked, reload to the current base URL
-            if (!selectedCategory) {
-                const baseUrl = window.location.origin + window.location.pathname;
-                window.location.href = baseUrl;
-                return;
-            }
-
-            // Update URL with selected category
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('category', selectedCategory);
-            urlParams.delete('paged'); // Reset pagination
-
-            window.location.search = urlParams.toString();
-        });
-    });
-});
-</script>*/
-?>

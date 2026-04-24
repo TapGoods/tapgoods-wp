@@ -202,6 +202,17 @@ function handleSync(syncButton) {
             // Get the message from response.data (wp_send_json_success format)
             const message = response.data || '';
 
+            // Check if sync is in progress (when another sync is already running)
+            if (message && message.includes('Sync in progress')) {
+                updateSyncStatus(message);
+                // Keep the modal open and showing the in-progress message
+                // Don't close it, don't disable protection, don't reset button
+                if (statusEl) {
+                    showConnectionNotice(message, 'info');
+                }
+                return; // Don't close modal, keep it open
+            }
+
             // Check if there's a message indicating nothing to sync
             if (message && message.includes('Nothing to sync')) {
                 updateSyncStatus(message);

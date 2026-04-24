@@ -209,7 +209,7 @@ class Tapgoods_Connection {
 		// Prevent concurrent syncs
 		if (get_transient('tapgrein_sync_lock')) {
 			$this->console_log('Sync is locked. Another process is running.');
-			return array('success' => false, 'message' => 'Sync in progress. Please wait...');
+			return array('success' => true, 'message' => 'Sync in progress. It can take up to 60 minutes for larger inventory. Please do not close the window until the sync is complete.', 'in_progress' => true);
 		}
 
 		// Lock the sync process
