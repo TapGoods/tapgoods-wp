@@ -1285,7 +1285,7 @@ add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 
 // Redirect category and tag archive pages to shop page with filters
-add_action('template_redirect', 'tapgrein_redirect_taxonomy_archives');
+// removed because of redemption tents jira ticket wp-132 add_action('template_redirect', 'tapgrein_redirect_taxonomy_archives');
 function tapgrein_redirect_taxonomy_archives() {
     $term = get_queried_object();
 
