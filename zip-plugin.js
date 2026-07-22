@@ -23,6 +23,10 @@ archive.on('error', function (err) {
 
 archive.pipe(output);
 
-archive.directory('./tapgoods-wp/', false);
+archive.glob('**/*', {
+  cwd: './tapgoods-wp/',
+  dot: true,
+  ignore: ['tests/**', 'phpunit.xml.dist', '.phpunit.cache/**', 'vendor/**', 'node_modules/**'],
+});
 
 archive.finalize();

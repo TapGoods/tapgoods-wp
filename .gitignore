@@ -39,6 +39,11 @@ cache
 /dist/*
 tapgoods-wp/vendor
 
+# PHPUnit cache
+tapgoods-wp/.phpunit.cache
+.phpunit.cache
+.phpunit.result.cache
+
 # Dev Configs
 dev/certs/*
 localdev.env

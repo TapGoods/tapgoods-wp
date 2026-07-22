@@ -1,0 +1,21 @@
+{
+    "data": {
+        "getStorefrontCagetories": [
+            {
+                "id": 701,
+                "name": "Tables",
+                "slug": "tables",
+                "sfSubCategories": [
+                    { "id": 801, "name": "Round Tables", "sfCategories": { "id": 701 } },
+                    { "id": 802, "name": "Banquet Tables", "sfCategories": { "id": 701 } }
+                ]
+            },
+            {
+                "id": 702,
+                "name": "Chairs",
+                "slug": "chairs",
+                "sfSubCategories": []
+            }
+        ]
+    }
+}

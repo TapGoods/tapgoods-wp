@@ -34,7 +34,14 @@ docker compose up                                   # WP at https://wordpress.lo
 docker compose exec wordpress /bin/bash             # shell into WP container
 docker compose run --rm wpcli [command]             # WP-CLI, e.g. `wpcli plugin activate tapgoods-wp`
 ```
-See `readme.md` for first-time setup (mkcert certs, `/etc/hosts`, `cp example.env localdev.env`). The plugin dir is bind-mounted into the container, so edits are live. There is no PHP test suite in this repo.
+See `readme.md` for first-time setup (mkcert certs, `/etc/hosts`, `cp example.env localdev.env`). The plugin dir is bind-mounted into the container, so edits are live.
+
+Tests (PHPUnit, isolated unit tests, no WordPress bootstrap; see "Testing & verification" below):
+```bash
+cd tapgoods-wp && composer install     # installs phpunit + brain/monkey + mockery
+cd tapgoods-wp && composer test        # run the whole unit suite
+cd tapgoods-wp && vendor/bin/phpunit --filter test_encrypt_decrypt_roundtrip   # single test
+```
 
 ## Releases are automated. Do not hand-bump versions
 
@@ -78,3 +85,42 @@ Match the existing prefix of whatever you are extending rather than introducing 
 ## Styling / assets
 
 Bootstrap 5 based. Author styles in `tapgoods-wp/assets/scss/*.scss` and compile with `npm run build-sass` (do not hand-edit the generated `assets/css/custom.css`). There are also prebuilt CSS bundles in `public/css/` and `assets/css/` referenced directly by enqueue code.
+
+## Testing & verification
+
+Tests live in `tapgoods-wp/tests/` and run with **PHPUnit** plus **Brain\Monkey** (+ **Mockery**) for mocking WordPress functions. Config: `tapgoods-wp/phpunit.xml.dist`, bootstrap: `tapgoods-wp/tests/bootstrap.php`. Dependencies are in `composer.json` require-dev.
+
+**Guiding principle: each package and method should be usable and testable in isolation.** The bootstrap deliberately does *not* load WordPress. Instead, each unit is exercised on its own with WP functions stubbed via Brain\Monkey (`Functions\when('get_option')->justReturn(...)`, etc.). This keeps tests fast and forces production code to expose seams rather than reaching into global WordPress state. Prefer this style for new code; only reach for a full WP-integration test (via the existing `@wordpress/env` / `.wp-env.json`) when a unit genuinely cannot be isolated.
+
+### Running tests
+
+Requires PHP + Composer. If you don't have them locally, use the repo's Docker (Colima) setup:
+```bash
+# one-time
+cd tapgoods-wp && composer install
+# or, with Docker only (no local PHP):
+docker run --rm -v "$PWD/tapgoods-wp":/app -w /app composer/composer:latest install
+
+# run the suite
+cd tapgoods-wp && composer test
+docker run --rm -v "$PWD/tapgoods-wp":/app -w /app --entrypoint php composer/composer:latest vendor/bin/phpunit
+
+# a single test / filter
+cd tapgoods-wp && vendor/bin/phpunit --filter test_get_business_runs_end_to_end_against_injected_mock
+cd tapgoods-wp && vendor/bin/phpunit tests/Unit/EncryptionTest.php
+```
+
+Current coverage: `Tapgoods_Encryption` (encrypt/decrypt round-trip; also documents the known `defined('LOGGED_IN_KEY ')` trailing-space bug that forces the insecure fallback key), the formatting helpers in `includes/tapgoods-formatting-functions.php`, `Tapgoods_API_Request` (`build_url`, `verify_parameters`, `transient_name`, config get/set), the mock API client, and one end-to-end `Tapgoods_Connection::get_business()` flow driven entirely by the mock.
+
+### Offline mock TapGoods API
+
+So tests (and, optionally, local dev) never hit the network, there is an env-var-gated mock of the TapGoods GraphQL API.
+
+- **Seam:** `Tapgoods_Connection::get_connection()` builds its client through `create_client()` (`includes/class-tapgoods-connection.php`). That method (a) lets a client be injected via the `tapgoods_api_client` filter, and (b) when the mock is enabled, returns `Tapgoods_Mock_API_Client` instead of the real `Tapgoods_API_Client`. Production behaviour is unchanged unless the mock is explicitly requested.
+- **Enable it:** define the `TG_MOCK` constant truthy, or set the `tg_mock` environment variable to a truthy value (`1`/`true`/`yes`/`on`). Gating logic lives in `Tapgoods_Connection::use_mock_api()`.
+- **Mock client:** `tapgoods-wp/tests/mock/class-tapgoods-mock-api-client.php`. It emulates the client surface `Tapgoods_Connection` calls (`validate_key`, `get_location_ids`, `get_location_details_from_graph`, `get_categories_from_graph`, `get_inventories_from_graph`, `item_exists`, …) and calls **no** WordPress functions, so it stays usable in isolated tests.
+- **Fixtures:** static JSON under `tapgoods-wp/tests/fixtures/`, one file per GraphQL response envelope: `bearer-token-validator.json` (`validate_key`), `get-location-details.json`, `get-storefront-categories.json`, `get-inventories.json`. **To add/extend a fixture:** drop a JSON file mirroring the real `{ "data": { ... } }` GraphQL shape in `tests/fixtures/`, then add a method to the mock client that loads it via `$this->fixture('your-file.json')` and returns the same structure the real client returns. In tests, inject the mock through the `tapgoods_api_client` filter (`Filters\expectApplied('tapgoods_api_client')->andReturn($mock)`) or set `tg_mock`.
+
+### Expectation for new code
+
+New code ships with unit tests and a verification step. Before saying a change works: add/extend isolated unit tests for the new behaviour, run `composer test`, and confirm the suite passes (call out explicitly any test intentionally left failing/skipped to document a known bug, as the encryption test does).

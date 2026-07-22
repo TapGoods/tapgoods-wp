@@ -51,8 +51,59 @@ class Tapgoods_Connection {
 			return $this->client;
 		}
 
-		$this->client = new Tapgoods_API_Client( $config );
+		$this->client = $this->create_client( $config );
 		return $this->client;
+	}
+
+	/**
+	 * Build the API client.
+	 *
+	 * Small testing / offline-dev seam. Production behaviour is unchanged unless a
+	 * mock is explicitly requested:
+	 *  - The `tapgoods_api_client` filter lets a client be injected. Unit tests use
+	 *    this to drive the connection end-to-end with no network.
+	 *  - When the TG_MOCK constant, or the `tg_mock` environment variable, is truthy
+	 *    an offline mock client that serves static JSON fixtures is used instead of
+	 *    the real client (see tests/mock/class-tapgoods-mock-api-client.php).
+	 *
+	 * @param array $config Client configuration.
+	 * @return Tapgoods_API_Client|Tapgoods_Mock_API_Client|object
+	 */
+	private function create_client( $config ) {
+
+		// Allow tests / integrations to inject a client.
+		$injected = apply_filters( 'tapgoods_api_client', null, $config );
+		if ( null !== $injected ) {
+			return $injected;
+		}
+
+		// Offline mock, gated by env var / constant.
+		if ( self::use_mock_api() ) {
+			$mock_file = TAPGOODS_PLUGIN_PATH . 'tests/mock/class-tapgoods-mock-api-client.php';
+			if ( file_exists( $mock_file ) ) {
+				require_once $mock_file;
+				return new Tapgoods_Mock_API_Client( $config );
+			}
+		}
+
+		return new Tapgoods_API_Client( $config );
+	}
+
+	/**
+	 * Whether the offline mock TapGoods API should be used.
+	 *
+	 * Enable it by defining the TG_MOCK constant truthy, or setting the `tg_mock`
+	 * environment variable to a truthy value (1/true/yes/on). This keeps tests and
+	 * local dev fully offline: no network calls to the TapGoods API.
+	 *
+	 * @return bool
+	 */
+	public static function use_mock_api() {
+		if ( defined( 'TG_MOCK' ) ) {
+			return (bool) TG_MOCK;
+		}
+		$env = tapgrein_getenv_docker( 'tg_mock', '' );
+		return in_array( strtolower( (string) $env ), array( '1', 'true', 'yes', 'on' ), true );
 	}
 
 	public function get_key() {
