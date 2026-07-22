@@ -11,9 +11,17 @@
             <directory>tests/Unit</directory>
         </testsuite>
     </testsuites>
+    <!--
+      The source element defines the code-coverage scope: shipped production
+      code only. It needs no coverage driver, so `composer test` stays green
+      everywhere. Clover/text report outputs are produced on demand via CLI
+      coverage flags in CI, where a driver is present (coverage: pcov).
+    -->
     <source>
         <include>
             <directory suffix=".php">includes</directory>
+            <directory suffix=".php">admin</directory>
+            <directory suffix=".php">public</directory>
         </include>
         <exclude>
             <directory suffix=".php">tests</directory>

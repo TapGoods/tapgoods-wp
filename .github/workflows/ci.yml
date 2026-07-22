@@ -1,0 +1,114 @@
+name: CI
+
+# Runs on every PR and push so changes get checks before they reach master.
+# (package-plugin.yml only runs on push to master and owns the release/version
+# bump; the layered verification stack lives here.)
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - "**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Layer 1 - static analysis (PHPStan, green via baseline).
+  static:
+    name: Static analysis (PHPStan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+          coverage: none
+
+      - name: Install PHP dependencies
+        working-directory: tapgoods-wp
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHPStan
+        working-directory: tapgoods-wp
+        run: composer analyze
+
+  # Layer 2 - isolated unit suite (fast gate) + PHP 7.2 compat + Layer 4 coverage.
+  unit:
+    name: Unit tests + compat + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+          coverage: pcov
+
+      - name: Install PHP dependencies
+        working-directory: tapgoods-wp
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Unit tests
+        working-directory: tapgoods-wp
+        run: composer test
+
+      - name: PHP 7.2 compatibility
+        working-directory: tapgoods-wp
+        run: composer compat
+
+      - name: Coverage (report-only, no threshold yet)
+        working-directory: tapgoods-wp
+        run: php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/phpunit --coverage-text --coverage-clover coverage/clover.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: tapgoods-wp/coverage/clover.xml
+          if-no-files-found: ignore
+
+  # Layer 3 - integration against real WordPress via @wordpress/env.
+  integration:
+    name: Integration tests (wp-env)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+          coverage: none
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install PHP dependencies (into the mounted plugin)
+        working-directory: tapgoods-wp
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install isolated PHPUnit 9.6 toolchain (WP test framework needs <= 9.6)
+        run: composer install --no-interaction --prefer-dist --no-progress --working-dir=tapgoods-wp/tools/phpunit9
+
+      - name: Install Node dependencies (provides @wordpress/env)
+        run: npm install
+
+      - name: Start wp-env
+        run: npx wp-env start
+
+      - name: Run integration suite
+        run: npm run test:integration
+
+      - name: Stop wp-env
+        if: always()
+        run: npx wp-env stop

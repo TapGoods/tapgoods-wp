@@ -39,6 +39,13 @@ cache
 /dist/*
 tapgoods-wp/vendor
 
+# Isolated integration test toolchain deps (installed on demand)
+tapgoods-wp/tools/phpunit9/vendor
+tapgoods-wp/tools/phpunit9/composer.lock
+
+# Coverage output
+tapgoods-wp/coverage
+
 # PHPUnit cache
 tapgoods-wp/.phpunit.cache
 .phpunit.cache

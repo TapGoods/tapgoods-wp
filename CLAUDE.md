@@ -88,29 +88,68 @@ Bootstrap 5 based. Author styles in `tapgoods-wp/assets/scss/*.scss` and compile
 
 ## Testing & verification
 
-Tests live in `tapgoods-wp/tests/` and run with **PHPUnit** plus **Brain\Monkey** (+ **Mockery**) for mocking WordPress functions. Config: `tapgoods-wp/phpunit.xml.dist`, bootstrap: `tapgoods-wp/tests/bootstrap.php`. Dependencies are in `composer.json` require-dev.
+The goal is to let AI agents (and humans) verify as much of the plugin as possible with trustworthy signal. Verification is a **layered stack**, run in order of speed/cost. Everything lives under `tapgoods-wp/`; dependencies are in `composer.json` require-dev (plus the isolated integration toolchain in `tapgoods-wp/tools/phpunit9/`).
 
-**Guiding principle: each package and method should be usable and testable in isolation.** The bootstrap deliberately does *not* load WordPress. Instead, each unit is exercised on its own with WP functions stubbed via Brain\Monkey (`Functions\when('get_option')->justReturn(...)`, etc.). This keeps tests fast and forces production code to expose seams rather than reaching into global WordPress state. Prefer this style for new code; only reach for a full WP-integration test (via the existing `@wordpress/env` / `.wp-env.json`) when a unit genuinely cannot be isolated.
+| Layer | Tool | Command | Config |
+|---|---|---|---|
+| 1. Static analysis | PHPStan + `szepeviktor/phpstan-wordpress` | `composer analyze` | `phpstan.neon.dist` (+ `phpstan-baseline.neon`) |
+| 2. Isolated unit tests | PHPUnit 10+ + Brain\Monkey (+ Mockery) | `composer test` | `phpunit.xml.dist`, bootstrap `tests/bootstrap.php` |
+| 3. Integration tests | PHPUnit 9.6 + wp-phpunit inside `@wordpress/env` | `npm run test:integration` | `phpunit-integration.xml.dist`, bootstrap `tests/Integration/bootstrap.php` |
+| 4. Coverage | PHPUnit + PCOV | CLI coverage flags (see below) | `<source>` scope in the PHPUnit configs |
+| (PHP 7.2 gate) | PHPCS + PHPCompatibility | `composer compat` | `phpcompat.xml.dist` |
 
-### Running tests
+CI wires these into `.github/workflows/ci.yml` (jobs `static`, `unit`, `integration`), triggered on every `pull_request`/`push`. The release workflow `package-plugin.yml` keeps its own unit + compat gate on push to `master` and is intentionally left without the slower integration job.
 
-Running the unit tests requires **PHP 8.1+** (PHPUnit 10+; CI uses PHP 8.2) even though the shipped plugin targets PHP 7.2 — the 7.2 floor applies to production code and is enforced separately by `composer compat`. If you don't have PHP + Composer locally, use the repo's Docker (Colima) setup:
+**Guiding principle: each package and method should be usable and testable in isolation.** The Layer 2 bootstrap deliberately does *not* load WordPress; each unit is exercised on its own with WP functions stubbed via Brain\Monkey (`Functions\when('get_option')->justReturn(...)`, etc.). This keeps the fast gate fast and forces production code to expose seams (see the `create_client()` / `tapgoods_api_client` mock seam) rather than reaching into global WordPress state. Prefer Layer 2 for new code; use Layer 3 only for behaviour that genuinely needs real WordPress (CPT/taxonomy registration, rewrite/routing, sync writing real posts/meta/terms). The offline TapGoods API mock (below) applies in **both** layers, so no test ever hits the network.
+
+### Layer 1: static analysis (PHPStan)
+
+`composer analyze` runs PHPStan (level 5) over production code only (`includes/`, `admin/`, `public/`, `tapgoods.php`, `uninstall.php`). Because this is a legacy codebase, pre-existing issues are captured in `phpstan-baseline.neon` (128 entries at introduction) so the suite is **green today and only NEW problems fail the build**. When you legitimately fix baselined debt, regenerate it: `composer analyze -- --generate-baseline` (needs a generous memory limit; CLI default `-1` is fine). Do not add blanket ignores to grow the baseline for new code.
+
+### Layer 2: isolated unit tests
+
+Requires **PHP 8.1+** (PHPUnit 10+; CI uses PHP 8.2) even though the shipped plugin targets PHP 7.2. The 7.2 floor applies to production code and is enforced separately by `composer compat`. If you don't have PHP + Composer locally, use the repo's Docker (Colima) setup:
 ```bash
 # one-time
 cd tapgoods-wp && composer install
 # or, with Docker only (no local PHP):
-docker run --rm -v "$PWD/tapgoods-wp":/app -w /app composer/composer:latest install
+docker run --rm -v "$PWD/tapgoods-wp":/app -w /app composer:2 composer install
 
 # run the suite
 cd tapgoods-wp && composer test
-docker run --rm -v "$PWD/tapgoods-wp":/app -w /app --entrypoint php composer/composer:latest vendor/bin/phpunit
+docker run --rm -v "$PWD/tapgoods-wp":/app -w /app --entrypoint php composer:2 vendor/bin/phpunit
 
 # a single test / filter
 cd tapgoods-wp && vendor/bin/phpunit --filter test_get_business_runs_end_to_end_against_injected_mock
 cd tapgoods-wp && vendor/bin/phpunit tests/Unit/EncryptionTest.php
 ```
 
-Current coverage: `Tapgoods_Encryption` (encrypt/decrypt round-trip; also documents the known `defined('LOGGED_IN_KEY ')` trailing-space bug that forces the insecure fallback key), the formatting helpers in `includes/tapgoods-formatting-functions.php`, `Tapgoods_API_Request` (`build_url`, `verify_parameters`, `transient_name`, config get/set), the mock API client, and one end-to-end `Tapgoods_Connection::get_business()` flow driven entirely by the mock.
+Unit coverage: `Tapgoods_Encryption` (encrypt/decrypt round-trip; also documents the known `defined('LOGGED_IN_KEY ')` trailing-space bug that forces the insecure fallback key), the formatting helpers in `includes/tapgoods-formatting-functions.php`, `Tapgoods_API_Request` (`build_url`, `verify_parameters`, `transient_name`, config get/set), `Tapgoods_Connection::prepare_meta_input()` (the pure API-item to meta transform), the mock API client, and the `create_client()` seam driven end-to-end by the mock (`get_business()`).
+
+### Layer 3: integration tests against real WordPress
+
+These run inside `@wordpress/env` (`.wp-env.json` maps `./tapgoods-wp` as a plugin) against a real WordPress + throwaway MySQL. They verify what the isolated layer cannot faithfully check: `tg_inventory` CPT and `tg_category`/`tg_tags`/`tg_location` taxonomy registration, `tapgrein_parse_request()` URL routing, and a full sync writing real posts/meta/terms. The TapGoods API is pinned to the offline mock via `TG_MOCK` in `tests/Integration/bootstrap.php`, so it is "real WP + deterministic external boundary, no network".
+
+**Important version split:** the WordPress core test framework is **not** compatible with PHPUnit 10+ (it calls `PHPUnit\Util\Test::parseTestMethodAnnotations()`, removed in 10). So integration runs under an **isolated PHPUnit 9.6 toolchain** in `tapgoods-wp/tools/phpunit9/` (its own `composer.json`/`vendor/`), completely separate from the PHPUnit 10 used by Layer 2. That is why `phpunit-integration.xml.dist` uses the PHPUnit 9 config schema.
+
+The Docker runtime here is **Colima**. First-time / local run:
+```bash
+colima start                    # if the Docker daemon isn't already up
+cd tapgoods-wp && composer install
+cd tapgoods-wp && composer install --working-dir=tools/phpunit9   # PHPUnit 9.6 runner + Yoast polyfills
+npm install                     # provides @wordpress/env at the repo root
+npx wp-env start                # boots WordPress (dev :8888, tests :8889) + MySQL
+npm run test:integration        # wraps: wp-env run tests-cli ... php tools/phpunit9/vendor/bin/phpunit -c phpunit-integration.xml.dist
+```
+`tests/Integration/wp-tests-config.php` reads DB creds from the container env (`WORDPRESS_DB_*`, which wp-env injects: host `tests-mysql`, db `tests-wordpress`, user/pass `root`/`password`) with sensible fallbacks, and points WordPress core at `/var/www/html/`. Inside the container you can also run `composer test:integration` directly from the plugin dir.
+
+### Layer 4: coverage
+
+Coverage scope is defined by the `<source>` element in both PHPUnit configs (production `includes/`, `admin/`, `public/`); no driver is needed just to define scope, so `composer test` stays green everywhere. Reports are produced on demand where a driver exists (CI uses `coverage: pcov`):
+```bash
+php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/phpunit --coverage-text --coverage-clover coverage/clover.xml
+```
+There is intentionally **no coverage threshold yet** (report-only). Setting `pcov.directory` matters, or PCOV attributes 0% to everything.
 
 ### Offline mock TapGoods API
 
@@ -123,4 +162,4 @@ So tests (and, optionally, local dev) never hit the network, there is an env-var
 
 ### Expectation for new code
 
-New code ships with unit tests and a verification step. Before saying a change works: add/extend isolated unit tests for the new behaviour, run `composer test`, and confirm the suite passes (call out explicitly any test intentionally left failing/skipped to document a known bug, as the encryption test does).
+New code ships with tests and a verification step. Before saying a change works: add/extend isolated unit tests (Layer 2) for the new behaviour, or an integration test (Layer 3) when it needs real WordPress; then run the relevant gates and confirm they pass. At minimum keep `composer analyze`, `composer test`, and `composer compat` green; run `npm run test:integration` when you touch CPT/taxonomy registration, routing, or the sync-to-WP path. Call out explicitly any test intentionally left failing/skipped to document a known bug, as the encryption test does. Do not grow the PHPStan baseline to hide issues in new code.

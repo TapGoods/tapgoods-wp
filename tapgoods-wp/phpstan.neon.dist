@@ -1,0 +1,43 @@
+includes:
+	# Pre-existing legacy debt is captured here so the suite is GREEN today and
+	# only NEW issues fail the build. Regenerate with:
+	#   composer analyze -- --generate-baseline
+	- phpstan-baseline.neon
+	# WordPress core function/class/constant stubs + WP-aware rules.
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+	# Pragmatic starting level for a legacy codebase. Raise over time.
+	level: 5
+
+	# Production (shipped) code only. Dev/test code is intentionally excluded.
+	paths:
+		- includes
+		- admin
+		- public
+		- tapgoods.php
+		- uninstall.php
+
+	excludePaths:
+		- tests/*
+		- vendor/*
+		- node_modules/*
+		- dist/*
+		- src/*
+
+	# The plugin has no autoloader; symbols are pulled in via require_once at
+	# runtime. Tell PHPStan where to find the plugin's own classes so it can
+	# resolve cross-file references without executing the bootstrap.
+	scanDirectories:
+		- includes
+		- admin
+		- public
+
+	# Third-party integrations the plugin talks to but does not bundle.
+	# These are optional at runtime (guarded by function_exists/class_exists),
+	# so their symbols are legitimately unknown to static analysis.
+	dynamicConstantNames:
+		- TAPGOODS_DEV
+		- TG_ENV
+		- TG_MOCK
+		- TAPGOODS_KEY
