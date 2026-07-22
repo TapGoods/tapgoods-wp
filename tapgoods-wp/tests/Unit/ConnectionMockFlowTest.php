@@ -96,6 +96,14 @@ final class ConnectionMockFlowTest extends TestCase {
 		putenv( 'tg_mock=off' );
 		$this->assertFalse( Tapgoods_Connection::use_mock_api() );
 
+		// The string "false" must be treated as falsy, not as a truthy non-empty
+		// string (guards the same normalization used for the TG_MOCK constant).
+		putenv( 'tg_mock=false' );
+		$this->assertFalse( Tapgoods_Connection::use_mock_api() );
+
+		putenv( 'tg_mock=yes' );
+		$this->assertTrue( Tapgoods_Connection::use_mock_api() );
+
 		putenv( 'tg_mock' ); // unset
 		$this->assertFalse( Tapgoods_Connection::use_mock_api() );
 	}

@@ -47,7 +47,11 @@ class Tapgoods_Connection {
 
 		// If we already have a client update the configs and return it ( To preserve Auth tokens/cookies/transients )
 		if ( null !== $this->client ) {
-			$this->client->set_config( $configs );
+			// A client injected via the `tapgoods_api_client` filter may not implement
+			// set_config(); guard so a non-conforming client can't fatal the plugin.
+			if ( method_exists( $this->client, 'set_config' ) ) {
+				$this->client->set_config( $configs );
+			}
 			return $this->client;
 		}
 
@@ -92,18 +96,34 @@ class Tapgoods_Connection {
 	/**
 	 * Whether the offline mock TapGoods API should be used.
 	 *
-	 * Enable it by defining the TG_MOCK constant truthy, or setting the `tg_mock`
-	 * environment variable to a truthy value (1/true/yes/on). This keeps tests and
-	 * local dev fully offline: no network calls to the TapGoods API.
+	 * Enable it by defining the TG_MOCK constant, or setting the `tg_mock`
+	 * environment variable, to a truthy value. "Truthy" is evaluated the same way
+	 * for both: real booleans/ints, or the strings 1/true/yes/on (case-insensitive).
+	 * A defined constant always takes precedence over the env var. This means, e.g.,
+	 * `define( 'TG_MOCK', 'false' )` correctly disables the mock rather than being
+	 * treated as a truthy string. Keeps tests and local dev fully offline.
 	 *
 	 * @return bool
 	 */
 	public static function use_mock_api() {
-		if ( defined( 'TG_MOCK' ) ) {
-			return (bool) TG_MOCK;
+		$raw = defined( 'TG_MOCK' ) ? TG_MOCK : tapgrein_getenv_docker( 'tg_mock', '' );
+		return self::is_truthy_flag( $raw );
+	}
+
+	/**
+	 * Normalize a config flag (bool, int, or string) to a boolean.
+	 *
+	 * @param mixed $value Raw flag value.
+	 * @return bool
+	 */
+	private static function is_truthy_flag( $value ) {
+		if ( is_bool( $value ) ) {
+			return $value;
 		}
-		$env = tapgrein_getenv_docker( 'tg_mock', '' );
-		return in_array( strtolower( (string) $env ), array( '1', 'true', 'yes', 'on' ), true );
+		if ( is_int( $value ) ) {
+			return 0 !== $value;
+		}
+		return in_array( strtolower( (string) $value ), array( '1', 'true', 'yes', 'on' ), true );
 	}
 
 	public function get_key() {

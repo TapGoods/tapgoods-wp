@@ -131,7 +131,15 @@ class Tapgoods_Mock_API_Client {
 	}
 
 	public function item_exists( $lid, $id ) {
-		return true;
+		// Mirror the real client: true only if the id is present in the fixtures.
+		$data       = $this->get_inventories_from_graph( $lid, 1 );
+		$collection = isset( $data['collection'] ) ? $data['collection'] : array();
+		foreach ( $collection as $item ) {
+			if ( isset( $item['id'] ) && (string) $item['id'] === (string) $id ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public function transient_name( $name ) {
