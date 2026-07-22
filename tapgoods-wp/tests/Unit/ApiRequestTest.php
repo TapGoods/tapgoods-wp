@@ -80,8 +80,11 @@ final class ApiRequestTest extends TestCase {
 	public function test_verify_parameters_present_and_absent() {
 		$req = $this->make_request();
 
-		// NOTE: verify_parameters currently returns true if ANY required key is
-		// present (not ALL) - documenting the current behaviour.
+		// KNOWN BUG (documented, not fixed here): verify_parameters() returns true
+		// when ANY required key is present, not when ALL are (see
+		// class-tapgoods-api-request.php:205-209). When that is fixed to require ALL
+		// keys, flip the two assertions below from assertTrue to assertFalse (only
+		// the all-keys-present case should pass).
 		$this->assertTrue( $req->verify_parameters( array( 'base_url', 'api_key' ), array( 'base_url' => 'x' ) ) );
 		$this->assertTrue( $req->verify_parameters( array( 'base_url', 'api_key' ), array( 'api_key' => 'x' ) ) );
 		$this->assertFalse( $req->verify_parameters( array( 'base_url', 'api_key' ), array( 'unrelated' => 'x' ) ) );

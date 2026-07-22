@@ -34,8 +34,10 @@ if ( ! defined( 'TG_FIXTURES_PATH' ) ) {
 
 /*
  * tapgrein_getenv_docker() normally lives in the plugin bootstrap (tapgoods.php),
- * which we deliberately do not load. Provide the same contract so the mock seam
- * (Tapgoods_Connection::use_mock_api()) can read env vars during tests.
+ * which we deliberately do not load. This is a minimal stub covering only the plain
+ * getenv() path the mock seam (Tapgoods_Connection::use_mock_api()) needs during
+ * tests; it intentionally omits the real function's docker-secrets ("<ENV>_FILE")
+ * branch, which no test exercises.
  */
 if ( ! function_exists( 'tapgrein_getenv_docker' ) ) {
 	function tapgrein_getenv_docker( $env, $default ) {

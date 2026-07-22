@@ -14,6 +14,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+
+      - name: Install PHP dependencies and run unit tests
+        working-directory: tapgoods-wp
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          composer test
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
