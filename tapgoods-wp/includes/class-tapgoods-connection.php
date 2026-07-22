@@ -75,9 +75,11 @@ class Tapgoods_Connection {
 	 */
 	private function create_client( $config ) {
 
-		// Allow tests / integrations to inject a client.
+		// Allow tests / integrations to inject a client. Only accept an object: a
+		// filter that returns false/'' (a common WP filter mistake) must not become
+		// the client, or later ->validate_key() calls would fatal.
 		$injected = apply_filters( 'tapgoods_api_client', null, $config );
-		if ( null !== $injected ) {
+		if ( is_object( $injected ) ) {
 			return $injected;
 		}
 

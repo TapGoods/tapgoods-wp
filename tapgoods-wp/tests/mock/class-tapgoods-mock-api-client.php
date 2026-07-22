@@ -50,7 +50,7 @@ class Tapgoods_Mock_API_Client {
 	 */
 	private function fixture( $file ) {
 		$base = defined( 'TG_FIXTURES_PATH' ) ? TG_FIXTURES_PATH : __DIR__ . '/../fixtures/';
-		$path = rtrim( $base, '/' ) . '/' . $file;
+		$path = rtrim( $base, '/\\' ) . '/' . $file;
 		if ( ! file_exists( $path ) ) {
 			throw new RuntimeException( "Missing mock fixture: {$path}" );
 		}

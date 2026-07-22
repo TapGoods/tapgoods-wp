@@ -94,7 +94,7 @@ Tests live in `tapgoods-wp/tests/` and run with **PHPUnit** plus **Brain\Monkey*
 
 ### Running tests
 
-Requires PHP + Composer. If you don't have them locally, use the repo's Docker (Colima) setup:
+Running the unit tests requires **PHP 8.1+** (PHPUnit 10+; CI uses PHP 8.2) even though the shipped plugin targets PHP 7.2 — the 7.2 floor applies to production code and is enforced separately by `composer compat`. If you don't have PHP + Composer locally, use the repo's Docker (Colima) setup:
 ```bash
 # one-time
 cd tapgoods-wp && composer install
