@@ -82,15 +82,25 @@ final class FormattingFunctionsTest extends TestCase {
 		$wpdb->options = 'wp_options';
 		$wpdb->shouldReceive( 'strip_invalid_text_for_column' )
 			->andReturnUsing( static fn( $table, $col, $value ) => $value );
+
+		// Save/restore the global so this test can't contaminate others.
+		$had_wpdb        = array_key_exists( 'wpdb', $GLOBALS );
+		$prev_wpdb       = $had_wpdb ? $GLOBALS['wpdb'] : null;
 		$GLOBALS['wpdb'] = $wpdb;
 
 		Functions\when( 'is_wp_error' )->justReturn( false );
 		Functions\when( 'esc_url_raw' )->returnArg();
 		Functions\when( 'untrailingslashit' )->alias( static fn( $v ) => rtrim( $v, '/' ) );
 
-		$this->assertSame( 'example.com/shop', tapgrein_sanitize_permalink( 'http://example.com/shop/' ) );
-		$this->assertSame( '', tapgrein_sanitize_permalink( null ) );
-
-		unset( $GLOBALS['wpdb'] );
+		try {
+			$this->assertSame( 'example.com/shop', tapgrein_sanitize_permalink( 'http://example.com/shop/' ) );
+			$this->assertSame( '', tapgrein_sanitize_permalink( null ) );
+		} finally {
+			if ( $had_wpdb ) {
+				$GLOBALS['wpdb'] = $prev_wpdb;
+			} else {
+				unset( $GLOBALS['wpdb'] );
+			}
+		}
 	}
 }

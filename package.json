@@ -10,6 +10,6 @@
     "clean": "rimraf releases && mkdir releases", 
     "build-sass": "sass ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css",
     "build": "npm run clean && npm run build-sass",
-    "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*' 'tapgoods-wp/vendor/*' 'tapgoods-wp/tests/*' 'tapgoods-wp/phpunit.xml.dist' 'tapgoods-wp/.phpunit.cache/*'"
+    "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*' 'tapgoods-wp/vendor/*' 'tapgoods-wp/tests/*' 'tapgoods-wp/phpunit.xml.dist' 'tapgoods-wp/phpcompat.xml.dist' 'tapgoods-wp/.phpunit.cache/*'"
   }
 }

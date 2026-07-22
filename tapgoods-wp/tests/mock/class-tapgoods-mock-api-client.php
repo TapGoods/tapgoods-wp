@@ -54,7 +54,11 @@ class Tapgoods_Mock_API_Client {
 		if ( ! file_exists( $path ) ) {
 			throw new RuntimeException( "Missing mock fixture: {$path}" );
 		}
-		return json_decode( file_get_contents( $path ), true );
+		$decoded = json_decode( file_get_contents( $path ), true );
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
+			throw new RuntimeException( "Invalid JSON in mock fixture {$path}: " . json_last_error_msg() );
+		}
+		return $decoded;
 	}
 
 	// --- Emulated client surface used by Tapgoods_Connection ------------------

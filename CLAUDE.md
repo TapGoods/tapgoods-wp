@@ -8,7 +8,7 @@ A WordPress plugin ("TapGoods Rental Inventory") that integrates a WordPress sit
 
 ## Repo layout: two nested levels
 
-- **Repo root** (`/`) is a local dev harness: `docker-compose.yml`, build scripts (`package.json`, `zip-plugin.js`), and the `releases/` output.
+- **Repo root** (`/`) is a local dev harness: `docker-compose.yml`, build scripts (`package.json`), and the `releases/` output.
 - **`tapgoods-wp/`** is the actual plugin (the shippable WordPress plugin directory). Almost all real code lives here. When editing plugin code, you are in `tapgoods-wp/`.
 
 ## Common commands

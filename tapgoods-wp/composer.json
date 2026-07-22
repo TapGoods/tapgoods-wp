@@ -4,7 +4,8 @@
         "wp-coding-standards/wpcs": "^3.0",
         "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0",
         "brain/monkey": "^2.6",
-        "mockery/mockery": "^1.6"
+        "mockery/mockery": "^1.6",
+        "phpcompatibility/phpcompatibility-wp": "^2.1"
     },
     "config": {
         "allow-plugins": {
@@ -15,12 +16,14 @@
         "test": "phpunit",
         "test:unit": "phpunit --testsuite unit",
         "lint": "phpcs",
-        "lint:fix": "phpcbf"
+        "lint:fix": "phpcbf",
+        "compat": "phpcs --standard=phpcompat.xml.dist"
     },
     "scripts-descriptions": {
         "test": "Run the full PHPUnit unit-test suite (isolated, no WordPress bootstrap).",
         "test:unit": "Run only the 'unit' test suite.",
         "lint": "Run PHP_CodeSniffer against the WordPress coding standard.",
-        "lint:fix": "Auto-fix coding-standard violations where possible."
+        "lint:fix": "Auto-fix coding-standard violations where possible.",
+        "compat": "Check production code stays compatible with the declared minimum PHP (7.2)."
     }
 }
