@@ -1284,105 +1284,39 @@ function tapgrein_update_inventory_grid() {
 add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 
-// Redirect category and tag archive pages to shop page with filters
-// removed because of redemption tents jira ticket wp-132 add_action('template_redirect', 'tapgrein_redirect_taxonomy_archives');
-function tapgrein_redirect_taxonomy_archives() {
-    $term = get_queried_object();
-
-    if (!$term || is_wp_error($term)) {
+// Route TapGoods tag term archives to the shop grid filtered by that tag.
+//
+// A tag term URL (e.g. /tags/tag-champagne/) otherwise renders WordPress's
+// default taxonomy archive, which has no TapGoods inventory grid and shows an
+// empty page (WPB-166). The reporter expects the tag to land on the main shop
+// grid (/shop/) filtered by the tag, which is exactly how category filtering
+// already behaves via the ?category= query arg.
+//
+// NOTE: only tg_tags is redirected here. Category archives are intentionally
+// NOT redirected (that behavior was removed for the "redemption tents" issue,
+// WP-132); tags have no such exception.
+add_action( 'template_redirect', 'tapgrein_redirect_tag_archives' );
+function tapgrein_redirect_tag_archives() {
+    if ( ! is_tax( 'tg_tags' ) ) {
         return;
     }
 
-    $shop_url = home_url('/shop/');
-    $redirect_url = null;
-
-    // Check if this is a tg_category taxonomy archive page
-    if (is_tax('tg_category')) {
-        // Use category slug as-is (no prefix to remove)
-        $category_slug = $term->slug;
-
-        // Build redirect URL with category parameter
-        $redirect_url = add_query_arg('category', $category_slug, $shop_url);
-    }
-    // Check if this is a tg_tags taxonomy archive page
-    elseif (is_tax('tg_tags')) {
-        // Remove 'tag-' prefix from slug if present for cleaner URL
-        $tag_slug = $term->slug;
-        if (strpos($tag_slug, 'tag-') === 0) {
-            $tag_slug = substr($tag_slug, 4); // Remove 'tag-' prefix
-        }
-
-        // Build redirect URL with tags parameter
-        $redirect_url = add_query_arg('tags', $tag_slug, $shop_url);
+    $term = get_queried_object();
+    if ( ! $term || is_wp_error( $term ) || empty( $term->slug ) ) {
+        return;
     }
 
-    // Perform redirect if URL was set
-    if ($redirect_url) {
-        wp_safe_redirect($redirect_url, 301);
-        exit;
-    }
-}
-
-add_filter('template_include', 'tapgrein_custom_tax_template');
-function tapgrein_custom_tax_template($template) {
-    // Check if this is a taxonomy archive page for a custom taxonomy
-    if (is_tax('tg_tags')) {
-        // Define the correct custom template path
-        $custom_template = TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
-
-        // Check if the custom template file exists
-        if (file_exists($custom_template)) {
-            return $custom_template; // Return the custom template
-        }
+    // Tag term slugs are stored with a 'tag-' prefix (see tg_insert_or_update_term).
+    // Strip it for a cleaner shop URL; the shop grid re-adds the prefix when it
+    // builds the tax query, so either form resolves to the same term.
+    $tag_slug = $term->slug;
+    if ( 0 === strpos( $tag_slug, 'tag-' ) ) {
+        $tag_slug = substr( $tag_slug, 4 );
     }
 
-    return $template; // Return the default template if conditions are not met
-}
-
-// Force enqueue scripts for tag pages - using wp_head to ensure proper timing
-add_action('wp_head', 'tapgrein_enqueue_tag_page_scripts', 1);
-function tapgrein_enqueue_tag_page_scripts() {
-    global $wp_query;
-    
-    // Debug: Check what WordPress thinks we are
-    error_log('TapGoods: tapgrein_enqueue_tag_page_scripts called');
-    error_log('TapGoods: is_tax(): ' . (is_tax() ? 'true' : 'false'));
-    error_log('TapGoods: is_tax(tg_tags): ' . (is_tax('tg_tags') ? 'true' : 'false'));
-    error_log('TapGoods: get_queried_object: ' . print_r(get_queried_object(), true));
-    
-    // Debug URL check
-    $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-    $is_tag_url = strpos($request_uri, '/tags/') !== false;
-    error_log('TapGoods: REQUEST_URI: ' . $request_uri);
-    error_log('TapGoods: is_tag_url: ' . ($is_tag_url ? 'true' : 'false'));
-    
-    // Check multiple conditions to catch tag pages
-    if (is_tax('tg_tags') || 
-        (is_tax() && isset($wp_query->queried_object->taxonomy) && $wp_query->queried_object->taxonomy === 'tg_tags') ||
-        $is_tag_url) {
-        
-        error_log('TapGoods: Tag page detected, enqueuing scripts');
-        
-        // Enqueue main JavaScript file
-        wp_enqueue_script(
-            'tapgoods-public-complete',
-            plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-complete.js',
-            array('jquery'),
-            '0.1.124-tag-fix',
-            true
-        );
-        
-        // Localize script with necessary data
-        wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'default_location' => get_option('tapgreino_default_location'),
-            'plugin_url' => plugin_dir_url(dirname(__FILE__))
-        ));
-        
-        error_log('TapGoods: Scripts enqueued for tag page');
-    } else {
-        error_log('TapGoods: Not a tag page, skipping script enqueue');
-    }
+    $redirect_url = add_query_arg( 'tags', $tag_slug, home_url( '/shop/' ) );
+    wp_safe_redirect( $redirect_url, 301 );
+    exit;
 }
 
 
