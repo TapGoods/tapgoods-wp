@@ -1,14 +1,13 @@
 name: CI
 
-# Runs on every PR and push so changes get checks before they reach master.
-# (package-plugin.yml only runs on push to master and owns the release/version
-# bump; the layered verification stack lives here.)
+# Runs on every PR (branch pushes get covered once a PR is open) and on push to
+# master. (package-plugin.yml only runs on push to master and owns the
+# release/version bump; the layered verification stack lives here.)
 on:
   pull_request:
   push:
     branches:
       - master
-      - "**"
 
 concurrency:
   group: ci-${{ github.ref }}
