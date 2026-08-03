@@ -413,6 +413,14 @@ function initAdminShortcodes() {
             return;
         }
         
+        // Read the shortcode from an authoritative source so it can never be
+        // clobbered by a browser password manager / autofill overwriting a
+        // form field (see WPB-167). Prefer the data attribute, then fall back
+        // to an input value or the element's text content.
+        const textToCopy = (input.dataset && typeof input.dataset.shortcode === 'string')
+            ? input.dataset.shortcode
+            : (typeof input.value === 'string' ? input.value : (input.textContent || '').trim());
+
         const button = document.querySelector(`button[onclick*="${elementId}"]`);
         const originalButtonContent = button ? button.innerHTML : null;
         
@@ -432,8 +440,8 @@ function initAdminShortcodes() {
         
         // Try modern clipboard API first
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(input.value).then(() => {
-                console.log("TapGoods Admin: Copied to clipboard: " + input.value);
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                console.log("TapGoods Admin: Copied to clipboard: " + textToCopy);
                 showCopyFeedback(true);
             }).catch(err => {
                 console.error("TapGoods Admin: Modern clipboard failed: ", err);
@@ -449,7 +457,7 @@ function initAdminShortcodes() {
             try {
                 // Create a temporary textarea element
                 const tempTextarea = document.createElement('textarea');
-                tempTextarea.value = input.value;
+                tempTextarea.value = textToCopy;
                 tempTextarea.style.position = 'fixed';
                 tempTextarea.style.left = '-999999px';
                 tempTextarea.style.top = '-999999px';
@@ -464,7 +472,7 @@ function initAdminShortcodes() {
                 document.body.removeChild(tempTextarea);
                 
                 if (successful) {
-                    console.log("TapGoods Admin: Copied using fallback method: " + input.value);
+                    console.log("TapGoods Admin: Copied using fallback method: " + textToCopy);
                     showCopyFeedback(true);
                 } else {
                     console.error("TapGoods Admin: Fallback copy command failed");
