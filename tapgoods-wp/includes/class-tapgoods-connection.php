@@ -276,8 +276,8 @@ class Tapgoods_Connection {
 			update_option('tg_last_api_key', $current_key);
 		}
 
-        $batch_size = 50;
-		$client = $this->get_connection();
+		$batch_size = 50;
+		$client     = $this->get_connection();
 
 		// Prevent concurrent syncs
 		if (get_transient('tapgrein_sync_lock')) {
@@ -285,82 +285,126 @@ class Tapgoods_Connection {
 			return array('success' => true, 'message' => 'Sync in progress. It can take up to 60 minutes for larger inventory. Please do not close the window until the sync is complete.', 'in_progress' => true);
 		}
 
-		// Lock the sync process
-		set_transient('tapgrein_sync_lock', true, 900);
+		// Lock the sync process. Align the TTL with the advertised "up to 60
+		// minutes" duration so the every-5-minute cron does not launch a second
+		// full sync on top of one that is still legitimately running. With the
+		// previous 900s (15 min) TTL the lock lapsed mid-run on large catalogs
+		// and each cron tick restarted the whole fetch, so the sync never
+		// converged and the "Synchronization in Progress" screen never cleared
+		// (WPB-165).
+		set_transient('tapgrein_sync_lock', true, HOUR_IN_SECONDS);
 
-		$location_ids = $client->get_location_ids();
-		if (false === $location_ids) {
+		// A full catalog sync makes hundreds of sequential API requests and can
+		// easily exceed PHP's default execution time / memory on large catalogs,
+		// which killed the request mid-run and left the sync spinning forever.
+		// Give the long-running job room to actually finish (WPB-165).
+		if (function_exists('set_time_limit')) {
+			@set_time_limit(0); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+		if (function_exists('wp_raise_memory_limit')) {
+			wp_raise_memory_limit('admin');
+		}
+
+		// Track whether every page fetched cleanly. get_inventories_from_graph()
+		// returns false on a transport/GraphQL error, which is indistinguishable
+		// from "no more pages"; if any page fails we must NOT run the destructive
+		// cleanup below, or we would delete items that simply were not fetched
+		// this run and could wipe most of the catalog (WPB-165 / WPB-172).
+		$fetch_complete = true;
+
+		// Always release the lock, even if a recoverable error is thrown mid-sync,
+		// so a single failure can never leave the sync permanently "in progress".
+		try {
+			$location_ids = $client->get_location_ids();
+			if (false === $location_ids) {
+				$this->console_log('Failed to retrieve location IDs.');
+				return array('success' => false, 'message' => 'Failed to retrieve location information.');
+			}
+
+			$total_items    = 0;
+			$start_time     = current_time('timestamp');
+			$existing_items = $this->get_all_existing_inventory_ids();
+			$synced_items   = [];
+
+			foreach ($location_ids as $lid) {
+				// Restart pagination for each location.
+				$current_page      = 1;
+				$continue_fetching = true;
+
+				while ($continue_fetching) {
+					$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
+
+					// A false response is an API/transport error, NOT the end of
+					// the collection. Flag the sync as incomplete and stop paging
+					// this location so cleanup is skipped for a partial fetch.
+					if (false === $response) {
+						$this->console_log('Error fetching items for location ID: ' . $lid . ' (page ' . $current_page . '). Marking sync incomplete.');
+						$fetch_complete    = false;
+						$continue_fetching = false;
+						continue;
+					}
+
+					if (empty($response['collection'])) {
+						$this->console_log('No more items to fetch for location ID: ' . $lid);
+						$continue_fetching = false;
+						continue;
+					}
+
+					$inventory    = $response['collection'];
+					$total_items += count($inventory);
+
+					foreach ($inventory as $item) {
+						$this->sync_inventory_item($item);
+						$synced_items[] = $item['id'];
+					}
+
+					if (count($inventory) < $batch_size) {
+						$continue_fetching = false;
+					} else {
+						$current_page++;
+					}
+				}
+			}
+
+			// Sync categories and tags after items
+			$this->console_log('Syncing categories and tags...');
+			$categories_synced = $this->sync_categories_from_api();
+
+			if ($categories_synced) {
+				$this->console_log('Assigning categories and tags to items...');
+				foreach ($synced_items as $tg_id) {
+					$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
+					if ($item) {
+						$this->tapgrein_assign_terms($item->ID);
+					}
+				}
+			} else {
+				$this->console_log('Category and tag sync failed.');
+			}
+
+			// Cleanup after sync. Only remove "missing" items when the whole
+			// catalog was fetched without error; otherwise a single failed page
+			// would delete every item that was not fetched this run.
+			if ($fetch_complete) {
+				$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+			} else {
+				$this->console_log('Fetch incomplete; skipping removal of missing items to avoid deleting un-fetched inventory.');
+			}
+			$this->remove_unused_terms('tg_category');
+			$this->remove_unused_terms('tg_tags');
+			$this->remove_duplicate_items();
+			$this->update_sync_info($start_time);
+
+			// Check if anything was actually synced
+			if ($total_items === 0) {
+				return array('success' => true, 'message' => 'Everything is up to date. Nothing to sync.');
+			}
+
+			return array('success' => true, 'message' => '');
+		} finally {
+			// Unlock the process
 			delete_transient('tapgrein_sync_lock');
-			$this->console_log('Failed to retrieve location IDs.');
-			return array('success' => false, 'message' => 'Failed to retrieve location information.');
 		}
-	
-		$total_items = 0;
-		$start_time = current_time('timestamp');
-		$existing_items = $this->get_all_existing_inventory_ids();
-		$synced_items = [];
-	
-        foreach ($location_ids as $lid) {
-            // Reiniciar paginación por cada ubicación
-            $current_page = 1;
-            $continue_fetching = true;
-	
-			while ($continue_fetching) {
-				$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
-				if (false === $response || empty($response['collection'])) {
-					$this->console_log('No more items to fetch for location ID: ' . $lid);
-					$continue_fetching = false;
-					continue;
-				}
-	
-				$inventory = $response['collection'];
-				$total_items += count($inventory);
-	
-                foreach ($inventory as $item) {
-                    $this->sync_inventory_item($item);
-                    $synced_items[] = $item['id'];
-                }
-	
-				if (count($inventory) < $batch_size) {
-					$continue_fetching = false;
-                } else {
-                    $current_page++;
-                }
-			}
-		}
-	
-		// Sync categories and tags after items
-		$this->console_log('Syncing categories and tags...');
-		$categories_synced = $this->sync_categories_from_api();
-	
-		if ($categories_synced) {
-			$this->console_log('Assigning categories and tags to items...');
-			foreach ($synced_items as $tg_id) {
-				$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
-				if ($item) {
-					$this->tapgrein_assign_terms($item->ID);
-				}
-			}
-		} else {
-			$this->console_log('Category and tag sync failed.');
-		}
-	
-		// Cleanup after sync
-		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
-		$this->remove_unused_terms('tg_category');
-		$this->remove_unused_terms('tg_tags');
-		$this->remove_duplicate_items();
-		$this->update_sync_info($start_time);
-
-		// Unlock the process
-        delete_transient('tapgrein_sync_lock');
-
-		// Check if anything was actually synced
-		if ($total_items === 0) {
-			return array('success' => true, 'message' => 'Everything is up to date. Nothing to sync.');
-		}
-
-		return array('success' => true, 'message' => '');
 	}
 	
 	

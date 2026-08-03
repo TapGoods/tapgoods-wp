@@ -78,6 +78,19 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertSame( '12.00', get_post_meta( $table->ID, 'tg_dailyPrice', true ) );
 	}
 
+	public function test_sync_releases_the_lock_when_it_finishes() {
+		// The sync must never leave the 'tapgrein_sync_lock' transient set once it
+		// returns, otherwise the every-5-minute cron keeps reporting "Sync in
+		// progress" and the admin sync screen never clears (WPB-165). The lock is
+		// released in a finally block so this holds even on an error mid-sync.
+		$result = $this->connection()->sync_inventory_in_batches( true );
+		$this->assertTrue( $result['success'] );
+		$this->assertFalse(
+			get_transient( 'tapgrein_sync_lock' ),
+			'The sync lock must be cleared once sync_inventory_in_batches() returns.'
+		);
+	}
+
 	public function test_full_sync_reports_success() {
 		$result = $this->connection()->sync_from_api();
 		$this->assertTrue( $result['success'] );
