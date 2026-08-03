@@ -572,6 +572,18 @@ function updateCartItemsOnLoad(container, locationId) {
 function setupInventoryCartButtons(container, locationId) {
     const addButtons = container.querySelectorAll('.add-cart');
     addButtons.forEach(button => {
+        // Bind the click handler at most once per button. This function is
+        // invoked from several places (initial load, tag pages via
+        // initTagResults(), and twice within each AJAX search/pagination
+        // refresh), so without this guard a single button accumulated multiple
+        // click listeners. That caused one click to fire the validation
+        // alert("Please enter a valid quantity.") repeatedly, and closing one
+        // alert immediately surfaced the next — the "un-closeable" error in
+        // WPB-168.
+        if (button.dataset.tgCartBound === '1') {
+            return;
+        }
+        button.dataset.tgCartBound = '1';
         button.addEventListener('click', function(event) {
             handleInventoryAddToCart(event, locationId);
         });
