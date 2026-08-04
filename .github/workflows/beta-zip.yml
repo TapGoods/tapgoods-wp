@@ -1,0 +1,201 @@
+name: Beta plugin zip
+
+# Builds an installable plugin zip from any branch so a change can be tested on
+# a real WordPress site (the internal WP Engine test site) BEFORE it reaches
+# master.
+#
+# Deliberately separate from package-plugin.yml, which owns production
+# packaging. This workflow never commits anything: it does not bump the version
+# header in git and does not touch the tracked releases/ folder. The build
+# version is stamped into the working copy only.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/tag/SHA to package (leave empty to use the branch selected above)"
+        required: false
+        type: string
+      publish_release:
+        description: "Publish as a GitHub pre-release (gives a shareable download link)"
+        required: false
+        type: boolean
+        default: true
+  pull_request:
+
+concurrency:
+  group: beta-zip-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # needed to publish the pre-release
+
+jobs:
+  build:
+    name: Build beta zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Empty string makes actions/checkout fall back to the event's ref,
+          # which is what we want for pull_request and for a dispatch that did
+          # not name an explicit ref.
+          ref: ${{ github.event.inputs.ref || '' }}
+
+      - name: Compute build identifiers
+        id: meta
+        run: |
+          set -euo pipefail
+
+          base_version=$(grep -oP 'Version:\s*\K[\d.]+' tapgoods-wp/tapgoods.php)
+          raw_ref="${{ github.event.inputs.ref || github.head_ref || github.ref_name }}"
+          # Branch names can contain "/" and other characters that are not safe
+          # in a file name, a git tag or a plugin version string.
+          slug=$(printf '%s' "$raw_ref" | tr '/' '-' | tr -cd '[:alnum:]._-')
+          head_sha=$(git rev-parse HEAD)
+          short_sha=$(printf '%s' "$head_sha" | cut -c1-7)
+
+          {
+            echo "base_version=${base_version}"
+            echo "version=${base_version}+${slug}.${short_sha}"
+            echo "tag=beta-${slug}-${short_sha}"
+            echo "head_sha=${head_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer
+          coverage: none
+
+      - name: Install PHP dependencies
+        working-directory: tapgoods-wp
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Same two gates package-plugin.yml runs before a production build. A zip
+      # that someone will install on a shared site should clear at least the bar
+      # a release clears. PHPStan is left to ci.yml to keep this build quick.
+      - name: Unit tests
+        working-directory: tapgoods-wp
+        run: composer test
+
+      - name: PHP 7.2 compatibility
+        working-directory: tapgoods-wp
+        run: composer compat
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Node dependencies
+        run: npm install
+
+      # build-sass only, not `npm run build`: the latter runs `clean`, which
+      # wipes the tracked releases/ folder that belongs to production packaging.
+      - name: Compile SCSS
+        run: npm run build-sass
+
+      # Working copy only, never committed. package-plugin.yml parses the
+      # Version header with a [\d.]+ regex on master and would mangle a suffix,
+      # which is exactly why the suffix is applied here at package time instead.
+      - name: Stamp build version
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          BASE_VERSION: ${{ steps.meta.outputs.base_version }}
+        run: |
+          set -euo pipefail
+
+          # Shown on the wp-admin Plugins screen, so a tester can always tell
+          # which branch and commit is installed.
+          sed -i "s|^ \* Version:.*| * Version:           ${VERSION}|" tapgoods-wp/tapgoods.php
+          sed -i "s|^Stable tag:.*|Stable tag: ${VERSION}|" tapgoods-wp/readme.txt
+          # Asset cache-buster. Bumping it per build stops a tester from seeing
+          # stale CSS/JS cached from the previous zip.
+          sed -i "s|define( 'TAPGOODSWP_VERSION', '[^']*' );|define( 'TAPGOODSWP_VERSION', '${VERSION}' );|" tapgoods-wp/tapgoods.php
+
+          echo "--- stamped headers ---"
+          grep -E "^ \* Version:|TAPGOODSWP_VERSION" tapgoods-wp/tapgoods.php
+
+      - name: Package plugin
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # `zip -r existing.zip dir` UPDATES an existing archive instead of
+          # replacing it, and releases/tapgoods-wp.zip is committed to the repo.
+          # Without this removal the beta zip would carry stale files from the
+          # last production build.
+          rm -f releases/tapgoods-wp.zip
+
+          npm run zip-plugin
+
+          mkdir -p build
+          mv releases/tapgoods-wp.zip "build/tapgoods-wp-${VERSION}.zip"
+
+          # Guard against a packaging change that would break "upload over the
+          # existing plugin": WordPress replaces a plugin in place only when the
+          # archive has the tapgoods-wp/ directory at its root.
+          # Captured into a variable first: piping into `grep -q` under
+          # `pipefail` makes grep exit on the first match, unzip die on SIGPIPE
+          # and the pipeline report 141, failing the check on a valid zip.
+          listing=$(unzip -l "build/tapgoods-wp-${VERSION}.zip")
+          if ! grep -q " tapgoods-wp/tapgoods.php$" <<< "$listing"; then
+            echo "::error::Zip does not contain tapgoods-wp/tapgoods.php at the archive root."
+            exit 1
+          fi
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tapgoods-wp-${{ steps.meta.outputs.version }}
+          path: build/*.zip
+          if-no-files-found: error
+
+      - name: Publish pre-release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+
+          cat > release-notes.md <<NOTES
+          Test build of the TapGoods plugin. **Not for production sites.**
+
+          - Branch/ref: \`${{ github.event.inputs.ref || github.ref_name }}\`
+          - Commit: \`${HEAD_SHA}\`
+          - Version shown in wp-admin: \`${VERSION}\`
+
+          ## Install
+
+          1. Download the \`.zip\` below.
+          2. In wp-admin: **Plugins -> Add New -> Upload Plugin**, choose the zip.
+          3. WordPress detects the plugin is already installed and shows a
+             comparison screen. Choose **Replace current with uploaded**.
+          4. Confirm on **Plugins** that the version matches \`${VERSION}\`.
+
+          WordPress may warn that the uploaded version is *older* than the
+          installed one. That is expected: the \`+branch.sha\` suffix sorts below
+          a plain version number. Replacing is safe, and plugin settings stored
+          in the database are preserved.
+
+          ## Going back to the production build
+
+          Install the zip from \`releases/tapgoods-wp.zip\` on \`master\` the same way.
+          NOTES
+
+          # Make re-running the workflow on the same commit idempotent.
+          gh release delete "${TAG}" --yes --cleanup-tag 2>/dev/null || true
+
+          gh release create "${TAG}" build/*.zip \
+            --prerelease \
+            --target "${HEAD_SHA}" \
+            --title "Beta ${VERSION}" \
+            --notes-file release-notes.md
+
+          echo "### Beta zip published" >> "$GITHUB_STEP_SUMMARY"
+          gh release view "${TAG}" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

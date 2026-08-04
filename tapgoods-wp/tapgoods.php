@@ -12,6 +12,15 @@
  * License:           MIT
  * Text Domain:       tapgoods
  * Domain Path:       /languages
+ * Update URI:        false
+ *
+ * "Update URI: false" tells WordPress 5.8+ that this plugin has no update
+ * source, so core stops asking wordpress.org about it. Without it, every site
+ * running this plugin sends the folder name "tapgoods-wp" to the .org update
+ * API, and an unrelated .org plugin claiming that same slug would be offered
+ * to our users as an "update" and overwrite this one. Remove this line only if
+ * the plugin is actually published to wordpress.org, or replace it with the
+ * URL of a self-hosted update server.
  *
  *
  * MIT License
