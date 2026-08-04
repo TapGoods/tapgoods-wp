@@ -10,6 +10,13 @@ parameters:
 	# Pragmatic starting level for a legacy codebase. Raise over time.
 	level: 5
 
+	# composer.lock is intentionally not committed, so CI resolves PHPStan fresh
+	# and a patch release can analyze a baselined line slightly differently,
+	# leaving a baseline entry unmatched. Don't fail the build on that (it would
+	# make the baseline brittle across PHPStan versions); new real issues still
+	# fail. Prune stale baseline entries when regenerating the baseline.
+	reportUnmatchedIgnoredErrors: false
+
 	# Production (shipped) code only. Dev/test code is intentionally excluded.
 	paths:
 		- includes
