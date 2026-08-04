@@ -51,7 +51,11 @@ jobs:
           # Branch names can contain "/" and other characters that are not safe
           # in a file name, a git tag or a plugin version string.
           slug=$(printf '%s' "$raw_ref" | tr '/' '-' | tr -cd '[:alnum:]._-')
-          head_sha=$(git rev-parse HEAD)
+          # On pull_request, HEAD is the ephemeral merge commit GitHub builds for
+          # the check, which exists on no branch. Prefer the PR head so the
+          # version suffix names a commit a tester can actually look up.
+          head_sha="${{ github.event.pull_request.head.sha || '' }}"
+          [ -n "$head_sha" ] || head_sha=$(git rev-parse HEAD)
           short_sha=$(printf '%s' "$head_sha" | cut -c1-7)
 
           {
