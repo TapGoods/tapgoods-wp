@@ -110,6 +110,14 @@ CI wires these into `.github/workflows/ci.yml` (jobs `static`, `unit`, `integrat
 
 `composer analyze` runs PHPStan (level 5) over production code only (`includes/`, `admin/`, `public/`, `tapgoods.php`, `uninstall.php`). Because this is a legacy codebase, pre-existing issues are captured in `phpstan-baseline.neon` (128 entries at introduction) so the suite is **green today and only NEW problems fail the build**. When you legitimately fix baselined debt, regenerate it: `composer analyze -- --generate-baseline` (needs a generous memory limit; CLI default `-1` is fine). Do not add blanket ignores to grow the baseline for new code.
 
+`phpstan/phpstan` is pinned to an **exact version** (`2.2.5`) in `composer.json`, not a `^2.0` range. `composer.lock` is not committed, so CI resolves dev dependencies fresh on every run; under a range, a PHPStan patch release lands in CI without anyone touching the repo and reports errors the baseline does not cover, failing `static` on unrelated PRs (2.2.7 did exactly this with `empty.variable` in `class-tapgoods-post-types.php`). Do not relax the pin back to a range. To move to a newer PHPStan, bump the exact version deliberately and regenerate the baseline in the same commit. Verify a bump the way CI sees it, resolving with no lock present:
+
+```bash
+# from a copy of tapgoods-wp/ with vendor/ and composer.lock removed
+docker run --rm -v "$PWD":/app -w /app --entrypoint bash composer:2 -c \
+  'composer install --no-interaction --no-progress && php -d memory_limit=-1 vendor/bin/phpstan analyse'
+```
+
 ### Layer 2: isolated unit tests
 
 Requires **PHP 8.1+** (PHPUnit 10+; CI uses PHP 8.2) even though the shipped plugin targets PHP 7.2. The 7.2 floor applies to production code and is enforced separately by `composer compat`. If you don't have PHP + Composer locally, use the repo's Docker (Colima) setup:
