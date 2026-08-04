@@ -117,6 +117,53 @@ Currently we're just using SASS to customize bootstrap for the WP-Admin. If you 
 ```
 sass --watch ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css
 ```
+
+## Testing a build on a real site before it reaches master (beta zip)
+
+`master` is packaged automatically and is the version handed to customers. To try
+a change on a real WordPress site *before* it gets there, use the **Beta plugin
+zip** workflow (`.github/workflows/beta-zip.yml`). It builds an installable zip
+from any branch. It never bumps the version in git and never touches
+`releases/`, so it cannot affect the production package.
+
+### Getting a zip
+
+- **From a branch:** GitHub → Actions → *Beta plugin zip* → **Run workflow**.
+  Optionally type a branch in the `ref` field to package a branch other than the
+  one selected. It publishes a **pre-release** whose download link you can share.
+- **From a pull request:** every PR builds one automatically. Open the PR's
+  *Checks* tab → *Beta plugin zip* → **Artifacts**.
+
+Either way the build runs the unit tests and the PHP 7.2 compatibility check
+first, the same gates a production release runs.
+
+### Installing it
+
+1. In wp-admin: **Plugins → Add New → Upload Plugin**, choose the zip.
+2. WordPress sees the plugin is already installed and shows a comparison screen.
+   Choose **Replace current with uploaded**.
+3. On **Plugins**, confirm the version reads like `0.1.154+my-branch.a1b2c3d`.
+   That suffix is how you know which branch and commit is running.
+
+Notes:
+
+- WordPress may warn that the uploaded version is **older** than the installed
+  one. Expected: the `+branch.sha` suffix sorts below a plain version number.
+  Replacing is safe and settings stored in the database are preserved.
+- To go back to the customer-facing build, install `releases/tapgoods-wp.zip`
+  from `master` the same way.
+- The plugin reads its TapGoods environment from the `TG_ENV` constant
+  (defaulting to production, `tapgoods.com`). To point a test site at another
+  environment without editing plugin code, drop a file in
+  `wp-content/mu-plugins/` (files there load automatically, no activation
+  needed):
+
+  ```php
+  <?php
+  // wp-content/mu-plugins/tapgoods-env.php
+  define( 'TG_ENV', 'the-environment-domain' );
+  ```
+
 ## Questions
 
 **Q:** I'm a TapGoods customer, can I use this now?

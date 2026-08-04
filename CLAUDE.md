@@ -47,6 +47,10 @@ cd tapgoods-wp && vendor/bin/phpunit --filter test_encrypt_decrypt_roundtrip   #
 
 `.github/workflows/package-plugin.yml` runs on every push to `master`: it auto-increments the patch version in `tapgoods-wp/tapgoods.php` (plugin header `Version:`) and `tapgoods-wp/readme.txt` (`Stable tag`), commits "Bump version to X", then builds and commits the zip to `releases/`. Don't manually edit those version fields or the releases folder. Note the `TAPGOODSWP_VERSION` PHP constant (used for asset cache-busting) is separate and is not what CI bumps.
 
+**Pre-master test builds.** `.github/workflows/beta-zip.yml` ("Beta plugin zip") builds an installable zip from any branch so a change can be tested on a real WordPress site before it reaches `master`. It runs on `workflow_dispatch` (optional `ref` input; publishes a GitHub **pre-release** with a shareable link) and on every `pull_request` (artifact only). It gates on `composer test` + `composer compat`, the same checks `package-plugin.yml` runs. It deliberately does **not** commit anything: the build version `<base>+<branch-slug>.<short-sha>` is stamped into the working copy only (`Version:` header, `readme.txt` `Stable tag`, and `TAPGOODSWP_VERSION` so testers don't get stale cached assets). Never commit a suffixed version: `package-plugin.yml` parses the header with a `[\d.]+` regex and would mangle it. Two traps worth knowing if you edit this workflow: `zip -r` *updates* an existing archive rather than replacing it, so the tracked `releases/tapgoods-wp.zip` must be removed before packaging or stale files leak into the build; and piping `unzip -l` into `grep -q` under `set -o pipefail` fails on a valid zip (grep exits early, unzip takes SIGPIPE, pipeline returns 141).
+
+The plugin header carries `Update URI: false`, which stops WordPress from asking wordpress.org about the `tapgoods-wp` slug. Without it a same-named .org plugin could be offered to customer sites as an "update" and overwrite this one. The plugin has no update mechanism of its own (no `Update URI` server, no `site_transient_update_plugins` filter, no update-checker library), so customers only get new versions by installing a zip by hand. Remove that header only if the plugin is genuinely published to wordpress.org.
+
 ## Architecture
 
 **Bootstrap.** `tapgoods-wp/tapgoods.php` defines constants (`TAPGOODS_PLUGIN_PATH`, `TAPGOODS_UPLOADS`, etc.), registers activation/deactivation hooks, and on `plugins_loaded` calls `Tapgoods::get_instance()->init()`.
@@ -105,6 +109,14 @@ CI wires these into `.github/workflows/ci.yml` (jobs `static`, `unit`, `integrat
 ### Layer 1: static analysis (PHPStan)
 
 `composer analyze` runs PHPStan (level 5) over production code only (`includes/`, `admin/`, `public/`, `tapgoods.php`, `uninstall.php`). Because this is a legacy codebase, pre-existing issues are captured in `phpstan-baseline.neon` (128 entries at introduction) so the suite is **green today and only NEW problems fail the build**. When you legitimately fix baselined debt, regenerate it: `composer analyze -- --generate-baseline` (needs a generous memory limit; CLI default `-1` is fine). Do not add blanket ignores to grow the baseline for new code.
+
+`phpstan/phpstan` is pinned to an **exact version** (`2.2.5`) in `composer.json`, not a `^2.0` range. `composer.lock` is not committed, so CI resolves dev dependencies fresh on every run; under a range, a PHPStan patch release lands in CI without anyone touching the repo and reports errors the baseline does not cover, failing `static` on unrelated PRs (2.2.7 did exactly this with `empty.variable` in `class-tapgoods-post-types.php`). Do not relax the pin back to a range. To move to a newer PHPStan, bump the exact version deliberately and regenerate the baseline in the same commit. Verify a bump the way CI sees it, resolving with no lock present:
+
+```bash
+# from a copy of tapgoods-wp/ with vendor/ and composer.lock removed
+docker run --rm -v "$PWD":/app -w /app --entrypoint bash composer:2 -c \
+  'composer install --no-interaction --no-progress && php -d memory_limit=-1 vendor/bin/phpstan analyse'
+```
 
 ### Layer 2: isolated unit tests
 
