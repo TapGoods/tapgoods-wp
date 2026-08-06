@@ -43,6 +43,7 @@ class Tapgoods {
 			'includes/class-tapgoods-post-types.php',     // Regusters Taxonomies and Post Types
 			'public/class-tapgoods-public.php',           // Class for frontend features
 			'includes/class-tapgoods-encryption.php',     // Class for encryption/decryption methods
+			'includes/class-tapgoods-sync-state.php',     // Sync flow state machine
 			'includes/class-tapgoods-connection.php',     // API Connection Controller
 			'includes/class-tapgoods-api-exception.php',  // API Exception Classes
 			'includes/class-tapgoods-api-request.php',    // API Request Class

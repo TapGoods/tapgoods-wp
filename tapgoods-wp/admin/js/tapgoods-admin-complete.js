@@ -15,7 +15,58 @@ document.addEventListener('DOMContentLoaded', function() {
     initTagFocus();
     initSyncButton();
     initInventorySync();
+    initClearSyncErrors();
 });
+
+/**
+ * Clear Errors button - resets a latched sync error via AJAX.
+ */
+function initClearSyncErrors() {
+    const clearButton = document.getElementById('tapgrein_clear_sync_errors');
+    if (!clearButton) {
+        return;
+    }
+
+    clearButton.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        clearButton.disabled = true;
+        const originalText = clearButton.textContent;
+        clearButton.textContent = 'Clearing...';
+
+        const formData = new FormData();
+        formData.append('action', 'tapgrein_clear_sync_errors');
+        formData.append('nonce', (typeof tg_admin_vars !== 'undefined' && tg_admin_vars.sync_nonce) ? tg_admin_vars.sync_nonce : '');
+
+        fetch(tg_admin_vars.ajaxurl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            if (response.success) {
+                // Hide the button and reflect the reset state in the panel.
+                clearButton.style.display = 'none';
+                const label = document.getElementById('tapgrein_sync_state_label');
+                if (label && response.data && response.data.state) {
+                    label.textContent = response.data.state.label;
+                }
+                showConnectionNotice('Sync errors cleared.', 'success');
+            } else {
+                clearButton.disabled = false;
+                clearButton.textContent = originalText;
+                const message = response.data || 'Unable to clear errors. Please try again.';
+                showConnectionNotice(message, 'error');
+            }
+        })
+        .catch(() => {
+            clearButton.disabled = false;
+            clearButton.textContent = originalText;
+            showConnectionNotice('Unable to clear errors. Please try again.', 'error');
+        });
+    });
+}
 
 /**
  * Admin Permalinks - from admin/class-tapgoods-admin-permalinks.php:129

@@ -186,28 +186,38 @@ class Tapgoods_Connection {
 		return $success;
 	}
 
+	/**
+	 * The sync flow state machine (single source of truth for sync status).
+	 *
+	 * @return Tapgoods_Sync_State
+	 */
+	public function sync_state() {
+		return Tapgoods_Sync_State::get_instance();
+	}
+
 	public function start_sync() {
 		$this->hash         = wp_hash( current_time( 'mysql' ) );
-		$this->is_active    = 1;
 		$this->u_sync_start = current_time( 'timestamp' );
 
 		do_action( 'tg_start_api_sync', $this->u_sync_start );
 
-		set_transient( 'tapgrein_sync_active', 1, 300 );
+		// Enter the state machine: PREP then ACTIVE.
+		$this->sync_state()->begin_prep()->mark_active();
 		set_transient( 'tg_u_sync_start', $this->u_sync_start, 60 );
 	}
 
 	public function is_active() {
-		if ( null === $this->is_active ) {
-			$this->is_active = get_transient( 'tapgrein_sync_active' );
-		}
-		return $this->is_active;
+		return $this->sync_state()->is_running();
 	}
 
 	public function stop_sync( $error = false, $message = '' ) {
 
-		$this->is_active = 0;
-		set_transient( 'tapgrein_sync_active', 0 );
+		// Drive the state machine to its terminal state.
+		if ( false !== $error ) {
+			$this->sync_state()->mark_error( $message );
+		} else {
+			$this->sync_state()->mark_completed();
+		}
 
 		$this->u_sync_end = current_time( 'timestamp' ); // phpcs:ignore
 
@@ -234,34 +244,36 @@ class Tapgoods_Connection {
 	}
 	public function last_sync_message() {
 		$api_connected = get_option('tg_api_connected', false);
-	
+
 		if (!$api_connected) {
 			return 'The last sync finish';
 		}
-	
+
+		$state = $this->sync_state();
+
 		// Check if the synchronization is in progress
-		if (get_transient('tapgrein_sync_lock')) {
+		if ($state->is_running()) {
 			//return 'Sync in progress. Please wait...';
 			return '';
 		}
-	
-		// Get the last synchronization information
-		$sync_info = get_option('tg_last_sync_info');
-	
-		// Verify that $sync_info is not false and contains the required keys
-		if (!$sync_info || !isset($sync_info['last_sync_end']) || !isset($sync_info['last_sync_duration'])) {
+
+		$last_success = $state->get_last_success();
+		$duration     = $state->get_last_duration();
+
+		// Verify that we have a recorded successful sync to report on.
+		if (empty($last_success) || null === $duration) {
 			return 'No sync information available';
 		}
-	
+
 		// Calculate elapsed time and duration
 		$time = current_time('timestamp'); // phpcs:ignore
-		$time_ago = $time - $sync_info['last_sync_end'];
+		$time_ago = $time - $last_success;
 		$time_ago_str = tapgrein_seconds_to_string($time_ago);
-		$duration_str = tapgrein_seconds_to_string($sync_info['last_sync_duration']);
-	
+		$duration_str = tapgrein_seconds_to_string($duration);
+
 		// Build the last synchronization message
 		$message = 'The last sync finished ' . $time_ago_str . " ago and took {$duration_str} seconds to run";
-	
+
 		return $message;
 	}
 	
@@ -278,82 +290,99 @@ class Tapgoods_Connection {
 
         $batch_size = 50;
 		$client = $this->get_connection();
+		$state  = $this->sync_state();
 
-		// Prevent concurrent syncs
-		if (get_transient('tapgrein_sync_lock')) {
+		// Prevent concurrent syncs. The state machine (PREP/ACTIVE) is the lock.
+		if ($state->is_running()) {
 			$this->console_log('Sync is locked. Another process is running.');
 			return array('success' => true, 'message' => 'Sync in progress. It can take up to 60 minutes for larger inventory. Please do not close the window until the sync is complete.', 'in_progress' => true);
 		}
 
-		// Lock the sync process
-		set_transient('tapgrein_sync_lock', true, 900);
+		// SYNC PREP: enter the state machine and figure out how many paging
+		// calls the full inventory sync will require.
+		$state->begin_prep();
 
 		$location_ids = $client->get_location_ids();
 		if (false === $location_ids) {
-			delete_transient('tapgrein_sync_lock');
 			$this->console_log('Failed to retrieve location IDs.');
+			$state->mark_error('Failed to retrieve location information.');
 			return array('success' => false, 'message' => 'Failed to retrieve location information.');
 		}
-	
+
+		$total_pages = $this->compute_total_sync_pages($client, $location_ids, $batch_size);
+		$state->set_total_pages($total_pages);
+		$this->console_log("Sync prep complete. Planned paging calls: {$total_pages}");
+
+		// SYNC ACTIVE: page through inventory and write it into WordPress.
+		$state->mark_active();
+
 		$total_items = 0;
 		$start_time = current_time('timestamp');
 		$existing_items = $this->get_all_existing_inventory_ids();
 		$synced_items = [];
-	
-        foreach ($location_ids as $lid) {
-            // Reiniciar paginación por cada ubicación
-            $current_page = 1;
-            $continue_fetching = true;
-	
-			while ($continue_fetching) {
-				$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
-				if (false === $response || empty($response['collection'])) {
-					$this->console_log('No more items to fetch for location ID: ' . $lid);
-					$continue_fetching = false;
-					continue;
-				}
-	
-				$inventory = $response['collection'];
-				$total_items += count($inventory);
-	
-                foreach ($inventory as $item) {
-                    $this->sync_inventory_item($item);
-                    $synced_items[] = $item['id'];
-                }
-	
-				if (count($inventory) < $batch_size) {
-					$continue_fetching = false;
-                } else {
-                    $current_page++;
-                }
-			}
-		}
-	
-		// Sync categories and tags after items
-		$this->console_log('Syncing categories and tags...');
-		$categories_synced = $this->sync_categories_from_api();
-	
-		if ($categories_synced) {
-			$this->console_log('Assigning categories and tags to items...');
-			foreach ($synced_items as $tg_id) {
-				$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
-				if ($item) {
-					$this->tapgrein_assign_terms($item->ID);
-				}
-			}
-		} else {
-			$this->console_log('Category and tag sync failed.');
-		}
-	
-		// Cleanup after sync
-		$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
-		$this->remove_unused_terms('tg_category');
-		$this->remove_unused_terms('tg_tags');
-		$this->remove_duplicate_items();
-		$this->update_sync_info($start_time);
 
-		// Unlock the process
-        delete_transient('tapgrein_sync_lock');
+		try {
+			foreach ($location_ids as $lid) {
+				// Reiniciar paginación por cada ubicación
+				$current_page = 1;
+				$continue_fetching = true;
+
+				while ($continue_fetching) {
+					$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
+					if (false === $response || empty($response['collection'])) {
+						$this->console_log('No more items to fetch for location ID: ' . $lid);
+						$continue_fetching = false;
+						continue;
+					}
+
+					$inventory = $response['collection'];
+					$total_items += count($inventory);
+					$state->increment_pages_completed();
+
+					foreach ($inventory as $item) {
+						$this->sync_inventory_item($item);
+						$synced_items[] = $item['id'];
+					}
+
+					if (count($inventory) < $batch_size) {
+						$continue_fetching = false;
+					} else {
+						$current_page++;
+					}
+				}
+			}
+
+			// Sync categories and tags after items
+			$this->console_log('Syncing categories and tags...');
+			$categories_synced = $this->sync_categories_from_api();
+
+			if ($categories_synced) {
+				$this->console_log('Assigning categories and tags to items...');
+				foreach ($synced_items as $tg_id) {
+					$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
+					if ($item) {
+						$this->tapgrein_assign_terms($item->ID);
+					}
+				}
+			} else {
+				$this->console_log('Category and tag sync failed.');
+			}
+
+			// Cleanup after sync
+			$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+			$this->remove_unused_terms('tg_category');
+			$this->remove_unused_terms('tg_tags');
+			$this->remove_duplicate_items();
+			$this->update_sync_info($start_time);
+		} catch (Exception $e) {
+			$this->console_log('Sync failed: ' . $e->getMessage());
+			$will_retry = $state->mark_error($e->getMessage());
+			$this->console_log($will_retry ? 'Sync will be retried on the next run.' : 'Sync retries exhausted; state set to ERROR.');
+			return array('success' => false, 'message' => 'Sync failed: ' . $e->getMessage());
+		}
+
+		// SYNC COMPLETED
+		$state->mark_completed();
 
 		// Check if anything was actually synced
 		if ($total_items === 0) {
@@ -361,6 +390,34 @@ class Tapgoods_Connection {
 		}
 
 		return array('success' => true, 'message' => '');
+	}
+
+	/**
+	 * Compute how many paging sync calls the full inventory set will require.
+	 *
+	 * Runs during SYNC PREP: for each location it reads the first page's
+	 * metadata (totalPages) and sums the result. Locations whose metadata is
+	 * unavailable but which returned at least one item count as a single page.
+	 *
+	 * @param object $client       The API client.
+	 * @param array  $location_ids Location IDs to page through.
+	 * @param int    $batch_size   Items per page.
+	 * @return int Total number of paging calls across all locations.
+	 */
+	private function compute_total_sync_pages($client, $location_ids, $batch_size) {
+		$total = 0;
+		foreach ($location_ids as $lid) {
+			$response = $client->get_inventories_from_graph($lid, 1, $batch_size);
+			if (false === $response) {
+				continue;
+			}
+			if (isset($response['metadata']['totalPages'])) {
+				$total += (int) $response['metadata']['totalPages'];
+			} elseif (!empty($response['collection'])) {
+				$total += 1;
+			}
+		}
+		return $total;
 	}
 	
 	
@@ -1497,6 +1554,31 @@ class Tapgoods_Connection {
 	}
 	
 
+	/**
+	 * AJAX handler: clear a latched sync error so cron can start syncing again.
+	 *
+	 * Admin-only and nonce-protected (the shared `tapgrein_sync_nonce`). Returns
+	 * the refreshed state summary so the admin screen can update in place.
+	 */
+	public function clear_sync_errors() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'You do not have permission to perform this action.' );
+			return;
+		}
+
+		check_ajax_referer( 'tapgrein_sync_nonce', 'nonce' );
+
+		$state = $this->sync_state();
+		$state->clear_errors();
+
+		wp_send_json_success(
+			array(
+				'message' => 'Sync errors cleared.',
+				'state'   => $state->get_summary(),
+			)
+		);
+	}
+
 	public function console_log($message) {
 //		error_log($message); // Log to PHP error log
 	}
@@ -1506,6 +1588,9 @@ class Tapgoods_Connection {
 }
 	// Add action for synchronization via AJAX
 	add_action('wp_ajax_tapgrein_api_sync', array(Tapgoods_Connection::get_instance(), 'manual_sync_trigger'));
+
+	// Clear a latched sync error (admin-only, nonce-protected).
+	add_action('wp_ajax_tapgrein_clear_sync_errors', array(Tapgoods_Connection::get_instance(), 'clear_sync_errors'));
 	
 // Create an endpoint to manually execute synchronization without using cron
 add_action('wp_ajax_tapgoods_manual_sync', [Tapgoods_Connection::get_instance(), 'manual_sync_trigger']);
