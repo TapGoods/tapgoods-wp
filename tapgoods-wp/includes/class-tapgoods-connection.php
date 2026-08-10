@@ -214,6 +214,64 @@ class Tapgoods_Connection {
 		return (int) round( ( microtime( true ) - (float) $since ) * 1000 );
 	}
 
+	/**
+	 * HTTP status of the client's last request, when the client can report one.
+	 *
+	 * A revoked key (401), an outage (500) and a rate limit (429) all surface as
+	 * `false` from the client, and that difference is most of what support needs
+	 * to triage. Guarded by method_exists so an injected or mock client without
+	 * the accessor simply reports nothing.
+	 *
+	 * @param object|null $client API client.
+	 * @return int|null
+	 */
+	private function client_http_status( $client ) {
+		if ( is_object( $client ) && method_exists( $client, 'get_last_http_code' ) ) {
+			return $client->get_last_http_code();
+		}
+		return null;
+	}
+
+	/**
+	 * Fail the current run: log why, latch the state, close the run, return.
+	 *
+	 * Collapses the "log, mark_error, end_run, return failure" tail that every
+	 * failure path in the sync shares. Having one of them is what stops a new
+	 * failure path from forgetting the terminal log line.
+	 *
+	 * @param string      $message          Human-readable failure, also stored in the state.
+	 * @param string      $event            Event name for the detail line.
+	 * @param array       $context          Extra fields for the detail line.
+	 * @param array       $run_context      Extra fields for the run-end line.
+	 * @param string|null $response_message Message for the caller's response, when
+	 *                                      it differs from the one stored in state.
+	 * @return array The failure response for the caller to return.
+	 */
+	private function fail_run( $message, $event = 'sync.error', $context = array(), $run_context = array(), $response_message = null ) {
+
+		$log   = $this->sync_log();
+		$state = $this->sync_state();
+
+		$log->error( $event, array_merge( array( 'message' => $message ), $context ) );
+
+		$will_retry = $state->mark_error( $message );
+		$log->warn(
+			'sync.retry',
+			array(
+				'will_retry' => $will_retry ? 1 : 0,
+				'failures'   => $state->get_failure_count(),
+				'state'      => $state->get_state(),
+			)
+		);
+
+		$log->end_run( 'error', $run_context );
+
+		return array(
+			'success' => false,
+			'message' => ( null === $response_message ) ? $message : $response_message,
+		);
+	}
+
 	public function start_sync() {
 		$this->hash         = wp_hash( current_time( 'mysql' ) );
 		$this->u_sync_start = current_time( 'timestamp' );
@@ -356,36 +414,46 @@ class Tapgoods_Connection {
 
 		// SYNC PREP: enter the state machine and figure out how many paging
 		// calls the full inventory sync will require.
+		$previous_state = $state->get_state();
 		$state->begin_prep();
-
-		$location_ids = $client->get_location_ids();
-		if (false === $location_ids) {
-			$log->error('sync.api.error', array('op' => 'get_location_ids', 'message' => 'Failed to retrieve location information.'));
-			$state->mark_error('Failed to retrieve location information.');
-			$log->end_run('error', array('stage' => 'prep'));
-			return array('success' => false, 'message' => 'Failed to retrieve location information.');
-		}
-
-		$log->info('sync.prep.locations', array('count' => count($location_ids)));
-
-		$prep_started = microtime(true);
-		$total_pages = $this->compute_total_sync_pages($client, $location_ids, $batch_size);
-		$state->set_total_pages($total_pages);
-		$log->info('sync.prep.pages', array('total_pages' => $total_pages, 'elapsed_ms' => self::elapsed_ms($prep_started)));
-
-		// SYNC ACTIVE: page through inventory and write it into WordPress.
-		$state->mark_active();
+		$log->info('sync.lock.acquired', array('state' => $state->get_state(), 'previous' => $previous_state));
 
 		$total_items = 0;
 		$start_time = current_time('timestamp');
-		$existing_items = $this->get_all_existing_inventory_ids();
+		$existing_items = array();
 		$synced_items = [];
 		$removed_items = 0;
 		$removed_terms = 0;
 		$removed_duplicates = 0;
 		$fetch_failures = 0;
 
+		// Everything that talks to the API lives inside the try. get_location_ids()
+		// and compute_total_sync_pages() both reach Tapgoods_API_Request, which
+		// throws on a WordPress http_request_failed (a DNS blip is enough); before,
+		// that threw past the run and left a run start with no terminal line.
 		try {
+			$location_ids = $client->get_location_ids();
+			if (false === $location_ids) {
+				return $this->fail_run(
+					'Failed to retrieve location information.',
+					'sync.api.error',
+					array('op' => 'get_location_ids', 'status' => $this->client_http_status($client)),
+					array('stage' => 'prep')
+				);
+			}
+
+			$log->info('sync.prep.locations', array('count' => count($location_ids)));
+
+			$prep_started = microtime(true);
+			$total_pages = $this->compute_total_sync_pages($client, $location_ids, $batch_size);
+			$state->set_total_pages($total_pages);
+			$log->info('sync.prep.pages', array('total_pages' => $total_pages, 'elapsed_ms' => self::elapsed_ms($prep_started)));
+
+			// SYNC ACTIVE: page through inventory and write it into WordPress.
+			$state->mark_active();
+
+			$existing_items = $this->get_all_existing_inventory_ids();
+
 			foreach ($location_ids as $lid) {
 				// Reiniciar paginación por cada ubicación
 				$current_page = 1;
@@ -479,25 +547,17 @@ class Tapgoods_Connection {
 			$removed_duplicates = $this->remove_duplicate_items();
 			$this->update_sync_info($start_time);
 		} catch (Exception $e) {
-			$log->error('sync.error', array('stage' => 'inventory', 'message' => $e->getMessage()));
-			$will_retry = $state->mark_error($e->getMessage());
-			$log->warn(
-				'sync.retry',
-				array(
-					'will_retry' => $will_retry ? 1 : 0,
-					'failures'   => $state->get_failure_count(),
-					'state'      => $state->get_state(),
-				)
-			);
-			$log->end_run(
-				'error',
+			return $this->fail_run(
+				$e->getMessage(),
+				'sync.error',
+				array('stage' => 'inventory', 'class' => get_class($e), 'status' => $this->client_http_status($client)),
 				array(
 					'items' => $total_items,
 					'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(),
 					'stage' => 'inventory',
-				)
+				),
+				'Sync failed: ' . $e->getMessage()
 			);
-			return array('success' => false, 'message' => 'Sync failed: ' . $e->getMessage());
 		}
 
 		// SYNC COMPLETED
@@ -684,7 +744,7 @@ class Tapgoods_Connection {
 	//		$this->console_log('Result of get_business: ' . print_r($business, true));
 	
 			if (false === $business) {
-				$log->error('sync.location.error', array('reason' => 'no_business', 'elapsed_ms' => self::elapsed_ms($settings_started)));
+				$log->error('sync.location.error', array('reason' => 'no_business', 'status' => $this->client_http_status($client), 'elapsed_ms' => self::elapsed_ms($settings_started)));
 				return false;
 			}
 	
@@ -721,7 +781,7 @@ class Tapgoods_Connection {
 	//			$this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
 	
 				if (false === $location_details) {
-					$log->warn('sync.location.fetch_failed', array('location' => $location_id));
+					$log->warn('sync.location.fetch_failed', array('location' => $location_id, 'status' => $this->client_http_status($client)));
 					continue;
 				}
 	
@@ -979,7 +1039,7 @@ class Tapgoods_Connection {
 		$location_ids = $client->get_location_ids();
 
 		if (false === $location_ids || is_wp_error($location_ids)) {
-			$log->error('sync.api.error', array('op' => 'get_location_ids', 'stage' => 'categories', 'pass' => $pass));
+			$log->error('sync.api.error', array('op' => 'get_location_ids', 'stage' => 'categories', 'pass' => $pass, 'status' => $this->client_http_status($client)));
 			$log->info('sync.categories.done', array('pass' => $pass, 'ok' => 0, 'elapsed_ms' => self::elapsed_ms($started)));
 			return false;
 		}
@@ -991,7 +1051,7 @@ class Tapgoods_Connection {
 			$categories = $client->get_categories_from_graph($lid);
 
 			if (false === $categories || is_wp_error($categories)) {
-				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass));
+				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass, 'status' => $this->client_http_status($client)));
 				continue;
 			}
 

@@ -9,6 +9,18 @@ class Tapgoods_API_Request {
 
 	private $last_request_time;
 
+	/**
+	 * HTTP status of the most recent live request, or null if none was made.
+	 *
+	 * The client methods collapse every failure to `false`, which loses the one
+	 * detail support needs first: 401 (revoked key) against 429 (rate limited)
+	 * against 5xx (outage). Recorded here so callers can report it. Not updated
+	 * for responses served from a transient, which made no request.
+	 *
+	 * @var int|null
+	 */
+	private $last_http_code = null;
+
 	public function __construct( $config ) {
 
 		if ( ! is_array( $config ) ) {
@@ -156,9 +168,19 @@ class Tapgoods_API_Request {
 			die();
 		}
 
-		$res = new Tapgoods_API_Response( $response );
-		$this->cookies = $res->get_cookies();
+		$res                  = new Tapgoods_API_Response( $response );
+		$this->last_http_code = $res->get_http_code();
+		$this->cookies        = $res->get_cookies();
 		return $res;
+	}
+
+	/**
+	 * HTTP status of the most recent live request.
+	 *
+	 * @return int|null
+	 */
+	public function get_last_http_code() {
+		return $this->last_http_code;
 	}
 
 	public function build_url( $endpoint, $params = null, $override = '', ) {

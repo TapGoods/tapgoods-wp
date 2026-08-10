@@ -76,6 +76,7 @@ class Tapgoods_Sync_Log {
 	const MIRRORED_EVENTS = array(
 		'sync.run.start',
 		'sync.run.end',
+		'sync.run.aborted',
 		'sync.run.locked',
 		'sync.api.error',
 		'sync.error',
@@ -145,6 +146,13 @@ class Tapgoods_Sync_Log {
 	 * @var string|null
 	 */
 	private $min_level = null;
+
+	/**
+	 * Whether the shutdown guard has been registered for this instance.
+	 *
+	 * @var bool
+	 */
+	private $shutdown_armed = false;
 
 	/**
 	 * Build a logger. Both arguments exist so tests can point it at a temp dir.
@@ -233,9 +241,113 @@ class Tapgoods_Sync_Log {
 		$this->run_totals  = array();
 		$this->run_result  = 'ok';
 
+		$this->arm_shutdown_guard();
+
 		$this->info( 'sync.run.start', array_merge( array( 'trigger' => $trigger ), $context ) );
 
 		return $this->run_id;
+	}
+
+	/**
+	 * Make sure an open run always gets a terminal line, even on a fatal.
+	 *
+	 * A run start with no run end is the worst thing this log can produce: it is
+	 * indistinguishable from a sync that is still going, which is the very
+	 * confusion the log exists to remove. And it is reachable: the sync calls into
+	 * an API client that throws from outside any try/catch, and one of the classes
+	 * it throws (TG_Unknown_Error_Exception) is not even defined, so that path is a
+	 * hard fatal rather than a catchable exception. No try/catch can cover a fatal;
+	 * a shutdown function can.
+	 *
+	 * Registered once per instance, and a no-op when the run closed normally.
+	 *
+	 * @return void
+	 */
+	private function arm_shutdown_guard() {
+
+		if ( $this->shutdown_armed ) {
+			return;
+		}
+
+		$this->shutdown_armed = true;
+
+		/*
+		 * Two mechanisms, because on a real WordPress fatal the obvious one does
+		 * not run. WordPress registers its own fatal handler in wp-settings.php,
+		 * before any plugin is loaded, and that handler ends in wp_die(); exiting
+		 * inside a shutdown function skips every shutdown function registered
+		 * after it, so ours would never fire. Verified, not assumed: a deliberate
+		 * fatal mid-sync produced no terminal line until this filter was added.
+		 *
+		 * `wp_should_handle_php_error` is applied inside that handler, just before
+		 * it takes over, which is the last moment at which anything of ours can
+		 * still write. It only fires when a fatal actually happened.
+		 */
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'wp_should_handle_php_error', array( $this, 'note_fatal_error' ), 10, 2 );
+		}
+
+		/*
+		 * And the plain shutdown function for every other way a request can end
+		 * without a terminal line: a fatal when WordPress's handler is disabled
+		 * (WP_DISABLE_FATAL_ERROR_HANDLER), a timeout, a die() somewhere in the
+		 * call stack. Both paths funnel into close_open_run(), which is
+		 * idempotent, so whichever fires first wins and the other does nothing.
+		 */
+		if ( function_exists( 'register_shutdown_function' ) ) {
+			register_shutdown_function( array( $this, 'close_open_run' ) );
+		}
+	}
+
+	/**
+	 * Write the terminal line while WordPress's fatal handler is deciding.
+	 *
+	 * Hooked to `wp_should_handle_php_error`; passes the decision straight
+	 * through, since this is an observer and must not change how WordPress
+	 * handles the error.
+	 *
+	 * @param bool  $should_handle Whether WordPress will handle this error.
+	 * @param array $error         The error, as returned by error_get_last().
+	 * @return bool $should_handle, unchanged.
+	 */
+	public function note_fatal_error( $should_handle, $error = null ) {
+		// Prefer the error WordPress is actually handling over error_get_last().
+		$this->close_open_run( is_array( $error ) ? $error : null );
+		return $should_handle;
+	}
+
+	/**
+	 * Terminal line for a run that never closed. Public because the shutdown
+	 * handler and the fatal-error filter both call it; safe to call at any time,
+	 * and a no-op once the run has closed normally.
+	 *
+	 * @param array|null $error Error to report, in error_get_last() shape. Falls
+	 *                          back to error_get_last() when not supplied.
+	 * @return void
+	 */
+	public function close_open_run( $error = null ) {
+
+		if ( $this->run_depth < 1 ) {
+			return;
+		}
+
+		$context = array( 'reason' => 'no_terminal_event' );
+
+		// If PHP died on us, say what it died of: that is usually the whole answer.
+		$fatal = ( null === $error ) ? error_get_last() : $error;
+		if ( is_array( $fatal ) && isset( $fatal['type'], $fatal['message'], $fatal['file'], $fatal['line'] ) && in_array( (int) $fatal['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ), true ) ) {
+			$context['reason']  = 'fatal';
+			$context['message'] = $fatal['message'];
+			$context['file']    = $fatal['file'];
+			$context['line']    = $fatal['line'];
+		}
+
+		$this->error( 'sync.run.aborted', $context );
+
+		// Collapse any nesting so exactly one run-end line is written.
+		$this->run_depth  = 1;
+		$this->run_result = 'aborted';
+		$this->end_run( 'aborted' );
 	}
 
 	/**
@@ -318,7 +430,10 @@ class Tapgoods_Sync_Log {
 		if ( '' === $path || ! file_exists( $path ) ) {
 			return 0;
 		}
-		$size = filesize( $path );
+		// Suppressed: file_exists() above is a TOCTOU check and this is also
+		// reached from the sync path, where a warning must never surface.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$size = @filesize( $path );
 		return ( false === $size ) ? 0 : (int) $size;
 	}
 
@@ -452,11 +567,31 @@ class Tapgoods_Sync_Log {
 	/**
 	 * Strip anything credential-shaped.
 	 *
-	 * Three layers, because the cheapest place to leak a key is an error message
-	 * nobody expected to contain one:
-	 *   1. credential-sounding field names never render their value at all;
-	 *   2. an inline "Bearer xyz" loses the token;
-	 *   3. any long opaque word (>= 32 chars of base64/hex alphabet) is dropped.
+	 * This is defence in depth, not the primary control. The primary control is
+	 * that call sites pass ids, counts and timings, and that the API key travels
+	 * in an Authorization header and in validate_key()'s POST body, neither of
+	 * which any call site logs. But two of the events here are mirrored into a
+	 * host error log that stock WordPress serves over HTTP, so the cost of one
+	 * upstream refactor putting a key into an error message is a public
+	 * credential leak. The layers therefore assume the worst:
+	 *
+	 *   1. credential-sounding field names never render their value at all.
+	 *      Matched as a SUBSTRING, so apikey / keys / authorization / x-api-key
+	 *      are all covered without maintaining a list of separator styles;
+	 *   2. a credential-sounding assignment ANYWHERE inside a value loses its
+	 *      right-hand side: `?key=abc`, `{"api_key":"abc"}`,
+	 *      `bearerToken: \"abc\"` and `Authorization: Bearer abc` all collapse.
+	 *      This is what covers a short key, which no length heuristic can catch;
+	 *   3. any long opaque run (24+ chars of the base64/hex alphabet carrying at
+	 *      least one digit and one letter) is dropped, as a SUBSTRING rather than
+	 *      a whitespace-delimited word, so a trailing dot or comma no longer
+	 *      saves the token.
+	 *
+	 * Rule 3 deliberately excludes '/' from its alphabet: with it, ordinary URL
+	 * paths and long error strings get eaten. A bare slash-bearing base64 blob
+	 * pasted into a message with no `key=` next to it is the known residual gap;
+	 * rules 1 and 2 cover every shape the plugin can actually produce, and the
+	 * 300-character value cap bounds the rest.
 	 *
 	 * @param string $key   Field name.
 	 * @param string $value Raw value.
@@ -464,13 +599,36 @@ class Tapgoods_Sync_Log {
 	 */
 	public static function redact( $key, $value ) {
 
-		if ( preg_match( '/(^|_)(key|token|secret|password|passwd|auth|bearer|credential|nonce|signature)(_|$)/i', (string) $key ) ) {
+		// 1. Credential-sounding field name: the value never renders.
+		if ( preg_match( '/(key|token|secret|password|passwd|auth|bearer|credential|nonce|signature)/i', (string) $key ) ) {
 			return '<REDACTED>';
 		}
 
-		$value = preg_replace( '/\bBearer\s+\S+/i', 'Bearer <REDACTED>', (string) $value );
+		$value = (string) $value;
 
-		return preg_replace( '/(^|\s)[A-Za-z0-9+\/=_-]{32,}(?=\s|$)/', '$1<REDACTED>', (string) $value );
+		// 2. `<credential word><separator><value>` anywhere inside the string.
+		$value = preg_replace(
+			// The optional Bearer/Token prefix inside the captured group matters:
+			// without it, `Authorization: Bearer abc` loses only the word "Bearer".
+			'/((?:api[_.-]?key|apikey|keys?|bearer[_.-]?token|token|secret|password|passwd|authorization|auth|credential|signature)["\']?\s*(?:[:=]|=>)\s*["\']?\\\\?"?)((?:bearer\s+|token\s+)?[^"\'\s,;&})\]]{3,})/i',
+			'$1<REDACTED>',
+			$value
+		);
+
+		// `Bearer <token>` has no separator, so it needs its own pass.
+		$value = preg_replace( '/\bBearer\s+\S+/i', 'Bearer <REDACTED>', $value );
+
+		// 3. Long opaque runs, matched as substrings.
+		return preg_replace_callback(
+			'/[A-Za-z0-9+=_-]{24,}/',
+			static function ( $matches ) {
+				$candidate  = $matches[0];
+				$has_digit  = (bool) preg_match( '/[0-9]/', $candidate );
+				$has_letter = (bool) preg_match( '/[A-Za-z]/', $candidate );
+				return ( $has_digit && $has_letter ) ? '<REDACTED>' : $candidate;
+			},
+			$value
+		);
 	}
 
 	private static function sanitize_event( $event ) {
@@ -582,7 +740,19 @@ class Tapgoods_Sync_Log {
 		$path = $this->get_file_path();
 		$data = $line . "\n";
 
-		$this->maybe_rotate( $path, strlen( $data ) );
+		if ( ! $this->enforce_size_cap( $path, strlen( $data ) ) ) {
+			// Rotation was needed and could not be done (open_basedir, a read-only
+			// mount, rename() disabled, .1 occupied by something we can't move).
+			// Silent degradation is right for logging but NOT for the cap: growing
+			// past it is somebody's disk. Drop the history instead, and say so in
+			// the file so nobody mistakes the gap for a quiet sync.
+			if ( ! $this->reset_file( $path ) ) {
+				// Can't rotate and can't truncate: stop writing for this request
+				// rather than grow without bound.
+				$this->ready = false;
+				return false;
+			}
+		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged
 		$written = @file_put_contents( $path, $data, FILE_APPEND | LOCK_EX );
@@ -591,25 +761,90 @@ class Tapgoods_Sync_Log {
 	}
 
 	/**
-	 * Size-based rotation: current -> .1 -> .2 -> .3, oldest dropped.
+	 * Keep the log inside its size budget, rotating if needed.
 	 *
-	 * A fixed number of fixed-size files is the only thing standing between this
-	 * log and a customer's disk, so it is not optional.
+	 * The size check and the renames run under an exclusive lock on a separate
+	 * lock file, and the size is re-checked after the lock is held. Without that,
+	 * two writers arriving near the boundary both decide to rotate and the second
+	 * one's rename() clobbers the backup the first just created with a nearly
+	 * empty file, silently destroying history. A lock on the log file itself would
+	 * not do: after the rename the descriptor no longer refers to that path, so a
+	 * third writer would lock a different inode.
 	 *
 	 * @param string $path     Current log file.
 	 * @param int    $incoming Bytes about to be appended.
-	 * @return void
+	 * @return bool True when the cap is satisfied, false when rotation was needed
+	 *              but failed.
 	 */
-	private function maybe_rotate( $path, $incoming ) {
+	private function enforce_size_cap( $path, $incoming ) {
+
+		if ( ! $this->over_cap( $path, $incoming ) ) {
+			return true;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
+		$lock = @fopen( $path . '.lock', 'c' );
+		if ( is_resource( $lock ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			@flock( $lock, LOCK_EX );
+		}
+
+		// Re-check while holding the lock: another writer may have just rotated.
+		$rotated = true;
+		if ( $this->over_cap( $path, $incoming ) ) {
+			$rotated = $this->rotate( $path );
+		}
+
+		if ( is_resource( $lock ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			@flock( $lock, LOCK_UN );
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose, WordPress.PHP.NoSilencedErrors.Discouraged
+			@fclose( $lock );
+		}
+
+		return $rotated;
+	}
+
+	/**
+	 * Whether appending $incoming bytes would push the file past the cap.
+	 *
+	 * Deliberately impure: it stats the filesystem every time it is called, which
+	 * is the whole point of asking again once the rotation lock is held.
+	 *
+	 * @phpstan-impure
+	 *
+	 * @param string $path     Current log file.
+	 * @param int    $incoming Bytes about to be appended.
+	 * @return bool
+	 */
+	private function over_cap( $path, $incoming ) {
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@clearstatcache( true, $path );
 
 		if ( ! file_exists( $path ) ) {
-			return;
+			return false;
 		}
 
-		$size = filesize( $path );
-		if ( false === $size || ( $size + $incoming ) <= self::MAX_BYTES ) {
-			return;
-		}
+		// Suppressed: file_exists() above is a TOCTOU check, and this runs on the
+		// sync path where a warning could print into an AJAX response body.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$size = @filesize( $path );
+
+		return ( false !== $size && ( $size + $incoming ) > self::MAX_BYTES );
+	}
+
+	/**
+	 * Size-based rotation: current -> .1 -> .2 -> .3, oldest dropped.
+	 *
+	 * A fixed number of fixed-size files is the only thing standing between this
+	 * log and a customer's disk, so it is not optional. Called with the rotation
+	 * lock held.
+	 *
+	 * @param string $path Current log file.
+	 * @return bool True when the current file was moved out of the way.
+	 */
+	private function rotate( $path ) {
 
 		for ( $i = self::MAX_FILES; $i >= 1; $i-- ) {
 			$from = ( 1 === $i ) ? $path : $path . '.' . ( $i - 1 );
@@ -626,8 +861,40 @@ class Tapgoods_Sync_Log {
 			}
 
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- WP_Filesystem needs credentials we may not have during cron.
-			@rename( $from, $to );
+			$moved = @rename( $from, $to );
+
+			// Only the current file matters for the cap: if the older backups
+			// cannot shuffle along we lose history, not containment.
+			if ( 1 === $i && ! $moved ) {
+				return false;
+			}
 		}
+
+		return true;
+	}
+
+	/**
+	 * Start the log file over, recording why the history is gone.
+	 *
+	 * @param string $path Current log file.
+	 * @return bool
+	 */
+	private function reset_file( $path ) {
+
+		$notice = self::format_line(
+			self::LEVEL_WARN,
+			'sync.log.rotation_failed',
+			array(
+				'action' => 'truncated',
+				'reason' => 'rotation_unavailable',
+				'cap'    => self::MAX_BYTES,
+			)
+		) . "\n";
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, WordPress.PHP.NoSilencedErrors.Discouraged
+		$written = @file_put_contents( $path, $notice, LOCK_EX );
+
+		return false !== $written;
 	}
 
 	/**

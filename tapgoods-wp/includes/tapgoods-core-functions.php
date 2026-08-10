@@ -196,25 +196,17 @@ function tapgrein_get_product_weight( $product_id ) {
 	return $weight_string;
 }
 
-/**
- * Legacy debug helper, now routed into the sync activity log.
- *
- * It used to be a no-op gated on WP_DEBUG with every error_log() commented out,
- * so none of its call sites wrote anything. It now writes a DEBUG line, which is
- * below the log's default level: existing call sites stay silent on a normal site
- * and only appear once someone raises the level with the
- * `tapgoods_sync_log_level` filter. Arrays and objects are described, never
- * serialized, so no call site can dump a payload into the log.
- *
- * @param mixed  $data  Message, or a value to describe.
- * @param string $event Optional event name.
- * @return void
- */
-function tapgrein_write_log( $data, $event = 'legacy.debug' ) {
-	if ( ! class_exists( 'Tapgoods_Sync_Log' ) ) {
-		return;
+function tapgrein_write_log( $data ) {
+	if ( true === WP_DEBUG && true === WP_DEBUG_LOG ) {
+		if ( is_array( $data ) || is_object( $data ) ) {
+//			error_log( 'tgwpdev: ' . print_r( $data, true ) );
+		} else {
+			ob_start();
+//			var_dump( $data );
+			$data = ob_get_clean();
+//			error_log( 'tgwpdev: ' . $data );
+		}
 	}
-	Tapgoods_Sync_Log::get_instance()->debug( $event, array( 'msg' => $data ) );
 }
 
 

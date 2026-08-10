@@ -206,11 +206,13 @@ class Tapgoods_Admin {
 		$client = Tapgoods_Connection::get_instance();
 
 		// This handler is registered on both wp_ajax_ and wp_ajax_nopriv_ for
-		// tapgrein_api_sync. In practice only the unauthenticated cron self-ping
-		// gets here (the logged-in action is claimed earlier by
-		// Tapgoods_Connection::manual_sync_trigger(), which wp_die()s), but label
-		// the run by what actually happened rather than by that assumption.
-		$trigger = ( is_user_logged_in() ) ? 'admin_ajax_sync' : 'cron_selfping';
+		// tapgrein_api_sync, and that action has no nonce (WPB-176), so the
+		// unauthenticated branch is reachable by anyone and not only by our own
+		// cron self-ping. The label therefore states just what is known, the
+		// endpoint and the auth state, instead of claiming the caller was cron.
+		// The five-minute self-ping is the expected source; an unexpected volume
+		// of ajax_sync_unauth runs is itself a finding.
+		$trigger = ( is_user_logged_in() ) ? 'admin_ajax_sync' : 'ajax_sync_unauth';
 
 		$response = $client->sync_from_api( $trigger );
 

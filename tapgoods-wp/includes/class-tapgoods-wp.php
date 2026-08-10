@@ -149,18 +149,16 @@ class Tapgoods {
 	public function tapgrein_cron_exec() {
 		$api_connected = get_option( 'tg_api_connected', 0 );
 
-		// The five-minute heartbeat. Logged even when it does nothing: "did cron
-		// fire at all?" is the first question when a site stops syncing, and the
-		// answer used to be unknowable from the site itself.
-		Tapgoods_Sync_Log::get_instance()->info(
-			'sync.cron.tick',
-			array(
-				'api_connected' => $api_connected,
-				'will_ping'     => ( '1' === $api_connected ) ? 1 : 0,
-			)
-		);
-
 		if ( '1' === $api_connected ) {
+			// The five-minute heartbeat, at DEBUG so it costs nothing by default.
+			// It fires every 300s forever and is the one log write that happens
+			// outside the sync's own state guard, so it does not earn an INFO line
+			// on every site. Support can raise `tapgoods_sync_log_level` when the
+			// question is "did cron fire at all". Skipped entirely when the site is
+			// not connected: there is nothing to report about a sync that will
+			// never be attempted.
+			Tapgoods_Sync_Log::get_instance()->debug( 'sync.cron.tick', array( 'will_ping' => 1 ) );
+
 			$connection = Tapgoods_Connection::get_instance();
 			$sync       = $connection->tapgrein_async_sync_from_api();
 		}

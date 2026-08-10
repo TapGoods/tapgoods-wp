@@ -127,6 +127,9 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'sync.run.start', $contents );
 		$this->assertStringContainsString( 'trigger=admin_manual', $contents );
 
+		// Both halves of the lock: taking it here, refusing it in the test below.
+		$this->assertStringContainsString( 'sync.lock.acquired', $contents );
+
 		// At least one inventory batch, with a page number and an item count.
 		$this->assertMatchesRegularExpression( '/sync\.batch\.page .*page=1 items=\d+/', $contents );
 
@@ -150,12 +153,22 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$contents = $this->sync_log_contents();
 		$this->assertNotSame( '', $contents );
 
-		// The mock client's key (see the connection config) must never appear, and
-		// nothing that looks like a serialized GraphQL envelope may either.
+		// No credential material, and nothing shaped like a serialized payload.
+		// Note what is NOT asserted here: the bare word "collection" appears
+		// legitimately in `reason=empty_collection`, so asserting on it only passed
+		// because these fixtures happen not to page evenly. Assert on the shapes a
+		// serialized envelope actually has instead.
 		$this->assertStringNotContainsString( 'Bearer ', $contents );
 		$this->assertStringNotContainsString( '"data"', $contents );
-		$this->assertStringNotContainsString( 'collection', $contents );
+		$this->assertStringNotContainsString( '{"', $contents, 'No JSON object may reach the log.' );
+		$this->assertStringNotContainsString( '[{', $contents, 'No JSON array of objects may reach the log.' );
+		$this->assertStringNotContainsString( '=>', $contents, 'No print_r() output may reach the log.' );
 		$this->assertStringNotContainsString( 'Array', $contents, 'No print_r() output may reach the log.' );
+
+		// And no value anywhere is long enough to be a payload.
+		foreach ( array_filter( explode( "\n", $contents ) ) as $line ) {
+			$this->assertLessThanOrEqual( Tapgoods_Sync_Log::MAX_LINE_LENGTH + 20, strlen( $line ) );
+		}
 
 		// A run that came in through sync_from_api() syncs categories twice; the
 		// pass labels are what make that visible.
@@ -178,6 +191,83 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'trigger=cron_daily', $contents );
 		$this->assertStringContainsString( 'result=skipped', $contents );
 		$this->assertMatchesRegularExpression( '/sync\.run\.locked .*age_s=\d+/', $contents );
+	}
+
+	/**
+	 * A prep-stage API failure must name the HTTP status and still close the run.
+	 *
+	 * The client collapses 401 (revoked key), 429 (rate limited) and 5xx (outage)
+	 * into a single `false`, and telling those apart is most of what support needs.
+	 */
+	public function test_a_failed_prep_records_the_http_status_and_ends_the_run() {
+		$stub = new class() {
+			public function get_location_ids() {
+				return false;
+			}
+			public function get_last_http_code() {
+				return 401;
+			}
+			public function set_config( $param, $value = null ) {}
+		};
+
+		add_filter(
+			'tapgoods_api_client',
+			static function () use ( $stub ) {
+				return $stub;
+			}
+		);
+
+		$result = $this->connection()->sync_inventory_in_batches( false, 'cron_daily' );
+
+		$this->assertFalse( $result['success'] );
+
+		$contents = $this->sync_log_contents();
+		$this->assertStringContainsString( 'sync.api.error', $contents );
+		$this->assertStringContainsString( 'op=get_location_ids', $contents );
+		$this->assertStringContainsString( 'status=401', $contents );
+
+		// The run is closed exactly once even though it died during prep.
+		$this->assertSame( 1, substr_count( $contents, 'sync.run.start' ) );
+		$this->assertSame( 1, substr_count( $contents, 'sync.run.end' ) );
+		$this->assertStringContainsString( 'result=error', $contents );
+		$this->assertStringContainsString( 'stage=prep', $contents );
+
+		// And the retry budget is reported, since mark_error() consumed one.
+		$this->assertStringContainsString( 'sync.retry', $contents );
+	}
+
+	/**
+	 * An exception thrown from the API client during prep must not leave a run
+	 * start with no terminal line. get_location_ids() reaches
+	 * Tapgoods_API_Request, which throws on a WordPress http_request_failed, and
+	 * that call used to sit outside the try.
+	 */
+	public function test_an_exception_during_prep_still_closes_the_run() {
+		$stub = new class() {
+			public function get_location_ids() {
+				throw new \RuntimeException( 'cURL error 6: Could not resolve host' );
+			}
+			public function set_config( $param, $value = null ) {}
+		};
+
+		add_filter(
+			'tapgoods_api_client',
+			static function () use ( $stub ) {
+				return $stub;
+			}
+		);
+
+		$result = $this->connection()->sync_inventory_in_batches( false, 'cron_selfping' );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'Could not resolve host', $result['message'] );
+
+		$contents = $this->sync_log_contents();
+		$this->assertSame( 1, substr_count( $contents, 'sync.run.start' ), 'One start.' );
+		$this->assertSame( 1, substr_count( $contents, 'sync.run.end' ), 'And one terminal line.' );
+		$this->assertStringContainsString( 'sync.error', $contents );
+		$this->assertStringContainsString( 'class=RuntimeException', $contents );
+		$this->assertStringContainsString( 'result=error', $contents );
 	}
 
 	public function test_full_sync_reports_success() {
