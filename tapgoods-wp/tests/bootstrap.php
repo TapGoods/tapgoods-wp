@@ -50,6 +50,7 @@ if ( ! function_exists( 'tapgrein_getenv_docker' ) ) {
 // no WordPress calls executed at include time).
 $plugin_dir = dirname( __DIR__ );
 require_once $plugin_dir . '/includes/tapgoods-formatting-functions.php';
+require_once $plugin_dir . '/includes/class-tapgoods-sync-log.php';
 require_once $plugin_dir . '/includes/class-tapgoods-encryption.php';
 require_once $plugin_dir . '/includes/class-tapgoods-api-response.php';
 require_once $plugin_dir . '/includes/class-tapgoods-api-request.php';
