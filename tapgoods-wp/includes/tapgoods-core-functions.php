@@ -196,17 +196,25 @@ function tapgrein_get_product_weight( $product_id ) {
 	return $weight_string;
 }
 
-function tapgrein_write_log( $data ) {
-	if ( true === WP_DEBUG && true === WP_DEBUG_LOG ) {
-		if ( is_array( $data ) || is_object( $data ) ) {
-//			error_log( 'tgwpdev: ' . print_r( $data, true ) );
-		} else {
-			ob_start();
-//			var_dump( $data );
-			$data = ob_get_clean();
-//			error_log( 'tgwpdev: ' . $data );
-		}
+/**
+ * Legacy debug helper, now routed into the sync activity log.
+ *
+ * It used to be a no-op gated on WP_DEBUG with every error_log() commented out,
+ * so none of its call sites wrote anything. It now writes a DEBUG line, which is
+ * below the log's default level: existing call sites stay silent on a normal site
+ * and only appear once someone raises the level with the
+ * `tapgoods_sync_log_level` filter. Arrays and objects are described, never
+ * serialized, so no call site can dump a payload into the log.
+ *
+ * @param mixed  $data  Message, or a value to describe.
+ * @param string $event Optional event name.
+ * @return void
+ */
+function tapgrein_write_log( $data, $event = 'legacy.debug' ) {
+	if ( ! class_exists( 'Tapgoods_Sync_Log' ) ) {
+		return;
 	}
+	Tapgoods_Sync_Log::get_instance()->debug( $event, array( 'msg' => $data ) );
 }
 
 
@@ -1138,6 +1146,8 @@ add_action('wp_ajax_load_status_tab_content', function () {
             <hr class="my-4">
         <?php endforeach; ?>
     </div>
+
+    <?php require dirname( __DIR__ ) . '/admin/partials/tapgoods-sync-log.php'; ?>
 </div>
 
     <?php
@@ -1494,12 +1504,20 @@ add_action('tg_auto_sync_event', 'execute_auto_sync');
 
 /**
  * Executes the automatic synchronization process.
+ *
+ * Reached two ways, which is why the trigger is a parameter: the daily
+ * tg_auto_sync_event cron fires it with no arguments, and the frontend 24h
+ * fallback below fires the same action passing 'frontend_fallback'. Both look
+ * identical from inside sync_inventory_in_batches(), so they have to name
+ * themselves for the activity log to be able to tell them apart.
+ *
+ * @param string $trigger Which path fired this run.
  */
-function execute_auto_sync() {
+function execute_auto_sync($trigger = 'cron_daily') {
     $tg_api = Tapgoods_Connection::get_instance();
 
     if (method_exists($tg_api, 'sync_inventory_in_batches')) {
-        $tg_api->sync_inventory_in_batches();
+        $tg_api->sync_inventory_in_batches(false, $trigger);
         error_log('Auto-sync executed.');
     } else {
         error_log('Error: No valid sync function found in Tapgoods_Connection.');
@@ -1510,8 +1528,14 @@ function execute_auto_sync() {
 function execute_manual_sync() {
     $tg_api = Tapgoods_Connection::get_instance();
 
+    // This endpoint is also registered for wp_ajax_nopriv (see below), so the run
+    // is labelled by whether the caller was authenticated. The missing nonce on
+    // that unauthenticated registration is tracked separately (WPB-176); it is
+    // only labelled here, not fixed.
+    $trigger = ( function_exists('is_user_logged_in') && is_user_logged_in() ) ? 'ajax_manual' : 'ajax_nopriv';
+
     if (method_exists($tg_api, 'sync_inventory_in_batches')) {
-        $tg_api->sync_inventory_in_batches();
+        $tg_api->sync_inventory_in_batches(false, $trigger);
         wp_send_json_success('Sync executed successfully.');
     } else {
         error_log('Error: No valid sync function found in Tapgoods_Connection.');
@@ -1534,7 +1558,9 @@ add_action('init', function() {
         $last_run = get_option('tg_last_sync_time', 0);
         if (time() - $last_run >= DAY_IN_SECONDS) { // 86400 seconds = 24 hours
             update_option('tg_last_sync_time', time());
-            do_action('tg_auto_sync_event'); // Manually trigger the sync process
+            // Same action as the daily cron, but a different trigger: pass the name
+            // so the activity log can tell a visitor-driven sync from a cron one.
+            do_action('tg_auto_sync_event', 'frontend_fallback'); // Manually trigger the sync process
         }
     }
 });

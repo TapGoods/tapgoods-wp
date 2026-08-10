@@ -195,6 +195,25 @@ class Tapgoods_Connection {
 		return Tapgoods_Sync_State::get_instance();
 	}
 
+	/**
+	 * The sync activity log (always on, independent of WP_DEBUG).
+	 *
+	 * @return Tapgoods_Sync_Log
+	 */
+	public function sync_log() {
+		return Tapgoods_Sync_Log::get_instance();
+	}
+
+	/**
+	 * Milliseconds elapsed since a microtime(true) mark, for log timings.
+	 *
+	 * @param float $since microtime(true) value.
+	 * @return int
+	 */
+	private static function elapsed_ms( $since ) {
+		return (int) round( ( microtime( true ) - (float) $since ) * 1000 );
+	}
+
 	public function start_sync() {
 		$this->hash         = wp_hash( current_time( 'mysql' ) );
 		$this->u_sync_start = current_time( 'timestamp' );
@@ -277,13 +296,37 @@ class Tapgoods_Connection {
 		return $message;
 	}
 	
-	public function sync_inventory_in_batches($manual_trigger = false) {
+	/**
+	 * Page through the whole inventory and write it into WordPress.
+	 *
+	 * @param bool        $manual_trigger Whether an administrator asked for this run.
+	 * @param string|null $trigger        Which entry point started the run, for the
+	 *                                    activity log. $manual_trigger cannot answer
+	 *                                    that: four of the five paths into this
+	 *                                    method pass false (the five-minute cron
+	 *                                    self-ping, the daily tg_auto_sync_event, the
+	 *                                    frontend 24h fallback and the public
+	 *                                    execute_manual_sync AJAX endpoint), so every
+	 *                                    caller names itself instead. Known names:
+	 *                                    admin_manual, cron_selfping, cron_daily,
+	 *                                    frontend_fallback, ajax_manual, ajax_nopriv,
+	 *                                    admin_ajax_sync, unknown.
+	 * @return array
+	 */
+	public function sync_inventory_in_batches($manual_trigger = false, $trigger = null) {
+		$log = $this->sync_log();
+		if (null === $trigger) {
+			$trigger = $manual_trigger ? 'admin_manual' : 'unknown';
+		}
+		$log->begin_run($trigger, array('entry' => 'sync_inventory_in_batches', 'manual' => $manual_trigger ? 1 : 0));
+
 		$current_key = $this->get_key();
 		$stored_key = get_option('tg_last_api_key');
 
 		// Handle API key change
 		if ($current_key !== $stored_key) {
-			$this->console_log('API Key has changed. Clearing previous data...');
+			// Never the key itself, only that it changed and what that cost.
+			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
 			$this->tapgrein_delete_data();
 			update_option('tg_last_api_key', $current_key);
 		}
@@ -294,7 +337,20 @@ class Tapgoods_Connection {
 
 		// Prevent concurrent syncs. The state machine (PREP/ACTIVE) is the lock.
 		if ($state->is_running()) {
-			$this->console_log('Sync is locked. Another process is running.');
+			// This early exit performs no state transition, so it leaves no trace
+			// anywhere else: without this line a site stuck behind a run that never
+			// finished looks silent, which is exactly the WPB-165 report.
+			$log->warn(
+				'sync.run.locked',
+				array(
+					'reason'        => 'already_running',
+					'state'         => $state->get_state(),
+					'age_s'         => $state->get_age(),
+					'pages'         => $state->get_pages_completed() . '/' . $state->get_total_pages(),
+					'stale_after_s' => Tapgoods_Sync_State::STALE_AFTER,
+				)
+			);
+			$log->end_run('skipped', array('state' => $state->get_state()));
 			return array('success' => true, 'message' => 'Sync in progress. It can take up to 60 minutes for larger inventory. Please do not close the window until the sync is complete.', 'in_progress' => true);
 		}
 
@@ -304,14 +360,18 @@ class Tapgoods_Connection {
 
 		$location_ids = $client->get_location_ids();
 		if (false === $location_ids) {
-			$this->console_log('Failed to retrieve location IDs.');
+			$log->error('sync.api.error', array('op' => 'get_location_ids', 'message' => 'Failed to retrieve location information.'));
 			$state->mark_error('Failed to retrieve location information.');
+			$log->end_run('error', array('stage' => 'prep'));
 			return array('success' => false, 'message' => 'Failed to retrieve location information.');
 		}
 
+		$log->info('sync.prep.locations', array('count' => count($location_ids)));
+
+		$prep_started = microtime(true);
 		$total_pages = $this->compute_total_sync_pages($client, $location_ids, $batch_size);
 		$state->set_total_pages($total_pages);
-		$this->console_log("Sync prep complete. Planned paging calls: {$total_pages}");
+		$log->info('sync.prep.pages', array('total_pages' => $total_pages, 'elapsed_ms' => self::elapsed_ms($prep_started)));
 
 		// SYNC ACTIVE: page through inventory and write it into WordPress.
 		$state->mark_active();
@@ -320,6 +380,10 @@ class Tapgoods_Connection {
 		$start_time = current_time('timestamp');
 		$existing_items = $this->get_all_existing_inventory_ids();
 		$synced_items = [];
+		$removed_items = 0;
+		$removed_terms = 0;
+		$removed_duplicates = 0;
+		$fetch_failures = 0;
 
 		try {
 			foreach ($location_ids as $lid) {
@@ -328,15 +392,42 @@ class Tapgoods_Connection {
 				$continue_fetching = true;
 
 				while ($continue_fetching) {
+					$page_started = microtime(true);
 					$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
-					if (false === $response || empty($response['collection'])) {
-						$this->console_log('No more items to fetch for location ID: ' . $lid);
+					if (false === $response) {
+						// A failed fetch is NOT an empty page: every item this page
+						// would have returned is about to look "missing" to the
+						// removal pass below. Logged separately on purpose (WPB-165).
+						++$fetch_failures;
+						$log->warn(
+							'sync.batch.fetch_failed',
+							array(
+								'location'   => $lid,
+								'page'       => $current_page,
+								'reason'     => 'false_response',
+								'elapsed_ms' => self::elapsed_ms($page_started),
+							)
+						);
+						$continue_fetching = false;
+						continue;
+					}
+					if (empty($response['collection'])) {
+						$log->info(
+							'sync.batch.end',
+							array(
+								'location'   => $lid,
+								'page'       => $current_page,
+								'reason'     => 'empty_collection',
+								'elapsed_ms' => self::elapsed_ms($page_started),
+							)
+						);
 						$continue_fetching = false;
 						continue;
 					}
 
 					$inventory = $response['collection'];
-					$total_items += count($inventory);
+					$page_items = count($inventory);
+					$total_items += $page_items;
 					$state->increment_pages_completed();
 
 					foreach ($inventory as $item) {
@@ -344,7 +435,19 @@ class Tapgoods_Connection {
 						$synced_items[] = $item['id'];
 					}
 
-					if (count($inventory) < $batch_size) {
+					// `items` is this page only; `total_items` is the running total.
+					$log->info(
+						'sync.batch.page',
+						array(
+							'location'    => $lid,
+							'page'        => $current_page,
+							'items'       => $page_items,
+							'total_items' => $total_items,
+							'elapsed_ms'  => self::elapsed_ms($page_started),
+						)
+					);
+
+					if ($page_items < $batch_size) {
 						$continue_fetching = false;
 					} else {
 						$current_page++;
@@ -352,37 +455,68 @@ class Tapgoods_Connection {
 				}
 			}
 
-			// Sync categories and tags after items
-			$this->console_log('Syncing categories and tags...');
-			$categories_synced = $this->sync_categories_from_api();
+			// Sync categories and tags after items. Note this is the SECOND category
+			// pass when the run came in through sync_from_api(); the `pass` field
+			// makes that visible. Removing the duplicate work belongs to WPB-165.
+			$categories_synced = $this->sync_categories_from_api('post_inventory');
 
 			if ($categories_synced) {
-				$this->console_log('Assigning categories and tags to items...');
+				$assigned = 0;
 				foreach ($synced_items as $tg_id) {
 					$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
 					if ($item) {
 						$this->tapgrein_assign_terms($item->ID);
+						++$assigned;
 					}
 				}
-			} else {
-				$this->console_log('Category and tag sync failed.');
+				$log->info('sync.categories.assigned', array('items' => $assigned, 'of' => count($synced_items)));
 			}
 
 			// Cleanup after sync
-			$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
-			$this->remove_unused_terms('tg_category');
-			$this->remove_unused_terms('tg_tags');
-			$this->remove_duplicate_items();
+			$removed_items = $this->remove_missing_items_from_wordpress($existing_items, $synced_items);
+			$removed_terms = $this->remove_unused_terms('tg_category');
+			$removed_terms += $this->remove_unused_terms('tg_tags');
+			$removed_duplicates = $this->remove_duplicate_items();
 			$this->update_sync_info($start_time);
 		} catch (Exception $e) {
-			$this->console_log('Sync failed: ' . $e->getMessage());
+			$log->error('sync.error', array('stage' => 'inventory', 'message' => $e->getMessage()));
 			$will_retry = $state->mark_error($e->getMessage());
-			$this->console_log($will_retry ? 'Sync will be retried on the next run.' : 'Sync retries exhausted; state set to ERROR.');
+			$log->warn(
+				'sync.retry',
+				array(
+					'will_retry' => $will_retry ? 1 : 0,
+					'failures'   => $state->get_failure_count(),
+					'state'      => $state->get_state(),
+				)
+			);
+			$log->end_run(
+				'error',
+				array(
+					'items' => $total_items,
+					'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(),
+					'stage' => 'inventory',
+				)
+			);
 			return array('success' => false, 'message' => 'Sync failed: ' . $e->getMessage());
 		}
 
 		// SYNC COMPLETED
 		$state->mark_completed();
+
+		// The single run-end line. Everything here is observed, not reported: page
+		// counts come from the state machine, not from a return value.
+		$log->end_run(
+			'ok',
+			array(
+				'items'              => $total_items,
+				'pages'              => $state->get_pages_completed() . '/' . $state->get_total_pages(),
+				'state'              => $state->get_state(),
+				'fetch_failures'     => $fetch_failures,
+				'items_removed'      => $removed_items,
+				'terms_removed'      => $removed_terms,
+				'duplicates_removed' => $removed_duplicates,
+			)
+		);
 
 		// Check if anything was actually synced
 		if ($total_items === 0) {
@@ -468,14 +602,45 @@ class Tapgoods_Connection {
 		return $existing_items;
 	}
 
+	/**
+	 * Delete the tg_inventory posts that the run did not see in the API.
+	 *
+	 * @param array $existing_items tg_id => post_id map of everything in WordPress.
+	 * @param array $synced_items   tg_ids the run actually fetched.
+	 * @return int Number of posts deleted.
+	 */
 	public function remove_missing_items_from_wordpress($existing_items, $synced_items) {
+		$log = $this->sync_log();
 		$items_to_remove = array_diff(array_keys($existing_items), $synced_items);
-	
+
+		// The plan is logged BEFORE anything is deleted: when a page fetch failed
+		// earlier in the run this number is the size of an accidental mass
+		// deletion, and it is the first thing to look at (WPB-165).
+		$log->info(
+			'sync.cleanup.plan',
+			array(
+				'existing'  => count($existing_items),
+				'synced'    => count($synced_items),
+				'to_remove' => count($items_to_remove),
+			)
+		);
+
+		$removed = 0;
+		$sample  = array();
+
 		foreach ($items_to_remove as $tg_id) {
 			$post_id = $existing_items[$tg_id];
 			wp_delete_post($post_id, true);
-			$this->console_log('Removed missing item with tg_id: ' . $tg_id . ', post ID: ' . $post_id);
+			++$removed;
+			if (count($sample) < 20) {
+				$sample[] = $tg_id;
+			}
+			$log->debug('sync.cleanup.item_removed', array('tg_id' => $tg_id, 'post' => $post_id));
 		}
+
+		$log->info('sync.cleanup.items_removed', array('count' => $removed, 'sample_ids' => implode(',', $sample)));
+
+		return $removed;
 	}
 	
 	
@@ -494,12 +659,14 @@ class Tapgoods_Connection {
 
 	
 	public function sync_location_settings($force_update = false) {
-		$this->console_log('Starting function sync_location_settings');
-	
+		$log = $this->sync_log();
+		$settings_started = microtime(true);
+		$log->info('sync.location.start', array('force' => $force_update ? 1 : 0));
+
 		$client = $this->get_connection();
 		$location_ids = get_option('tg_locationIds', false);
 		$business_id = get_option('tg_businessId', false);
-	
+
 		if ($force_update) {
 			$this->console_log('Force update enabled. Clearing cached location_ids and business_id.');
 			delete_option('tg_locationIds');
@@ -517,7 +684,7 @@ class Tapgoods_Connection {
 	//		$this->console_log('Result of get_business: ' . print_r($business, true));
 	
 			if (false === $business) {
-				$this->console_log('No business found. Exiting the function.');
+				$log->error('sync.location.error', array('reason' => 'no_business', 'elapsed_ms' => self::elapsed_ms($settings_started)));
 				return false;
 			}
 	
@@ -528,7 +695,7 @@ class Tapgoods_Connection {
 		}
 	
 		if (false === $location_ids || false === $business_id) {
-			$this->console_log('location_ids or business_id are invalid.');
+			$log->error('sync.location.error', array('reason' => 'invalid_ids', 'elapsed_ms' => self::elapsed_ms($settings_started)));
 			return false;
 		}
 	
@@ -554,7 +721,7 @@ class Tapgoods_Connection {
 	//			$this->console_log('Result of get_location_details_from_graph for location_id ' . $location_id . ': ' . print_r($location_details, true));
 	
 				if (false === $location_details) {
-					$this->console_log('Error fetching location details for location_id: ' . $location_id);
+					$log->warn('sync.location.fetch_failed', array('location' => $location_id));
 					continue;
 				}
 	
@@ -564,7 +731,7 @@ class Tapgoods_Connection {
 	
 			// Verifica que los datos obtenidos sean para el ID correcto
 			if (!isset($location_details['id']) || $location_details['id'] != $location_id) {
-				$this->console_log('Mismatch in location_id for location_details. Skipping.');
+				$log->warn('sync.location.mismatch', array('location' => $location_id));
 				continue;
 			}
 	
@@ -588,8 +755,15 @@ class Tapgoods_Connection {
 			update_option('tapgreino_default_location', $new_default_location);
 			$this->console_log('Updated tapgreino_default_location to: ' . $new_default_location);
 		}
-	
-		$this->console_log('Completed sync_location_settings function.');
+
+		$log->info(
+			'sync.location.done',
+			array(
+				'locations'  => count($location_info),
+				'requested'  => count($location_ids),
+				'elapsed_ms' => self::elapsed_ms($settings_started),
+			)
+		);
 		return true;
 	}
 	
@@ -787,28 +961,40 @@ class Tapgoods_Connection {
 	
 	
 	
-	public function sync_categories_from_api() {
-		$this->console_log('Starting sync_categories_from_api...');
-		
+	/**
+	 * Sync storefront categories (and their subcategories, as tags) from the API.
+	 *
+	 * @param string $pass Which pass this is, for the activity log. A run entered
+	 *                     through sync_from_api() does this twice per run
+	 *                     ('pre_inventory' then 'post_inventory'); the duplicated
+	 *                     work is pre-existing and belongs to WPB-165.
+	 * @return bool
+	 */
+	public function sync_categories_from_api($pass = 'standalone') {
+		$log = $this->sync_log();
+		$started = microtime(true);
+		$log->info('sync.categories.start', array('pass' => $pass));
+
 		$client = $this->get_connection();
 		$location_ids = $client->get_location_ids();
-	
+
 		if (false === $location_ids || is_wp_error($location_ids)) {
-			$this->console_log('Failed to retrieve location IDs.');
+			$log->error('sync.api.error', array('op' => 'get_location_ids', 'stage' => 'categories', 'pass' => $pass));
+			$log->info('sync.categories.done', array('pass' => $pass, 'ok' => 0, 'elapsed_ms' => self::elapsed_ms($started)));
 			return false;
 		}
-	
+
 		$valid_category_ids = [];
 		$valid_tag_ids = [];
-	
+
 		foreach ($location_ids as $lid) {
 			$categories = $client->get_categories_from_graph($lid);
-	
+
 			if (false === $categories || is_wp_error($categories)) {
-				$this->console_log("Failed to fetch categories for location ID: {$lid}");
+				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass));
 				continue;
 			}
-	
+
 			foreach ($categories as $category) {
 				$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
 				if ($category_term_id) {
@@ -831,8 +1017,17 @@ class Tapgoods_Connection {
 		// Remove obsolete terms.
 		$this->remove_obsolete_terms('tg_category', $valid_category_ids);
 		$this->remove_obsolete_terms('tg_tags', $valid_tag_ids);
-	
-		$this->console_log('Categories and tags synchronized successfully.');
+
+		$log->info(
+			'sync.categories.done',
+			array(
+				'pass'       => $pass,
+				'ok'         => 1,
+				'categories' => count($valid_category_ids),
+				'tags'       => count($valid_tag_ids),
+				'elapsed_ms' => self::elapsed_ms($started),
+			)
+		);
 		return true;
 	}
 	
@@ -1122,37 +1317,48 @@ class Tapgoods_Connection {
 	
 	
 	
+	/**
+	 * Delete terms in a taxonomy that no post is assigned to.
+	 *
+	 * @param string $taxonomy Taxonomy to clean up.
+	 * @return int Number of terms deleted.
+	 */
 	public function remove_unused_terms($taxonomy) {
-		$this->console_log("Starting cleanup for unused terms in taxonomy: $taxonomy");
-	
+		$log = $this->sync_log();
+
 		// Fetch all terms in the taxonomy.
 		$terms = get_terms([
 			'taxonomy'   => $taxonomy,
 			'hide_empty' => false, // Include terms even if they're not assigned to posts.
 		]);
-	
+
 		if (is_wp_error($terms)) {
-			$this->console_log("Error fetching terms for taxonomy: $taxonomy - " . $terms->get_error_message());
-			return;
+			$log->error('sync.cleanup.terms_error', array('taxonomy' => $taxonomy, 'message' => $terms->get_error_message()));
+			return 0;
 		}
-	
+
+		$removed = 0;
+
 		foreach ($terms as $term) {
 			// Check if the term is assigned to any posts.
 			$term_count = $term->count;
-	
+
 			if ($term_count === 0) {
 				// Delete the term if it has no assignments.
 				$deleted = wp_delete_term($term->term_id, $taxonomy);
-	
+
 				if (is_wp_error($deleted)) {
-					$this->console_log("Error deleting term ID: {$term->term_id} - " . $deleted->get_error_message());
+					$log->warn('sync.cleanup.term_error', array('taxonomy' => $taxonomy, 'term' => $term->term_id, 'message' => $deleted->get_error_message()));
 				} else {
-					$this->console_log("Deleted unused term ID: {$term->term_id}, name: {$term->name}");
+					++$removed;
+					$log->debug('sync.cleanup.term_removed', array('taxonomy' => $taxonomy, 'term' => $term->term_id));
 				}
 			}
 		}
-	
-		$this->console_log("Finished cleanup for taxonomy: $taxonomy");
+
+		$log->info('sync.cleanup.terms_removed', array('taxonomy' => $taxonomy, 'count' => $removed, 'total' => count($terms)));
+
+		return $removed;
 	}
 	
 	
@@ -1307,17 +1513,47 @@ class Tapgoods_Connection {
 	}
 
 
-	public function sync_from_api() {
-		$this->console_log('Starting full sync');
-	
-		// Sync categories and tags
-		$categories_result = $this->sync_categories_from_api();
-	//	$this->console_log('Categories sync result: ' . print_r($categories_result, true));
-	
+	/**
+	 * Full sync: categories then inventory. The cron self-ping entry point.
+	 *
+	 * @param string $trigger Which entry point started the run (activity log).
+	 * @return array
+	 */
+	public function sync_from_api( $trigger = 'unknown' ) {
+		$log = $this->sync_log();
+		$log->begin_run($trigger, array('entry' => 'sync_from_api'));
+
+		// Sync categories and tags. sync_inventory_in_batches() does this again
+		// below; both passes are logged with a `pass` field so the duplicated work
+		// is visible. Removing it belongs to WPB-165.
+		$categories_result = $this->sync_categories_from_api('pre_inventory');
+
 		// Sync inventory
-		$inventory_result = $this->sync_inventory_in_batches(false);
-	//	$this->console_log('Inventory sync result: ' . print_r($inventory_result, true));
-	
+		$inventory_result = $this->sync_inventory_in_batches(false, $trigger);
+
+		// This method returns success unconditionally (see below), so the log must
+		// not believe it. Compare against what was actually observed and record the
+		// disagreement: that contrast is the WPB-165 signal.
+		$state       = $this->sync_state();
+		$observed_ok = ( ! empty($inventory_result['success']) && ! $state->has_error() );
+
+		if ( ! $observed_ok ) {
+			$log->warn(
+				'sync.result.mismatch',
+				array(
+					'reported' => 'success',
+					'observed' => $state->has_error() ? 'error' : 'failed',
+					'state'    => $state->get_state(),
+					'message'  => $state->get_error_message(),
+				)
+			);
+		}
+
+		$log->end_run(
+			$observed_ok ? 'ok' : 'error',
+			array('categories_pre' => $categories_result ? 1 : 0)
+		);
+
 		return array(
 			'success' => true,
 			'message' => 'Sync completed successfully.',
@@ -1345,9 +1581,14 @@ class Tapgoods_Connection {
 	
 	
 	
-	// Function to remove duplicates after synchronization
+	/**
+	 * Remove duplicate tg_inventory posts sharing a tg_id, keeping the lowest ID.
+	 *
+	 * @return int Number of posts deleted.
+	 */
 	public function remove_duplicate_items() {
 		global $wpdb;
+		$log = $this->sync_log();
 	
 		$duplicates = $wpdb->get_results(
 			$wpdb->prepare(
@@ -1359,9 +1600,9 @@ class Tapgoods_Connection {
 				'tg_id'
 			)
 		);
-		
-		
-	
+
+		$removed = 0;
+
 		foreach ($duplicates as $duplicate) {
 			$duplicate_ids = $wpdb->get_col(
 				$wpdb->prepare(
@@ -1374,11 +1615,14 @@ class Tapgoods_Connection {
 	
 			foreach ($duplicate_ids as $post_id) {
 				wp_delete_post($post_id, true);
-				$this->console_log('Removed duplicate item with post ID: ' . $post_id);
+				++$removed;
+				$log->debug('sync.cleanup.duplicate_removed', array('post' => $post_id, 'tg_id' => $duplicate->tg_id));
 			}
 		}
-	
-		$this->console_log('Duplicate removal process completed.');
+
+		$log->info('sync.cleanup.duplicates_removed', array('count' => $removed, 'groups' => count($duplicates)));
+
+		return $removed;
 	}
 	
 	
@@ -1535,12 +1779,20 @@ class Tapgoods_Connection {
 	// }
 	
 	public function manual_sync_trigger() {
-		$this->console_log('Manual sync:1205');
+		$log = $this->sync_log();
+		$log->begin_run('admin_manual', array('entry' => 'manual_sync_trigger'));
+
 		$location_info = $this->sync_location_settings(true);
-//		$this->console_log('Resultado de sync_location_settings en sync_from_api: ' . print_r($location_info, true));
 
 		if (current_user_can('manage_options')) {
-			$result = $this->sync_inventory_in_batches(true);
+			$result = $this->sync_inventory_in_batches(true, 'admin_manual');
+
+			// Every branch below ends in wp_send_json_*(), which calls wp_die():
+			// the run has to be closed before that or it is never closed at all.
+			$log->end_run(
+				! empty($result['success']) ? 'ok' : 'error',
+				array('location_settings' => $location_info ? 1 : 0)
+			);
 
 			// Ensure we're sending the correct response format
 			if ($result['success']) {
@@ -1549,6 +1801,8 @@ class Tapgoods_Connection {
 				wp_send_json_error($result['message']);
 			}
 		} else {
+			$log->warn('sync.run.denied', array('reason' => 'missing_capability'));
+			$log->end_run('error', array('location_settings' => $location_info ? 1 : 0));
 			wp_send_json_error('You do not have permission to access this endpoint.');
 		}
 	}

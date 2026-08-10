@@ -289,6 +289,25 @@ class Tapgoods_Sync_State {
 		return (int) $this->data['pages_completed'];
 	}
 
+	public function get_started_at() {
+		return $this->data['started_at'];
+	}
+
+	/**
+	 * How long the current run has been in flight, in seconds.
+	 *
+	 * Reported in the sync activity log next to STALE_AFTER, so a run that is
+	 * holding the lock can be told apart from one that has genuinely crashed.
+	 *
+	 * @return int|null Null when no run has ever started.
+	 */
+	public function get_age() {
+		if ( empty( $this->data['started_at'] ) ) {
+			return null;
+		}
+		return $this->now() - (int) $this->data['started_at'];
+	}
+
 	public function get_last_success() {
 		return $this->data['last_success'];
 	}

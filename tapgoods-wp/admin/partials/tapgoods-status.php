@@ -76,6 +76,8 @@ $reset_done = get_option('tapgreino_reset_done');
             <hr class="my-4">
         <?php endforeach; ?>
     </div>
+
+    <?php require __DIR__ . '/tapgoods-sync-log.php'; ?>
 </div>
 
 <?php

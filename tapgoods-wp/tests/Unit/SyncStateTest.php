@@ -161,6 +161,19 @@ final class SyncStateTest extends TestCase {
 		$this->assertTrue( $s->can_start() );
 	}
 
+	public function test_started_at_and_age_track_the_run_in_flight() {
+		$s = $this->state();
+		$this->assertNull( $s->get_started_at() );
+		$this->assertNull( $s->get_age(), 'No run has ever started, so there is no age to report.' );
+
+		$this->clock = 2000;
+		$s->begin_prep( 1 );
+		$this->assertSame( 2000, $s->get_started_at() );
+
+		$this->clock = 2075;
+		$this->assertSame( 75, $s->get_age() );
+	}
+
 	public function test_reset_restores_defaults() {
 		$s = $this->state();
 		$s->begin_prep( 5 )->mark_active();

@@ -43,6 +43,7 @@ class Tapgoods {
 			'includes/class-tapgoods-post-types.php',     // Regusters Taxonomies and Post Types
 			'public/class-tapgoods-public.php',           // Class for frontend features
 			'includes/class-tapgoods-encryption.php',     // Class for encryption/decryption methods
+			'includes/class-tapgoods-sync-log.php',       // Sync activity log (file + error_log mirror)
 			'includes/class-tapgoods-sync-state.php',     // Sync flow state machine
 			'includes/class-tapgoods-connection.php',     // API Connection Controller
 			'includes/class-tapgoods-api-exception.php',  // API Exception Classes
@@ -86,6 +87,7 @@ class Tapgoods {
 		$this->loader->add_action( 'wp_ajax_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_nopriv_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_load_location_details', $this->plugin_admin, 'load_location_details', 10, 1 );
+		$this->loader->add_action( 'wp_ajax_tapgrein_download_sync_log', $this->plugin_admin, 'tapgrein_download_sync_log', 10, 0 );
 
 		$this->loader->add_action( 'tg_save_custom_css', $this->plugin_admin, 'tapgrein_save_styles', 10, 1 );
 		$this->loader->add_action( 'tg_save_advanced', $this->plugin_admin, 'tg_save_advanced', 10, 0 );
@@ -145,9 +147,20 @@ class Tapgoods {
 	}
 
 	public function tapgrein_cron_exec() {
-		tapgrein_write_log( 'tapgrein_cron_exec running at: ' . current_time( 'mysql' ) );
+		$api_connected = get_option( 'tg_api_connected', 0 );
 
-		if ( '1' === get_option( 'tg_api_connected', 0 ) ) {
+		// The five-minute heartbeat. Logged even when it does nothing: "did cron
+		// fire at all?" is the first question when a site stops syncing, and the
+		// answer used to be unknowable from the site itself.
+		Tapgoods_Sync_Log::get_instance()->info(
+			'sync.cron.tick',
+			array(
+				'api_connected' => $api_connected,
+				'will_ping'     => ( '1' === $api_connected ) ? 1 : 0,
+			)
+		);
+
+		if ( '1' === $api_connected ) {
 			$connection = Tapgoods_Connection::get_instance();
 			$sync       = $connection->tapgrein_async_sync_from_api();
 		}
