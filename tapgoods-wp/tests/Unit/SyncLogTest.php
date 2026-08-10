@@ -343,6 +343,58 @@ final class SyncLogTest extends TestCase {
 	}
 
 	/**
+	 * Documents the KNOWN GAPS in the length heuristic, so that a future change
+	 * which closes or widens one is noticed here rather than in production.
+	 *
+	 * These are not desired behaviour; they are the accepted cost of a floor that
+	 * does not redact stack traces. Every one of them needs a BARE credential: no
+	 * field name and no `key=` style context, either of which redacts regardless of
+	 * length. Read alongside the rule-3 notes in Tapgoods_Sync_Log::redact().
+	 *
+	 * @dataProvider heuristic_gaps
+	 *
+	 * @param string $value  Value containing a bare secret.
+	 * @param string $secret The part that survives today.
+	 */
+	public function test_documented_gaps_in_the_length_heuristic( string $value, string $secret ) {
+		$this->assertStringContainsString(
+			$secret,
+			Tapgoods_Sync_Log::format_value( 'message', $value ),
+			'A documented gap now closes. Update redact()\'s notes and move this case into credential_shapes().'
+		);
+	}
+
+	public static function heuristic_gaps(): array {
+		$half = 'A1b2C3d4A1b2C3d4A1b2'; // 20 chars: under the 24-char floor.
+
+		return array(
+			'bare short key'            => array( 'refused abc12345678 here', 'abc12345678' ),
+			'bare 20-char digest'       => array( 'digest ' . $half . ' here', $half ),
+			// Collapsing whitespace before redacting does not rescue this one: the
+			// newline becomes a space and the two 20-char runs stay separate.
+			'bare key split by newline' => array( 'token ' . $half . "\n" . $half . ' end', $half ),
+		);
+	}
+
+	/**
+	 * The same bare tokens that defeat the length rule are redacted the moment any
+	 * context appears, which is what makes those gaps acceptable.
+	 *
+	 * @dataProvider heuristic_gaps
+	 *
+	 * @param string $value  Value containing a bare secret.
+	 * @param string $secret The secret.
+	 */
+	public function test_the_documented_gaps_close_as_soon_as_there_is_context( string $value, string $secret ) {
+		// Same value, but under a credential-named field.
+		$this->assertStringNotContainsString( $secret, Tapgoods_Sync_Log::format_value( 'api_key', $value ) );
+
+		// Same value, but with an assignment in front of the secret.
+		$assigned = str_replace( $secret, 'api_key=' . $secret, $value );
+		$this->assertStringNotContainsString( $secret, Tapgoods_Sync_Log::format_value( 'message', $assigned ) );
+	}
+
+	/**
 	 * The redaction rules must not eat the fields the log exists to carry.
 	 *
 	 * @dataProvider innocent_values
@@ -555,7 +607,13 @@ final class SyncLogTest extends TestCase {
 	 * log exists to remove. The sync reaches an API client that throws from
 	 * outside any try/catch (and one of the classes it throws is not even
 	 * defined, so that path is a fatal), so the guarantee cannot come from a
-	 * catch block. This is the shutdown path that backs it.
+	 * catch block.
+	 *
+	 * This exercises what register_shutdown_function() calls, which is the
+	 * mechanism that actually fires on a fatal. It survives WordPress's own fatal
+	 * handler only because core passes 'exit' => false to wp_die(); see
+	 * Tapgoods_Sync_Log::arm_shutdown_guard() for the host configurations that
+	 * bypass it, and note that the guarantee is best-effort rather than absolute.
 	 */
 	public function test_a_run_left_open_gets_a_terminal_line_at_shutdown() {
 		$log = $this->log();
@@ -603,11 +661,11 @@ final class SyncLogTest extends TestCase {
 	}
 
 	/**
-	 * The fatal path in production is not register_shutdown_function(): WordPress
-	 * registers its own fatal handler before any plugin loads and that handler
-	 * ends in wp_die(), which skips every later shutdown function. The filter
-	 * inside that handler is the real seam, and this asserts it observes without
-	 * changing WordPress's decision.
+	 * The secondary seam. This filter does NOT fire on an ordinary fatal:
+	 * WP_Fatal_Error_Handler::should_handle_error() returns true for E_ERROR and
+	 * friends before applying it, and core documents it as "only fired if the
+	 * error is not already configured to be handled by WordPress core". It is kept
+	 * for the error types core does not claim, and it must stay a pure observer.
 	 */
 	public function test_the_fatal_filter_writes_a_terminal_line_and_passes_the_decision_through() {
 		$log = $this->log();

@@ -52,6 +52,7 @@ $plugin_dir = dirname( __DIR__ );
 require_once $plugin_dir . '/includes/tapgoods-formatting-functions.php';
 require_once $plugin_dir . '/includes/class-tapgoods-sync-log.php';
 require_once $plugin_dir . '/includes/class-tapgoods-encryption.php';
+require_once $plugin_dir . '/includes/class-tapgoods-api-exception.php';
 require_once $plugin_dir . '/includes/class-tapgoods-api-response.php';
 require_once $plugin_dir . '/includes/class-tapgoods-api-request.php';
 require_once $plugin_dir . '/includes/class-tapgoods-api-client.php';

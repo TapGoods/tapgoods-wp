@@ -268,6 +268,11 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'sync.error', $contents );
 		$this->assertStringContainsString( 'class=RuntimeException', $contents );
 		$this->assertStringContainsString( 'result=error', $contents );
+
+		// A request that never reached TapGoods has no status to report, and it has
+		// to render as missing rather than inheriting an earlier 200.
+		$this->assertStringContainsString( 'status=-', $contents );
+		$this->assertStringNotContainsString( 'status=200', $contents );
 	}
 
 	public function test_full_sync_reports_success() {

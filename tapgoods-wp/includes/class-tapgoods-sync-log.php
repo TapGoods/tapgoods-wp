@@ -259,6 +259,24 @@ class Tapgoods_Sync_Log {
 	 * hard fatal rather than a catchable exception. No try/catch can cover a fatal;
 	 * a shutdown function can.
 	 *
+	 * BEST EFFORT, AND HOST-DEPENDENT. Read the two blocks below for which
+	 * mechanism actually fires. Three host configurations bypass BOTH of them, and
+	 * they are common on exactly the managed hosts this log is aimed at, WP Engine
+	 * included:
+	 *
+	 *   - a `wp-content/php-error.php` drop-in: WP_Fatal_Error_Handler::
+	 *     display_error_template() requires it and returns immediately, and such
+	 *     drop-ins normally end the request themselves;
+	 *   - a `wp-content/fatal-error-handler.php` drop-in, which replaces the
+	 *     handler class outright and may do anything;
+	 *   - the `wp_php_error_args` filter setting 'exit' => true, which makes core's
+	 *     wp_die() terminate and skips every later shutdown function.
+	 *
+	 * So treat a missing terminal line as "possible, on some hosts" rather than
+	 * "impossible". A follow-up could re-seam onto `wp_php_error_message` /
+	 * `wp_php_error_args`, which run before that wp_die() and would survive the
+	 * third case (but still not a drop-in).
+	 *
 	 * Registered once per instance, and a no-op when the run closed normally.
 	 *
 	 * @return void
@@ -272,39 +290,47 @@ class Tapgoods_Sync_Log {
 		$this->shutdown_armed = true;
 
 		/*
-		 * Two mechanisms, because on a real WordPress fatal the obvious one does
-		 * not run. WordPress registers its own fatal handler in wp-settings.php,
-		 * before any plugin is loaded, and that handler ends in wp_die(); exiting
-		 * inside a shutdown function skips every shutdown function registered
-		 * after it, so ours would never fire. Verified, not assumed: a deliberate
-		 * fatal mid-sync produced no terminal line until this filter was added.
+		 * PRIMARY mechanism: a plain shutdown function. It covers a fatal, a
+		 * timeout, and a die() anywhere in the call stack.
 		 *
-		 * `wp_should_handle_php_error` is applied inside that handler, just before
-		 * it takes over, which is the last moment at which anything of ours can
-		 * still write. It only fires when a fatal actually happened.
-		 */
-		if ( function_exists( 'add_filter' ) ) {
-			add_filter( 'wp_should_handle_php_error', array( $this, 'note_fatal_error' ), 10, 2 );
-		}
-
-		/*
-		 * And the plain shutdown function for every other way a request can end
-		 * without a terminal line: a fatal when WordPress's handler is disabled
-		 * (WP_DISABLE_FATAL_ERROR_HANDLER), a timeout, a die() somewhere in the
-		 * call stack. Both paths funnel into close_open_run(), which is
-		 * idempotent, so whichever fires first wins and the other does nothing.
+		 * It works despite WordPress registering its own fatal handler first (in
+		 * wp-settings.php, before any plugin loads) only because that handler
+		 * finishes with wp_die( ..., array( 'exit' => false ) ): see
+		 * WP_Fatal_Error_Handler::display_default_error_template(). Core does not
+		 * exit, so the shutdown queue continues and reaches us. If core ever
+		 * exited there instead, every shutdown function registered after its own
+		 * would be skipped and this guarantee would silently disappear -- so do
+		 * not treat this registration as redundant, it is the one that fires.
 		 */
 		if ( function_exists( 'register_shutdown_function' ) ) {
 			register_shutdown_function( array( $this, 'close_open_run' ) );
+		}
+
+		/*
+		 * SECONDARY mechanism, and NOT the one that catches a normal fatal.
+		 * WP_Fatal_Error_Handler::should_handle_error() returns true for E_ERROR,
+		 * E_PARSE, E_USER_ERROR, E_COMPILE_ERROR and E_RECOVERABLE_ERROR *before*
+		 * it applies this filter, and core's own docblock says the filter "is only
+		 * fired if the error is not already configured to be handled by WordPress
+		 * core". So on an uncaught Error this hook never runs.
+		 *
+		 * It is kept because it does fire for the error types core does not handle
+		 * by default, where something else opts them in, and it runs earlier than
+		 * the shutdown function above. It is an observer: note_fatal_error()
+		 * returns the decision untouched.
+		 */
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'wp_should_handle_php_error', array( $this, 'note_fatal_error' ), 10, 2 );
 		}
 	}
 
 	/**
 	 * Write the terminal line while WordPress's fatal handler is deciding.
 	 *
-	 * Hooked to `wp_should_handle_php_error`; passes the decision straight
-	 * through, since this is an observer and must not change how WordPress
-	 * handles the error.
+	 * Hooked to `wp_should_handle_php_error`, which core applies only for error
+	 * types it does not already handle itself, so this does NOT run on an ordinary
+	 * fatal (see arm_shutdown_guard()). Passes the decision straight through: this
+	 * is an observer and must not change how WordPress handles the error.
 	 *
 	 * @param bool  $should_handle Whether WordPress will handle this error.
 	 * @param array $error         The error, as returned by error_get_last().
@@ -544,10 +570,13 @@ class Tapgoods_Sync_Log {
 			return $value ? '1' : '0';
 		}
 
-		$string = self::redact( $key, (string) $value );
+		// Collapse whitespace so one event is always exactly one line. This has to
+		// happen BEFORE redaction, not after: a key that arrives with a newline in
+		// the middle of it otherwise reaches the length rule as two short runs,
+		// each under the floor, and survives with a space where the newline was.
+		$string = trim( preg_replace( '/\s+/', ' ', (string) $value ) );
 
-		// Collapse whitespace so one event is always exactly one line.
-		$string = trim( preg_replace( '/\s+/', ' ', $string ) );
+		$string = self::redact( $key, $string );
 
 		if ( strlen( $string ) > self::MAX_VALUE_LENGTH ) {
 			$string = substr( $string, 0, self::MAX_VALUE_LENGTH ) . '[truncated]';
@@ -587,11 +616,27 @@ class Tapgoods_Sync_Log {
 	 *      a whitespace-delimited word, so a trailing dot or comma no longer
 	 *      saves the token.
 	 *
-	 * Rule 3 deliberately excludes '/' from its alphabet: with it, ordinary URL
-	 * paths and long error strings get eaten. A bare slash-bearing base64 blob
-	 * pasted into a message with no `key=` next to it is the known residual gap;
-	 * rules 1 and 2 cover every shape the plugin can actually produce, and the
-	 * 300-character value cap bounds the rest.
+	 * Rule 3 is a heuristic backstop and it has known, deliberate gaps. It is
+	 * defeated by a BARE credential (one with no field name and no `key=` style
+	 * context next to it) whenever the token does not look long and opaque enough:
+	 *
+	 *   - a short bare key, e.g. 11 characters;
+	 *   - a bare 20-character hex digest, i.e. anything under the 24-char floor;
+	 *   - a bare token containing whitespace, e.g. a 40-character key with a
+	 *     newline in the middle, which reaches the rule as two 20-character runs.
+	 *     Collapsing whitespace before redacting does not help: the newline becomes
+	 *     a space and the runs stay separate. Verified, not assumed;
+	 *   - a bare slash-bearing base64 blob, since '/' is excluded from the alphabet
+	 *     (with it, ordinary URL paths and long error strings get eaten -- the path
+	 *     `com/v1/external/graphql` alone is 23 characters).
+	 *
+	 * Lowering the floor or joining runs across whitespace would start redacting
+	 * stack traces and error text, which is where this log earns its keep, so the
+	 * floor stays where it is. These gaps are acceptable because rule 3 is the LAST
+	 * line of defence, not the first: no call site passes credentials, the key
+	 * travels in an Authorization header and in validate_key()'s POST body, rules 1
+	 * and 2 cover every shape the plugin can actually produce, and the
+	 * 300-character value cap bounds whatever is left.
 	 *
 	 * @param string $key   Field name.
 	 * @param string $value Raw value.
@@ -770,6 +815,14 @@ class Tapgoods_Sync_Log {
 	 * empty file, silently destroying history. A lock on the log file itself would
 	 * not do: after the rename the descriptor no longer refers to that path, so a
 	 * third writer would lock a different inode.
+	 *
+	 * flock() is advisory, and on some NFS and shared-hosting mounts it silently
+	 * does nothing. Note what that costs and what it does not: where the lock
+	 * no-ops, a concurrent burst can still lose rotated backup HISTORY, but it
+	 * cannot cause unbounded growth, because the rotation and the truncation
+	 * fallback both run regardless of whether the lock was effective. The
+	 * disk-filling guarantee therefore holds on every host; only the completeness
+	 * of the .1/.2/.3 chain is best-effort.
 	 *
 	 * @param string $path     Current log file.
 	 * @param int    $incoming Bytes about to be appended.
