@@ -9,12 +9,41 @@ class Tapgoods_Connection {
 	private $client = null;
 	protected $key;
 
-	private $is_active      = null;
 	private $hash           = null;
 	private $u_sync_start   = null;
 	private $u_sync_end     = null;
 	private $sync_duration  = null;
 	private $last_sync_time = null;
+
+	/**
+	 * True only while a bounded sync slice is executing in THIS request. The
+	 * shutdown handler uses it to tell a clean end from an abnormal one.
+	 *
+	 * @var bool
+	 */
+	private $active_run = false;
+
+	/** Whether the shutdown handler has already been registered this request. */
+	private $shutdown_registered = false;
+
+	/** Execution mutex transient: one request processes a slice at a time. */
+	const RUN_LOCK = 'tapgrein_sync_lock';
+
+	/**
+	 * TTL for the execution mutex. Must auto-expire so a request killed without
+	 * running its shutdown handler cannot wedge the sync forever; the next cron
+	 * tick then reacquires and resumes from the checkpointed cursor.
+	 */
+	const RUN_LOCK_TTL = 300;
+
+	/** Max term IDs per query when chunking large term operations. */
+	const TERM_CHUNK_SIZE = 150;
+
+	/** Default wall-clock budget (seconds) for one bounded sync slice. */
+	const SYNC_TIME_BUDGET = 20;
+
+	/** Default hard cap on pages fetched per slice (belt-and-braces with the clock). */
+	const SYNC_MAX_PAGES_PER_RUN = 25;
 
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
@@ -277,119 +306,358 @@ class Tapgoods_Connection {
 		return $message;
 	}
 	
+	/**
+	 * Entry point for an inventory sync. Both the cron path and the manual
+	 * "Sync Now" button land here.
+	 *
+	 * The sync is RESUMABLE and BOUNDED per request: a single invocation only
+	 * does as much work as fits in a wall-clock budget (self::sync_time_budget())
+	 * / page cap, then checkpoints its position in the state-machine cursor and
+	 * returns, leaving the run ACTIVE so the next cron tick resumes exactly where
+	 * it stopped instead of restarting at page 1. This keeps every request well
+	 * under any host's request-time limit (the WPB-165 failure was trying to page
+	 * a 372-page catalog in one request), with no host-specific branching.
+	 *
+	 * @param bool $manual_trigger True when invoked from the admin "Sync Now".
+	 * @return array { success: bool, message: string, in_progress?: bool }
+	 */
 	public function sync_inventory_in_batches($manual_trigger = false) {
 		$current_key = $this->get_key();
-		$stored_key = get_option('tg_last_api_key');
+		$stored_key  = get_option('tg_last_api_key');
 
-		// Handle API key change
-		if ($current_key !== $stored_key) {
+		// Handle API key change (only meaningful when no run is in flight).
+		if ($current_key !== $stored_key && ! $this->sync_state()->is_running()) {
 			$this->console_log('API Key has changed. Clearing previous data...');
 			$this->tapgrein_delete_data();
 			update_option('tg_last_api_key', $current_key);
 		}
 
-        $batch_size = 50;
-		$client = $this->get_connection();
-		$state  = $this->sync_state();
+		$state = $this->sync_state();
 
-		// Prevent concurrent syncs. The state machine (PREP/ACTIVE) is the lock.
-		if ($state->is_running()) {
-			$this->console_log('Sync is locked. Another process is running.');
-			return array('success' => true, 'message' => 'Sync in progress. It can take up to 60 minutes for larger inventory. Please do not close the window until the sync is complete.', 'in_progress' => true);
+		// A latched ERROR blocks everything until an admin clears it.
+		if ($state->has_error() && Tapgoods_Sync_State::STATE_ERROR === $state->get_state()) {
+			$this->console_log('Sync is in ERROR state; not starting. Clear errors first.');
+			return array('success' => false, 'message' => 'Sync is in an error state. Clear the sync error before retrying.');
 		}
 
-		// SYNC PREP: enter the state machine and figure out how many paging
-		// calls the full inventory sync will require.
-		$state->begin_prep();
-
-		$location_ids = $client->get_location_ids();
-		if (false === $location_ids) {
-			$this->console_log('Failed to retrieve location IDs.');
-			$state->mark_error('Failed to retrieve location information.');
-			return array('success' => false, 'message' => 'Failed to retrieve location information.');
+		// Only one request may process a slice at a time. This is the execution
+		// mutex; the ACTIVE state + cursor is the durable "work remains" marker.
+		if (! $this->acquire_run_lock()) {
+			$this->console_log('Sync is locked. Another process is running a slice.');
+			return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
 		}
 
-		$total_pages = $this->compute_total_sync_pages($client, $location_ids, $batch_size);
-		$state->set_total_pages($total_pages);
-		$this->console_log("Sync prep complete. Planned paging calls: {$total_pages}");
-
-		// SYNC ACTIVE: page through inventory and write it into WordPress.
-		$state->mark_active();
-
-		$total_items = 0;
-		$start_time = current_time('timestamp');
-		$existing_items = $this->get_all_existing_inventory_ids();
-		$synced_items = [];
+		// Arm the abnormal-termination safety net now, before PREP: a fatal (e.g.
+		// max-execution-time) during PREP must be recovered too, not just during
+		// paging. on_sync_shutdown() gates its own work on $active_run.
+		$this->active_run = true;
+		$this->maybe_register_shutdown();
 
 		try {
-			foreach ($location_ids as $lid) {
-				// Reiniciar paginación por cada ubicación
-				$current_page = 1;
-				$continue_fetching = true;
+			// Resume an in-flight run only when it has a properly initialised
+			// cursor. A run that is "running" but has no location list (e.g. a
+			// request that died mid-PREP before init_cursor) must NOT be resumed:
+			// resuming it would fall straight through to finalize with an empty
+			// synced set and could delete the whole catalog. Start such a run fresh.
+			$resume = $state->is_running() && ! empty($state->get_cursor()['location_ids']);
 
-				while ($continue_fetching) {
-					$response = $client->get_inventories_from_graph($lid, $current_page, $batch_size);
-					if (false === $response || empty($response['collection'])) {
-						$this->console_log('No more items to fetch for location ID: ' . $lid);
-						$continue_fetching = false;
-						continue;
-					}
-
-					$inventory = $response['collection'];
-					$total_items += count($inventory);
-					$state->increment_pages_completed();
-
-					foreach ($inventory as $item) {
-						$this->sync_inventory_item($item);
-						$synced_items[] = $item['id'];
-					}
-
-					if (count($inventory) < $batch_size) {
-						$continue_fetching = false;
-					} else {
-						$current_page++;
-					}
-				}
-			}
-
-			// Sync categories and tags after items
-			$this->console_log('Syncing categories and tags...');
-			$categories_synced = $this->sync_categories_from_api();
-
-			if ($categories_synced) {
-				$this->console_log('Assigning categories and tags to items...');
-				foreach ($synced_items as $tg_id) {
-					$item = $this->get_existing_inventory_item_by_tg_id($tg_id);
-					if ($item) {
-						$this->tapgrein_assign_terms($item->ID);
-					}
-				}
+			if ($resume) {
+				$this->console_log('Resuming in-flight sync from checkpoint.');
 			} else {
-				$this->console_log('Category and tag sync failed.');
+				$this->console_log('Starting a new sync run (PREP).');
+				$client       = $this->get_connection();
+				$location_ids = $client->get_location_ids();
+				if (false === $location_ids) {
+					$this->console_log('Failed to retrieve location IDs.');
+					$state->mark_error('Failed to retrieve location information.');
+					$this->active_run = false;
+					return array('success' => false, 'message' => 'Failed to retrieve location information.');
+				}
+
+				$state->begin_prep();
+				$total_pages = $this->compute_total_sync_pages($client, $location_ids, 50);
+				$state->set_total_pages($total_pages);
+				$state->init_cursor($location_ids);
+				$this->console_log("Sync prep complete. Planned paging calls: {$total_pages}");
+				$state->mark_active();
 			}
 
-			// Cleanup after sync
-			$this->remove_missing_items_from_wordpress($existing_items, $synced_items);
-			$this->remove_unused_terms('tg_category');
-			$this->remove_unused_terms('tg_tags');
-			$this->remove_duplicate_items();
+			return $this->run_sync_slice($state);
+		} finally {
+			$this->release_run_lock();
+		}
+	}
+
+	/**
+	 * Process one bounded slice of the current run and checkpoint.
+	 *
+	 * Walks the resumable cursor: an optional one-shot category/tag pass, then
+	 * paging through locations (writing items + assigning their terms), then a
+	 * finalize phase (cleanup + removal reconciliation) once every location is
+	 * done. Returns as soon as the per-request budget is spent, leaving the run
+	 * resumable, or drives the state machine to COMPLETED when everything is done.
+	 *
+	 * @param Tapgoods_Sync_State $state The sync state machine.
+	 * @return array Result envelope for the caller.
+	 */
+	private function run_sync_slice($state) {
+		$client     = $this->get_connection();
+		$batch_size = 50;
+		$start_time = current_time('timestamp');
+		$pages_this_run = 0;
+
+		// The abnormal-termination safety net is armed by the caller
+		// (sync_inventory_in_batches) before PREP; keep it armed here defensively.
+		$this->active_run = true;
+		$this->maybe_register_shutdown();
+
+		$cursor = $state->get_cursor();
+
+		try {
+			// One-shot category/tag pass, up front, so terms exist before items
+			// are paged and each item's own tapgrein_assign_terms() can find them.
+			if (empty($cursor['categories_done'])) {
+				$this->console_log('Syncing categories and tags...');
+				$this->sync_categories_from_api();
+				$cursor['categories_done'] = true;
+				$state->save_cursor($cursor);
+
+				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+					$this->active_run = false;
+					return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+				}
+			}
+
+			// PAGING PHASE.
+			if ('paging' === $cursor['phase']) {
+				$location_ids = $cursor['location_ids'];
+				$idx          = (int) $cursor['location_index'];
+				$page         = (int) $cursor['next_page'];
+
+				while ($idx < count($location_ids)) {
+					$lid      = $location_ids[$idx];
+					$response = $client->get_inventories_from_graph($lid, $page, $batch_size);
+
+					if (false === $response) {
+						// A false response is an API ERROR, not "no more items".
+						// Treating it as end-of-location would let finalize delete
+						// items that still exist (a partial/aborted pass). Abort the
+						// run instead so it is retried fresh, with no deletions.
+						throw new Exception("API error paging location {$lid} (page {$page}); aborting before finalize to protect against deleting items on a partial pass.");
+					}
+
+					if (empty($response['collection'])) {
+						// Location genuinely exhausted: advance to the next one.
+						$this->console_log('No more items to fetch for location ID: ' . $lid);
+						++$idx;
+						$page = 1;
+					} else {
+						$inventory = $response['collection'];
+						foreach ($inventory as $item) {
+							$this->sync_inventory_item($item);
+							$cursor['synced_ids'][] = (string) $item['id'];
+						}
+						$cursor['total_items'] += count($inventory);
+						$state->increment_pages_completed();
+						++$pages_this_run;
+
+						if (count($inventory) < $batch_size) {
+							++$idx;
+							$page = 1;
+						} else {
+							++$page;
+						}
+					}
+
+					// Checkpoint after every page so a resume loses at most one page.
+					$cursor['location_index'] = $idx;
+					$cursor['next_page']      = $page;
+					$state->save_cursor($cursor);
+
+					if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+						$this->active_run = false;
+						return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+					}
+				}
+
+				// All locations paged: hand over to the finalize phase.
+				$cursor['phase'] = 'finalize';
+				$state->save_cursor($cursor);
+
+				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+					$this->active_run = false;
+					return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+				}
+			}
+
+			// FINALIZE PHASE: only reached once a FULL pass is confirmed, so it is
+			// safe to reconcile removals against the accumulated synced-id set.
+			$this->finalize_sync($cursor['synced_ids']);
 			$this->update_sync_info($start_time);
 		} catch (Exception $e) {
 			$this->console_log('Sync failed: ' . $e->getMessage());
 			$will_retry = $state->mark_error($e->getMessage());
 			$this->console_log($will_retry ? 'Sync will be retried on the next run.' : 'Sync retries exhausted; state set to ERROR.');
+			$this->active_run = false;
 			return array('success' => false, 'message' => 'Sync failed: ' . $e->getMessage());
 		}
 
-		// SYNC COMPLETED
+		// SYNC COMPLETED.
 		$state->mark_completed();
+		$this->active_run = false;
 
-		// Check if anything was actually synced
-		if ($total_items === 0) {
+		if (0 === (int) $cursor['total_items']) {
 			return array('success' => true, 'message' => 'Everything is up to date. Nothing to sync.');
 		}
-
 		return array('success' => true, 'message' => '');
+	}
+
+	/**
+	 * Finalize a completed full pass: reconcile removals and clean up terms.
+	 *
+	 * Runs ONLY after every location/page has been fetched, so the synced-id set
+	 * is complete and it is safe to delete WordPress items the API no longer
+	 * returns. All term operations here are chunked (see remove_unused_terms) so
+	 * no single query carries thousands of term IDs.
+	 *
+	 * @param array $synced_ids tg_ids seen during this run's full pass.
+	 * @return void
+	 */
+	private function finalize_sync($synced_ids) {
+		$existing_items = $this->get_all_existing_inventory_ids();
+
+		// Deletion safety valve: only reconcile item removals when this pass
+		// actually saw items. An empty synced set reaching finalize (e.g. a
+		// business that legitimately returned nothing, or an unexpected code
+		// path) must NOT wipe every existing item. Term cleanup (which only
+		// removes genuinely unused/obsolete terms) is still safe to run.
+		if (! empty($synced_ids)) {
+			$this->remove_missing_items_from_wordpress($existing_items, $synced_ids);
+		} else {
+			$this->console_log('Finalize: synced set is empty; skipping item-removal reconciliation to avoid deleting the whole catalog.');
+		}
+
+		$this->remove_unused_terms('tg_category');
+		$this->remove_unused_terms('tg_tags');
+		$this->remove_duplicate_items();
+	}
+
+	// --- Bounded-slice helpers ------------------------------------------------
+
+	/**
+	 * Wall-clock budget (seconds) for one sync slice. Overridable via the
+	 * TG_SYNC_TIME_BUDGET constant so a host with generous request limits can
+	 * page more per request.
+	 *
+	 * @return int
+	 */
+	public static function sync_time_budget() {
+		if (defined('TG_SYNC_TIME_BUDGET') && (int) TG_SYNC_TIME_BUDGET > 0) {
+			return (int) TG_SYNC_TIME_BUDGET;
+		}
+		return self::SYNC_TIME_BUDGET;
+	}
+
+	/**
+	 * Hard cap on pages fetched per slice. Overridable via TG_SYNC_MAX_PAGES.
+	 *
+	 * @return int
+	 */
+	public static function sync_max_pages_per_run() {
+		if (defined('TG_SYNC_MAX_PAGES') && (int) TG_SYNC_MAX_PAGES > 0) {
+			return (int) TG_SYNC_MAX_PAGES;
+		}
+		return self::SYNC_MAX_PAGES_PER_RUN;
+	}
+
+	/**
+	 * Whether the current slice has spent its per-request budget (time or pages).
+	 *
+	 * @param int $start_time     current_time('timestamp') when the slice began.
+	 * @param int $pages_this_run Pages fetched so far this slice.
+	 * @return bool
+	 */
+	private function slice_budget_spent($start_time, $pages_this_run) {
+		if ((current_time('timestamp') - (int) $start_time) >= self::sync_time_budget()) {
+			return true;
+		}
+		if ((int) $pages_this_run >= self::sync_max_pages_per_run()) {
+			return true;
+		}
+		return false;
+	}
+
+	private function in_progress_message() {
+		return 'Sync in progress. It continues automatically in the background; you can leave this page.';
+	}
+
+	// --- Execution mutex ------------------------------------------------------
+
+	/**
+	 * Acquire the execution mutex. Returns false if another request holds it.
+	 *
+	 * @return bool
+	 */
+	private function acquire_run_lock() {
+		if (get_transient(self::RUN_LOCK)) {
+			return false;
+		}
+		set_transient(self::RUN_LOCK, current_time('timestamp'), self::RUN_LOCK_TTL);
+		return true;
+	}
+
+	private function release_run_lock() {
+		delete_transient(self::RUN_LOCK);
+	}
+
+	// --- Abnormal-termination safety net -------------------------------------
+
+	/**
+	 * Register the shutdown handler once per request. register_shutdown_function
+	 * cannot be undone, so on_sync_shutdown() gates its own work on $active_run.
+	 *
+	 * @return void
+	 */
+	private function maybe_register_shutdown() {
+		if ($this->shutdown_registered) {
+			return;
+		}
+		$this->shutdown_registered = true;
+		register_shutdown_function(array($this, 'on_sync_shutdown'));
+	}
+
+	/**
+	 * Runs on request shutdown. If the request ended WHILE a slice was executing
+	 * (a PHP fatal such as the max-execution-time timeout, which a try/catch can't
+	 * catch), recover gracefully:
+	 *   - resumable run (paging still has work, checkpoint intact): leave the
+	 *     cursor so the next cron tick resumes; just free the lock.
+	 *   - otherwise (died in PREP, or in finalize with no remaining paging):
+	 *     record the abnormal end so the retry budget applies, then free the lock.
+	 * A clean slice clears $active_run before returning, so this is a no-op then.
+	 *
+	 * @return void
+	 */
+	public function on_sync_shutdown() {
+		if (! $this->active_run) {
+			return; // Slice ended cleanly, or this request never ran a slice.
+		}
+
+		$state = $this->sync_state();
+		$st    = $state->get_state();
+
+		if (Tapgoods_Sync_State::STATE_ACTIVE === $st && $state->cursor_has_remaining_paging()) {
+			// Resumable: keep the checkpointed cursor; the next tick continues.
+			$this->console_log('Sync request ended mid-slice; run is resumable and will continue on the next cron tick.');
+		} elseif (in_array($st, array(Tapgoods_Sync_State::STATE_PREP, Tapgoods_Sync_State::STATE_ACTIVE), true)) {
+			// Abnormal end with no resumable work left (PREP, or finalize): let the
+			// retry budget decide whether the next tick starts fresh or latches ERROR.
+			$state->mark_error('Sync ended unexpectedly (request terminated).');
+			$this->console_log('Sync request ended abnormally with no resumable work; recorded for retry.');
+		}
+
+		$this->active_run = false;
+		$this->release_run_lock();
 	}
 
 	/**
@@ -428,17 +696,60 @@ class Tapgoods_Connection {
 	 * @return bool True if terms exist, false otherwise.
 	 */
 	public function confirm_terms_ready($taxonomy) {
-		$terms = get_terms(array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-		));
-	
-		if (empty($terms) || is_wp_error($terms)) {
+		// Cheap existence check: read term IDs straight from term_taxonomy with no
+		// oversized IN() / term-cache prime (the WPB-165 "KILLED QUERY" fingerprint).
+		$term_ids = $this->get_term_ids_for_taxonomy($taxonomy);
+
+		if (empty($term_ids)) {
 			$this->console_log("No terms found for taxonomy: $taxonomy.");
 			return false;
 		}
-	
+
 		return true;
+	}
+
+	/**
+	 * All term IDs for a taxonomy, read directly from term_taxonomy.
+	 *
+	 * Deliberately avoids get_terms(): get_terms() primes the term object cache
+	 * with a single "... WHERE t.term_id IN (<all ids>)" query, which is the
+	 * ~4000-id "KILLED QUERY" seen on the failing site (WPB-165). This query has
+	 * no IN() clause at all, so it is safe on any host. Callers then process the
+	 * IDs in chunks (see tapgrein_chunk_ids / TERM_CHUNK_SIZE).
+	 *
+	 * @param string $taxonomy Taxonomy slug.
+	 * @return int[] Term IDs.
+	 */
+	private function get_term_ids_for_taxonomy($taxonomy) {
+		global $wpdb;
+
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT term_id FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s",
+				$taxonomy
+			)
+		);
+
+		return array_map('intval', (array) $ids);
+	}
+
+	/**
+	 * Split a list of IDs into chunks no larger than the term-query cap.
+	 *
+	 * Pure helper (no WordPress calls) so the chunking guarantee is unit-testable
+	 * in isolation: every returned chunk has at most self::TERM_CHUNK_SIZE IDs,
+	 * so no term query built from a chunk can carry an oversized IN() list.
+	 *
+	 * @param array    $ids  IDs to chunk.
+	 * @param int|null $size Chunk size (defaults to TERM_CHUNK_SIZE).
+	 * @return array[] Array of ID chunks.
+	 */
+	public static function tapgrein_chunk_ids($ids, $size = null) {
+		$size = (null === $size) ? self::TERM_CHUNK_SIZE : max(1, (int) $size);
+		if (empty($ids)) {
+			return array();
+		}
+		return array_chunk(array_values((array) $ids), $size);
 	}
 	
 	
@@ -841,16 +1152,17 @@ class Tapgoods_Connection {
 	
 	
 	public function remove_obsolete_terms($taxonomy, $valid_ids) {
-		$existing_terms = get_terms(array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'fields'     => 'ids',
-		));
-	
-		foreach ($existing_terms as $term_id) {
-			if (!in_array($term_id, $valid_ids)) {
-				wp_delete_term($term_id, $taxonomy);
-				$this->console_log("Removed obsolete term ID: {$term_id} from taxonomy: {$taxonomy}");
+		$valid    = array_map('intval', (array) $valid_ids);
+		$term_ids = $this->get_term_ids_for_taxonomy($taxonomy);
+
+		// Chunked purely to keep memory bounded on huge taxonomies; the delete
+		// decision is an in-memory in_array against the valid set (no term query).
+		foreach (self::tapgrein_chunk_ids($term_ids) as $chunk) {
+			foreach ($chunk as $term_id) {
+				if (!in_array((int) $term_id, $valid, true)) {
+					wp_delete_term($term_id, $taxonomy);
+					$this->console_log("Removed obsolete term ID: {$term_id} from taxonomy: {$taxonomy}");
+				}
 			}
 		}
 	}
@@ -859,23 +1171,21 @@ class Tapgoods_Connection {
 	
 	
 	public function remove_missing_terms($taxonomy, $valid_ids) {
-		$existing_terms = get_terms(array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'fields'     => 'ids',
-		));
-	
-		foreach ($existing_terms as $term_id) {
-			$tg_id = get_term_meta($term_id, 'tg_id', true);
-			$tg_hash = get_term_meta($term_id, 'tg_hash', true);
-	
-			// Si el término tiene un tg_id o tg_hash válido, no lo elimines
-			if (in_array($tg_id, $valid_ids) || $tg_hash === $this->hash) {
-				continue;
+		$term_ids = $this->get_term_ids_for_taxonomy($taxonomy);
+
+		foreach (self::tapgrein_chunk_ids($term_ids) as $chunk) {
+			foreach ($chunk as $term_id) {
+				$tg_id   = get_term_meta($term_id, 'tg_id', true);
+				$tg_hash = get_term_meta($term_id, 'tg_hash', true);
+
+				// Si el término tiene un tg_id o tg_hash válido, no lo elimines
+				if (in_array($tg_id, $valid_ids) || $tg_hash === $this->hash) {
+					continue;
+				}
+
+				wp_delete_term($term_id, $taxonomy);
+				$this->console_log("Removed term ID: {$term_id} from taxonomy: {$taxonomy}");
 			}
-	
-			wp_delete_term($term_id, $taxonomy);
-			$this->console_log("Removed term ID: {$term_id} from taxonomy: {$taxonomy}");
 		}
 	}
 	
@@ -1124,34 +1434,41 @@ class Tapgoods_Connection {
 	
 	public function remove_unused_terms($taxonomy) {
 		$this->console_log("Starting cleanup for unused terms in taxonomy: $taxonomy");
-	
-		// Fetch all terms in the taxonomy.
-		$terms = get_terms([
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false, // Include terms even if they're not assigned to posts.
-		]);
-	
-		if (is_wp_error($terms)) {
-			$this->console_log("Error fetching terms for taxonomy: $taxonomy - " . $terms->get_error_message());
-			return;
-		}
-	
-		foreach ($terms as $term) {
-			// Check if the term is assigned to any posts.
-			$term_count = $term->count;
-	
-			if ($term_count === 0) {
-				// Delete the term if it has no assignments.
-				$deleted = wp_delete_term($term->term_id, $taxonomy);
-	
-				if (is_wp_error($deleted)) {
-					$this->console_log("Error deleting term ID: {$term->term_id} - " . $deleted->get_error_message());
-				} else {
-					$this->console_log("Deleted unused term ID: {$term->term_id}, name: {$term->name}");
+
+		// Read the full ID list without priming caches (no oversized IN()), then
+		// load the term objects (which carry the post-count) a chunk at a time.
+		// The old single get_terms() over ~4000 terms produced the "KILLED QUERY"
+		// on the failing site; chunking caps every query's IN() at TERM_CHUNK_SIZE.
+		$term_ids = $this->get_term_ids_for_taxonomy($taxonomy);
+
+		foreach (self::tapgrein_chunk_ids($term_ids) as $chunk) {
+			$terms = get_terms([
+				'taxonomy'               => $taxonomy,
+				'hide_empty'             => false, // Include terms even if they're not assigned to posts.
+				'include'                => $chunk,
+				'update_term_meta_cache' => false,
+			]);
+
+			if (is_wp_error($terms)) {
+				$this->console_log("Error fetching terms for taxonomy: $taxonomy - " . $terms->get_error_message());
+				continue;
+			}
+
+			foreach ($terms as $term) {
+				// Check if the term is assigned to any posts.
+				if (0 === (int) $term->count) {
+					// Delete the term if it has no assignments.
+					$deleted = wp_delete_term($term->term_id, $taxonomy);
+
+					if (is_wp_error($deleted)) {
+						$this->console_log("Error deleting term ID: {$term->term_id} - " . $deleted->get_error_message());
+					} else {
+						$this->console_log("Deleted unused term ID: {$term->term_id}, name: {$term->name}");
+					}
 				}
 			}
 		}
-	
+
 		$this->console_log("Finished cleanup for taxonomy: $taxonomy");
 	}
 	
@@ -1307,37 +1624,44 @@ class Tapgoods_Connection {
 	}
 
 
+	/**
+	 * Cron entry point (fired via the unauthenticated admin-ajax self-ping).
+	 *
+	 * Delegates entirely to sync_inventory_in_batches(), which owns the execution
+	 * mutex and the state machine. Crucially, the category/tag pass now happens
+	 * INSIDE that guarded slice (as the cursor's one-shot categories step), so it
+	 * can no longer run concurrently with, or on top of, an in-flight run started
+	 * by the manual "Sync Now" button. Previously this method ran
+	 * sync_categories_from_api() directly, unguarded, before the lock existed.
+	 *
+	 * @return array Result envelope from the bounded slice.
+	 */
 	public function sync_from_api() {
 		$this->console_log('Starting full sync');
-	
-		// Sync categories and tags
-		$categories_result = $this->sync_categories_from_api();
-	//	$this->console_log('Categories sync result: ' . print_r($categories_result, true));
-	
-		// Sync inventory
-		$inventory_result = $this->sync_inventory_in_batches(false);
-	//	$this->console_log('Inventory sync result: ' . print_r($inventory_result, true));
-	
-		return array(
-			'success' => true,
-			'message' => 'Sync completed successfully.',
-		);
+		return $this->sync_inventory_in_batches(false);
 	}
 	
 	public function sync_inventory_item($item) {
 		try {
 			$existing_item_by_id = $this->get_existing_inventory_item_by_tg_id($item['id']);
-			
+
 			if ($existing_item_by_id) {
 				$this->console_log('Updating item with tg_id: ' . $item['id'] . ' (' . $item['name'] . ')');
-				$this->update_inventory_item($existing_item_by_id->ID, $item);
+				$post_id = $existing_item_by_id->ID;
+				$this->update_inventory_item($post_id, $item);
 			} else {
 				$this->console_log('Inserting new item: ' . $item['name']);
-				$this->tapgrein_insert_inventory($item);
+				$post_id = $this->tapgrein_insert_inventory($item);
 			}
-	
-			// Assign categories and tags to the item.
-			$this->tapgrein_assign_terms($existing_item_by_id ? $existing_item_by_id->ID : $item['id']);
+
+			// Assign categories and tags to the item using the real WP post ID.
+			// (Previously a newly-inserted item was passed its tg_id here, so its
+			// terms were never assigned during item sync and depended on a separate
+			// re-assignment pass. Categories are now synced before paging, so this
+			// per-item assignment is sufficient for both new and existing items.)
+			if ($post_id) {
+				$this->tapgrein_assign_terms($post_id);
+			}
 		} catch (Exception $e) {
 			$this->console_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
 		}
@@ -1563,7 +1887,6 @@ class Tapgoods_Connection {
 	public function clear_sync_errors() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'You do not have permission to perform this action.' );
-			return;
 		}
 
 		check_ajax_referer( 'tapgrein_sync_nonce', 'nonce' );
