@@ -88,6 +88,37 @@ class Tapgoods_Sync_State {
 			'last_error'      => null, // last_sync_error_timestamp.
 			'error_message'   => '',
 			'last_duration'   => null,
+			// Resumable paging cursor. Persisted so a bounded-per-request sync can
+			// checkpoint its position and the next cron tick resumes from here
+			// instead of restarting at page 1. See self::cursor_defaults().
+			'cursor'          => self::cursor_defaults(),
+		);
+	}
+
+	/**
+	 * Default shape of the resumable paging cursor.
+	 *
+	 *  - location_ids:    ordered list of location IDs captured when the run began.
+	 *  - location_index:  index into location_ids currently being paged.
+	 *  - next_page:       next 1-based page to fetch for that location.
+	 *  - synced_ids:      tg_ids written so far this run (durable across ticks so
+	 *                     removals only reconcile once a FULL pass is confirmed).
+	 *  - total_items:     running count of items written this run.
+	 *  - categories_done: whether the one-shot category/tag pass has run.
+	 *  - phase:           'paging' while walking locations, 'finalize' once every
+	 *                     location/page is done (cleanup + reconciliation).
+	 *
+	 * @return array
+	 */
+	public static function cursor_defaults() {
+		return array(
+			'location_ids'    => array(),
+			'location_index'  => 0,
+			'next_page'       => 1,
+			'synced_ids'      => array(),
+			'total_items'     => 0,
+			'categories_done' => false,
+			'phase'           => 'paging',
 		);
 	}
 
@@ -96,7 +127,16 @@ class Tapgoods_Sync_State {
 		if ( ! is_array( $stored ) ) {
 			$stored = array();
 		}
-		return array_merge( self::defaults(), $stored );
+		$data = array_merge( self::defaults(), $stored );
+
+		// array_merge is shallow: make sure a stored cursor missing some keys
+		// (e.g. saved by an older plugin version) still has the full shape.
+		$data['cursor'] = array_merge(
+			self::cursor_defaults(),
+			( isset( $data['cursor'] ) && is_array( $data['cursor'] ) ) ? $data['cursor'] : array()
+		);
+
+		return $data;
 	}
 
 	private function save() {
@@ -121,8 +161,61 @@ class Tapgoods_Sync_State {
 		$this->data['total_pages']     = max( 0, (int) $total_pages );
 		$this->data['pages_completed'] = 0;
 		$this->data['started_at']      = $this->now();
+		// A fresh run starts from a clean cursor.
+		$this->data['cursor'] = self::cursor_defaults();
 		$this->save();
 		return $this;
+	}
+
+	// --- Resumable paging cursor --------------------------------------------
+
+	/**
+	 * Seed the cursor for a new run with the ordered list of location IDs to page.
+	 *
+	 * @param array $location_ids Location IDs to page through, in order.
+	 * @return $this
+	 */
+	public function init_cursor( $location_ids ) {
+		$cursor                 = self::cursor_defaults();
+		$cursor['location_ids'] = array_values( array_map( 'strval', (array) $location_ids ) );
+		$this->data['cursor']   = $cursor;
+		$this->save();
+		return $this;
+	}
+
+	/**
+	 * Current paging cursor (always full-shaped).
+	 *
+	 * @return array
+	 */
+	public function get_cursor() {
+		return array_merge( self::cursor_defaults(), (array) $this->data['cursor'] );
+	}
+
+	/**
+	 * Persist an updated cursor (checkpoint). Refreshes updated_at so a healthy
+	 * long run never trips the stale timeout while it is making progress.
+	 *
+	 * @param array $cursor Cursor payload (merged over the defaults).
+	 * @return $this
+	 */
+	public function save_cursor( array $cursor ) {
+		$this->data['cursor'] = array_merge( self::cursor_defaults(), $cursor );
+		$this->save();
+		return $this;
+	}
+
+	/**
+	 * Whether the cursor still has locations/pages left to fetch.
+	 *
+	 * @return bool
+	 */
+	public function cursor_has_remaining_paging() {
+		$cursor = $this->get_cursor();
+		if ( 'paging' !== $cursor['phase'] ) {
+			return false;
+		}
+		return (int) $cursor['location_index'] < count( $cursor['location_ids'] );
 	}
 
 	/**
@@ -173,6 +266,9 @@ class Tapgoods_Sync_State {
 		$this->data['last_success']  = $now;
 		$this->data['failure_count'] = 0;
 		$this->data['error_message'] = '';
+		// The run is done: drop the (potentially large) resumable cursor so the
+		// persisted option does not carry a stale synced-id set around.
+		$this->data['cursor'] = self::cursor_defaults();
 		$this->save();
 		return $this;
 	}
@@ -255,10 +351,16 @@ class Tapgoods_Sync_State {
 		if ( ! in_array( $this->data['state'], array( self::STATE_PREP, self::STATE_ACTIVE ), true ) ) {
 			return false;
 		}
-		if ( empty( $this->data['started_at'] ) ) {
+		// Measure staleness from the last checkpoint, not the run's start: a
+		// resumable sync legitimately spans many cron ticks, and each bounded
+		// slice refreshes updated_at. Only a run that stopped making progress
+		// (crashed / externally killed with no resume) goes stale and frees the
+		// lock. Fall back to started_at for pre-cursor state payloads.
+		$last_progress = ! empty( $this->data['updated_at'] ) ? (int) $this->data['updated_at'] : (int) $this->data['started_at'];
+		if ( empty( $last_progress ) ) {
 			return false;
 		}
-		return ( $this->now() - (int) $this->data['started_at'] ) > self::STALE_AFTER;
+		return ( $this->now() - $last_progress ) > self::STALE_AFTER;
 	}
 
 	/**

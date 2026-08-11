@@ -46,6 +46,24 @@ if ( ! function_exists( 'tapgrein_getenv_docker' ) ) {
 	}
 }
 
+// wpdb output-format constant used by $wpdb->get_results() calls.
+if ( ! defined( 'ARRAY_A' ) ) {
+	define( 'ARRAY_A', 'ARRAY_A' );
+}
+
+// Minimal global WP_Query stub. Several Tapgoods_Connection lookups build a
+// `new WP_Query( ... )`; the isolated suite has no WordPress, so provide a stub
+// that simply reports no matches (tests that need matches can set ->posts).
+if ( ! class_exists( 'WP_Query' ) ) {
+	class WP_Query {
+		public $posts = array();
+		public function __construct( $args = array() ) {}
+		public function have_posts() {
+			return ! empty( $this->posts );
+		}
+	}
+}
+
 // Source files that are safe to load up-front (class/function definitions only,
 // no WordPress calls executed at include time).
 $plugin_dir = dirname( __DIR__ );

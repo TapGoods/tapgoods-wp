@@ -170,16 +170,21 @@ final class SyncFlowTest extends WP_UnitTestCase {
 			$this->assertLessThanOrEqual( Tapgoods_Sync_Log::MAX_LINE_LENGTH + 20, strlen( $line ) );
 		}
 
-		// A run that came in through sync_from_api() syncs categories twice; the
-		// pass labels are what make that visible.
-		$this->assertStringContainsString( 'pass=pre_inventory', $contents );
-		$this->assertStringContainsString( 'pass=post_inventory', $contents );
+		// Categories now sync exactly once per run: a single one-shot pass inside
+		// the bounded slice (the cursor's categories_done step), replacing the old
+		// pre-inventory + post-inventory double pass.
+		$this->assertStringContainsString( 'sync.categories.start', $contents );
+		$this->assertStringNotContainsString( 'pass=pre_inventory', $contents );
+		$this->assertStringNotContainsString( 'pass=post_inventory', $contents );
 	}
 
 	public function test_a_refused_concurrent_run_is_recorded() {
-		// Park the state machine in ACTIVE: the next run must refuse and say so,
-		// which is the case that used to leave no trace at all.
+		// The concurrency guard is now the execution mutex (a transient), and the
+		// ACTIVE state + cursor is the durable "work remains" marker. Hold the lock
+		// (and park the state ACTIVE so the run has an age to report): the next run
+		// must refuse and say so, which is the case that used to leave no trace.
 		Tapgoods_Sync_State::get_instance()->begin_prep( 3 )->mark_active();
+		set_transient( Tapgoods_Connection::RUN_LOCK, time(), Tapgoods_Connection::RUN_LOCK_TTL );
 
 		$result = $this->connection()->sync_inventory_in_batches( false, 'cron_daily' );
 
@@ -187,10 +192,12 @@ final class SyncFlowTest extends WP_UnitTestCase {
 
 		$contents = $this->sync_log_contents();
 		$this->assertStringContainsString( 'sync.run.locked', $contents );
-		$this->assertStringContainsString( 'reason=already_running', $contents );
+		$this->assertStringContainsString( 'reason=lock_held', $contents );
 		$this->assertStringContainsString( 'trigger=cron_daily', $contents );
 		$this->assertStringContainsString( 'result=skipped', $contents );
 		$this->assertMatchesRegularExpression( '/sync\.run\.locked .*age_s=\d+/', $contents );
+
+		delete_transient( Tapgoods_Connection::RUN_LOCK );
 	}
 
 	/**

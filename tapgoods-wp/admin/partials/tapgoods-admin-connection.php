@@ -146,7 +146,7 @@ if ( $connected ) :
             <span class="spinner-border spinner-border-lg text-primary" role="status" aria-hidden="true"></span>
         </div>
         <h2>Synchronization in Progress</h2>
-        <p>Please wait while we sync your inventory and locations from TapGoods. This process may take several minutes depending on the amount of data.</p>
+        <p>We're syncing your inventory and locations from TapGoods. This runs one batch now and then continues automatically in the background, so large catalogs keep syncing after this window closes.</p>
         <div class="sync-details">
             <p><strong>What we're doing:</strong></p>
             <ul>
@@ -156,7 +156,7 @@ if ( $connected ) :
                 <li>✓ Processing images and metadata</li>
             </ul>
         </div>
-        <p class="sync-warning"><strong>Important:</strong> Please do not close this window or navigate away until synchronization is complete.</p>
+        <p class="sync-warning"><strong>Good to know:</strong> You can safely leave this page. The sync continues in the background and its progress is shown under "Sync Status" below.</p>
         <div id="syncProgressStatus" class="sync-status">
             <p>Initializing synchronization...</p>
         </div>
