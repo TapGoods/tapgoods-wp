@@ -95,5 +95,14 @@ final class SyncResumeTest extends WP_UnitTestCase {
 		}
 		sort( $ids );
 		$this->assertSame( array( '11001', '11002' ), $ids );
+
+		// The bounded, resumable categories pass must have materialised the fixture
+		// terms and survived the deferred obsolete-term reconciliation (which only
+		// runs once every location's categories are collected, against the FULL
+		// valid-id set). A premature reconciliation on a partial pass would have
+		// deleted these before the run finished.
+		$this->assertNotFalse( get_term_by( 'slug', 'tables', 'tg_category' ), 'The "tables" category must survive the resumable run.' );
+		$this->assertNotFalse( get_term_by( 'slug', 'chairs', 'tg_category' ), 'The "chairs" category must survive the resumable run.' );
+		$this->assertNotFalse( get_term_by( 'slug', 'tag-round-tables', 'tg_tags' ), 'A sub-category tag must survive the resumable run.' );
 	}
 }

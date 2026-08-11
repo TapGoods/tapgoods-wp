@@ -520,11 +520,12 @@ class Tapgoods_Connection {
 	/**
 	 * Process one bounded slice of the current run and checkpoint.
 	 *
-	 * Walks the resumable cursor: an optional one-shot category/tag pass, then
-	 * paging through locations (writing items + assigning their terms), then a
-	 * finalize phase (cleanup + removal reconciliation) once every location is
-	 * done. Returns as soon as the per-request budget is spent, leaving the run
-	 * resumable, or drives the state machine to COMPLETED when everything is done.
+	 * Walks the resumable cursor: a bounded category/tag pass (one location per
+	 * iteration, checkpointed), then paging through locations (writing items +
+	 * assigning their terms), then a finalize phase (cleanup + removal
+	 * reconciliation) once every location is done. Returns as soon as the
+	 * per-request budget is spent, leaving the run resumable, or drives the state
+	 * machine to COMPLETED when everything is done.
 	 *
 	 * @param Tapgoods_Sync_State $state The sync state machine.
 	 * @return array Result envelope for the caller.
@@ -545,12 +546,61 @@ class Tapgoods_Connection {
 		$cursor = $state->get_cursor();
 
 		try {
-			// One-shot category/tag pass, up front, so terms exist before items
-			// are paged and each item's own tapgrein_assign_terms() can find them.
+			// CATEGORIES PHASE: bounded and resumable, mirroring the paging loop.
+			// Terms are synced up front so they exist before items are paged and each
+			// item's own tapgrein_assign_terms() can find them. A large business has
+			// thousands of categories/tags across ~18 locations; doing them all in one
+			// request is what stalled sync on a request-time-limited host (WPB-165), so
+			// each location is done in isolation and checkpointed. Obsolete-term
+			// reconciliation runs ONLY after every location's categories are collected
+			// (the FULL accumulated valid-id set), never on a partial pass.
 			if (empty($cursor['categories_done'])) {
-				$this->sync_categories_from_api();
+				$location_ids = $cursor['location_ids'];
+				$cat_idx      = (int) $cursor['cat_location_index'];
+
+				// Announce the categories phase exactly once, when it first begins.
+				if (0 === $cat_idx) {
+					$log->info('sync.categories.start', array('pass' => 'sliced', 'locations' => count($location_ids)));
+				}
+
+				while ($cat_idx < count($location_ids)) {
+					$lid         = $location_ids[$cat_idx];
+					$cat_started = microtime(true);
+					$touched     = $this->sync_categories_for_location($lid);
+
+					if (! $touched['ok']) {
+						$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => 'sliced', 'status' => $this->client_http_status($client)));
+					} else {
+						// Accumulate this location's valid ids into the durable cursor so
+						// the eventual reconciliation sees the FULL set across every slice.
+						$cursor['valid_category_ids'] = array_values(array_unique(array_merge((array) $cursor['valid_category_ids'], $touched['category_ids'])));
+						$cursor['valid_tag_ids']      = array_values(array_unique(array_merge((array) $cursor['valid_tag_ids'], $touched['tag_ids'])));
+					}
+
+					++$cat_idx;
+					$cursor['cat_location_index'] = $cat_idx;
+					$state->save_cursor($cursor); // Checkpoint after each location.
+
+					if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+						// Budget spent mid-categories: resume at cat_location_index next
+						// tick. Do NOT set categories_done and do NOT reconcile removals.
+						$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+						$this->active_run = false;
+						return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+					}
+				}
+
+				// Every location's categories are collected: NOW it is safe to reconcile
+				// obsolete terms against the FULL accumulated valid-id set. Doing this on
+				// a partial set would delete a not-yet-processed location's terms and
+				// re-add them next slice (churn + transient storefront 404s).
+				$this->remove_obsolete_terms('tg_category', $cursor['valid_category_ids']);
+				$this->remove_obsolete_terms('tg_tags', $cursor['valid_tag_ids']);
+
 				$cursor['categories_done'] = true;
 				$state->save_cursor($cursor);
+
+				$log->info('sync.categories.done', array('pass' => 'sliced', 'ok' => 1, 'categories' => count($cursor['valid_category_ids']), 'tags' => count($cursor['valid_tag_ids'])));
 
 				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
 					$log->info('sync.checkpoint', array('after' => 'categories', 'phase' => $cursor['phase'], 'pages_this_slice' => $pages_this_run, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
@@ -1320,10 +1370,15 @@ class Tapgoods_Connection {
 	/**
 	 * Sync storefront categories (and their subcategories, as tags) from the API.
 	 *
-	 * @param string $pass Which pass this is, for the activity log. A run entered
-	 *                     through sync_from_api() does this twice per run
-	 *                     ('pre_inventory' then 'post_inventory'); the duplicated
-	 *                     work is pre-existing and belongs to WPB-165.
+	 * One-shot form kept for direct (non-sliced) callers: it loops every location
+	 * through sync_categories_for_location(), accumulates the touched term ids, and
+	 * only then reconciles obsolete terms against the FULL set. The bounded sync
+	 * slice does NOT call this method; it drives sync_categories_for_location() one
+	 * location at a time so the work can be checkpointed across cron ticks (see
+	 * run_sync_slice()). For a large, request-time-limited host this all-locations
+	 * form cannot finish in one request, which is exactly the WPB-165 stall.
+	 *
+	 * @param string $pass Which pass this is, for the activity log.
 	 * @return bool
 	 */
 	public function sync_categories_from_api($pass = 'standalone') {
@@ -1340,37 +1395,23 @@ class Tapgoods_Connection {
 			return false;
 		}
 
-		$valid_category_ids = [];
-		$valid_tag_ids = [];
+		$valid_category_ids = array();
+		$valid_tag_ids = array();
 
 		foreach ($location_ids as $lid) {
-			$categories = $client->get_categories_from_graph($lid);
+			$touched = $this->sync_categories_for_location($lid);
 
-			if (false === $categories || is_wp_error($categories)) {
+			if (! $touched['ok']) {
 				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass, 'status' => $this->client_http_status($client)));
 				continue;
 			}
 
-			foreach ($categories as $category) {
-				$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
-				if ($category_term_id) {
-					$valid_category_ids[] = $category_term_id;
-
-					// Process subcategories as tags and link them to their parent category
-					if (!empty($category['sfSubCategories'])) {
-						foreach ($category['sfSubCategories'] as $tag) {
-							// Pass the parent category term ID to establish the relationship
-							$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
-							if ($tag_term_id) {
-								$valid_tag_ids[] = $tag_term_id;
-							}
-						}
-					}
-				}
-			}
+			$valid_category_ids = array_merge($valid_category_ids, $touched['category_ids']);
+			$valid_tag_ids      = array_merge($valid_tag_ids, $touched['tag_ids']);
 		}
-	
-		// Remove obsolete terms.
+
+		// Remove obsolete terms. Safe here because every location has been collected,
+		// so this reconciles against the FULL valid-id set (never a partial pass).
 		$this->remove_obsolete_terms('tg_category', $valid_category_ids);
 		$this->remove_obsolete_terms('tg_tags', $valid_tag_ids);
 
@@ -1385,6 +1426,61 @@ class Tapgoods_Connection {
 			)
 		);
 		return true;
+	}
+
+	/**
+	 * Sync ONE location's storefront categories (and their subcategories, as tags).
+	 *
+	 * Extracted from sync_categories_from_api() so the bounded sync slice can
+	 * process a single location per request and checkpoint between locations
+	 * (WPB-165: the one-shot all-locations pass could not finish inside a single
+	 * request on a request-time-limited host, so paging never started). It upserts
+	 * each category as a tg_category term and every sfSubCategories entry as a
+	 * tg_tags term linked to its parent, and returns the term ids it touched so the
+	 * caller can accumulate a full valid-id set before reconciling obsolete terms.
+	 *
+	 * DELETION SAFETY: this method deliberately does NOT remove obsolete terms.
+	 * Removal must run only once EVERY location has been collected (the full
+	 * accumulated valid-id set), never on this one location's partial set, or a
+	 * not-yet-processed location's terms would be deleted and re-added next slice.
+	 *
+	 * @param int|string $lid Location id.
+	 * @return array {
+	 *     @type bool  $ok           Whether the location's categories were fetched.
+	 *     @type int[] $category_ids tg_category term ids upserted for this location.
+	 *     @type int[] $tag_ids      tg_tags term ids upserted for this location.
+	 * }
+	 */
+	public function sync_categories_for_location($lid) {
+		$client     = $this->get_connection();
+		$categories = $client->get_categories_from_graph($lid);
+
+		if (false === $categories || is_wp_error($categories)) {
+			return array('ok' => false, 'category_ids' => array(), 'tag_ids' => array());
+		}
+
+		$category_ids = array();
+		$tag_ids      = array();
+
+		foreach ($categories as $category) {
+			$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
+			if ($category_term_id) {
+				$category_ids[] = $category_term_id;
+
+				// Process subcategories as tags and link them to their parent category
+				if (!empty($category['sfSubCategories'])) {
+					foreach ($category['sfSubCategories'] as $tag) {
+						// Pass the parent category term ID to establish the relationship
+						$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
+						if ($tag_term_id) {
+							$tag_ids[] = $tag_term_id;
+						}
+					}
+				}
+			}
+		}
+
+		return array('ok' => true, 'category_ids' => $category_ids, 'tag_ids' => $tag_ids);
 	}
 	
 	

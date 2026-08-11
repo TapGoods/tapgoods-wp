@@ -101,24 +101,35 @@ class Tapgoods_Sync_State {
 	 *  - location_ids:    ordered list of location IDs captured when the run began.
 	 *  - location_index:  index into location_ids currently being paged.
 	 *  - next_page:       next 1-based page to fetch for that location.
-	 *  - synced_ids:      tg_ids written so far this run (durable across ticks so
-	 *                     removals only reconcile once a FULL pass is confirmed).
-	 *  - total_items:     running count of items written this run.
-	 *  - categories_done: whether the one-shot category/tag pass has run.
-	 *  - phase:           'paging' while walking locations, 'finalize' once every
-	 *                     location/page is done (cleanup + reconciliation).
+	 *  - synced_ids:         tg_ids written so far this run (durable across ticks so
+	 *                        removals only reconcile once a FULL pass is confirmed).
+	 *  - total_items:        running count of items written this run.
+	 *  - categories_done:    whether the (now bounded/resumable) category/tag pass has
+	 *                        finished for EVERY location.
+	 *  - cat_location_index: how many of location_ids have had their categories synced
+	 *                        (the resume point for the bounded categories loop, mirroring
+	 *                        location_index for paging).
+	 *  - valid_category_ids: tg_category term ids upserted so far this run (durable across
+	 *                        ticks so obsolete-term reconciliation only runs once against
+	 *                        the FULL set, never on a partial pass).
+	 *  - valid_tag_ids:      tg_tags term ids upserted so far this run (same rationale).
+	 *  - phase:              'paging' while walking locations, 'finalize' once every
+	 *                        location/page is done (cleanup + reconciliation).
 	 *
 	 * @return array
 	 */
 	public static function cursor_defaults() {
 		return array(
-			'location_ids'    => array(),
-			'location_index'  => 0,
-			'next_page'       => 1,
-			'synced_ids'      => array(),
-			'total_items'     => 0,
-			'categories_done' => false,
-			'phase'           => 'paging',
+			'location_ids'       => array(),
+			'location_index'     => 0,
+			'next_page'          => 1,
+			'synced_ids'         => array(),
+			'total_items'        => 0,
+			'categories_done'    => false,
+			'cat_location_index' => 0,
+			'valid_category_ids' => array(),
+			'valid_tag_ids'      => array(),
+			'phase'              => 'paging',
 		);
 	}
 
