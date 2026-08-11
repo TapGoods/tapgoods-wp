@@ -106,6 +106,14 @@ final class ConnectionSyncSliceTest extends TestCase {
 		$this->assertCount( 2, Tapgoods_Connection::tapgrein_chunk_ids( range( 1, 4 ), 2 ) );
 	}
 
+	public function test_sync_page_size_is_conservative_by_default() {
+		// Smaller pages keep each getInventories call under the HTTP timeout / host
+		// request limit on a slow API or large catalog (WPB-165).
+		$this->assertSame( Tapgoods_Connection::SYNC_PAGE_SIZE, Tapgoods_Connection::sync_page_size() );
+		$this->assertGreaterThan( 0, Tapgoods_Connection::sync_page_size() );
+		$this->assertLessThanOrEqual( 50, Tapgoods_Connection::sync_page_size(), 'Page size must not exceed the old default of 50.' );
+	}
+
 	public function test_remove_unused_terms_never_queries_more_than_the_cap() {
 		// A taxonomy with 400 terms would previously load them in a single
 		// "... WHERE term_id IN (<400 ids>)" query (the WPB-165 KILLED QUERY).

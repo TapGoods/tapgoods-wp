@@ -45,6 +45,13 @@ class Tapgoods_Connection {
 	/** Default hard cap on pages fetched per slice (belt-and-braces with the clock). */
 	const SYNC_MAX_PAGES_PER_RUN = 25;
 
+	/**
+	 * Items requested per getInventories call. Smaller pages come back faster and
+	 * are far less likely to exceed the HTTP timeout or the host's request limit on
+	 * a slow API / large catalog (see WPB-165). Overridable via TG_SYNC_PAGE_SIZE.
+	 */
+	const SYNC_PAGE_SIZE = 25;
+
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
 			$key = $this->get_key();
@@ -465,7 +472,7 @@ class Tapgoods_Connection {
 					$log->info('sync.prep.locations', array('count' => count($location_ids)));
 
 					$prep_started = microtime(true);
-					$total_pages  = $this->compute_total_sync_pages($client, $location_ids, 50);
+					$total_pages  = $this->compute_total_sync_pages($client, $location_ids, self::sync_page_size());
 					$state->set_total_pages($total_pages);
 					$state->init_cursor($location_ids);
 					$log->info('sync.prep.pages', array('total_pages' => $total_pages, 'elapsed_ms' => self::elapsed_ms($prep_started)));
@@ -525,7 +532,7 @@ class Tapgoods_Connection {
 	private function run_sync_slice($state) {
 		$log            = $this->sync_log();
 		$client         = $this->get_connection();
-		$batch_size     = 50;
+		$batch_size     = self::sync_page_size();
 		$start_time     = current_time('timestamp');
 		$slice_started  = microtime(true);
 		$pages_this_run = 0;
@@ -728,6 +735,18 @@ class Tapgoods_Connection {
 			return (int) TG_SYNC_MAX_PAGES;
 		}
 		return self::SYNC_MAX_PAGES_PER_RUN;
+	}
+
+	/**
+	 * Items requested per getInventories page. Overridable via TG_SYNC_PAGE_SIZE.
+	 *
+	 * @return int
+	 */
+	public static function sync_page_size() {
+		if (defined('TG_SYNC_PAGE_SIZE') && (int) TG_SYNC_PAGE_SIZE > 0) {
+			return (int) TG_SYNC_PAGE_SIZE;
+		}
+		return self::SYNC_PAGE_SIZE;
 	}
 
 	/**

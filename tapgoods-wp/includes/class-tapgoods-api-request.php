@@ -124,7 +124,10 @@ class Tapgoods_API_Request {
 
 		$args = array_merge_recursive(
 			array(
-				'timeout'     => '10',
+				// The TapGoods API can take several seconds per getInventories page on
+				// large catalogs; 10s was too tight and surfaced as "URL failed to
+				// respond" (WPB-165). Default 30s, overridable via TG_HTTP_TIMEOUT.
+				'timeout'     => (string) ( defined( 'TG_HTTP_TIMEOUT' ) ? (int) TG_HTTP_TIMEOUT : 30 ),
 				'redirection' => '3',
 				'httpversion' => '1.1',
 				'blocking'    => true,
