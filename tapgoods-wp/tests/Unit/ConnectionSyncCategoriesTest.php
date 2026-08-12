@@ -1,6 +1,6 @@
 <?php
 /**
- * Unit tests for the BOUNDED, RESUMABLE categories/tags pass added to
+ * Unit tests for the BOUNDED, RESUMABLE categories/tags pass in
  * Tapgoods_Connection::run_sync_slice() (WPB-165 sync-stuck fix).
  *
  * Root cause fixed here: the old one-shot sync_categories_from_api() looped every
@@ -9,16 +9,18 @@
  * killed before categories_done was ever set, so paging never began and every
  * cron tick redid categories and was killed again (0/N forever).
  *
- * The fix mirrors the existing bounded paging loop: one location's categories per
- * iteration, checkpointed into the cursor, with obsolete-term reconciliation
- * deferred until EVERY location has been collected (the full valid-id set).
+ * The fix mirrors the bounded paging loop at TWO granularities:
+ *   - across locations (cat_location_index), and
+ *   - WITHIN a location (cat_item_index): categories are upserted in bounded
+ *     batches and checkpointed, so one large location can no longer exceed the
+ *     request window before its first checkpoint.
+ * Obsolete-term reconciliation is deferred until EVERY location has been collected
+ * (the full accumulated valid-id set), never on a partial pass.
  *
  * These tests drive the private run_sync_slice() via reflection against a probe
- * (an anonymous subclass built once the parent class is loaded) that stubs the
- * term-DB seams (sync_categories_for_location(), remove_obsolete_terms(),
- * finalize) so the loop's orchestration is asserted in isolation, exactly as the
- * WPB-165 fingerprint requires:
- *   - categories resume across slices at the right cat_location_index,
+ * (an anonymous subclass) that stubs the term-DB seams so the loop's orchestration
+ * is asserted in isolation:
+ *   - categories resume across slices at the right cat_location_index / cat_item_index,
  *   - categories_done is set only after all locations,
  *   - obsolete-term removal runs once, with the full id set, never on a partial pass,
  *   - paging does not start until categories are done.
@@ -125,7 +127,8 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 	/**
 	 * A minimal fake API client. Records inventory-paging calls so a test can prove
-	 * paging never started while categories were still in progress.
+	 * paging never started while categories were still in progress. Category lists
+	 * are served by the probe's get_location_categories_cached() override, not here.
 	 */
 	private function make_client() {
 		return new class() {
@@ -136,7 +139,7 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 				return array( 5001, 5002, 5003 );
 			}
 			public function get_categories_from_graph( $lid, $keyword = false ) {
-				return array(); // Unused: the probe overrides sync_categories_for_location().
+				return array();
 			}
 			public function get_inventories_from_graph( $lid, $page = 1, $size = 25 ) {
 				++$this->inv_calls;
@@ -151,20 +154,36 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	}
 
 	/**
+	 * Build a simple category record: id + name/slug and optional sub-tag ids.
+	 *
+	 * @param int   $id       Category tg_id (also the term id the probe returns).
+	 * @param int[] $sub_ids  Sub-category tg_ids (become tg_tags).
+	 * @return array
+	 */
+	private function cat( $id, array $sub_ids = array() ) {
+		$subs = array();
+		foreach ( $sub_ids as $sid ) {
+			$subs[] = array( 'id' => $sid, 'name' => "T$sid", 'slug' => "t$sid" );
+		}
+		return array( 'id' => $id, 'name' => "C$id", 'slug' => "c$id", 'sfSubCategories' => $subs );
+	}
+
+	/**
 	 * Build a probe: an anonymous subclass of Tapgoods_Connection that stubs the
-	 * term-DB seams the categories loop depends on, so the loop's control flow is
-	 * testable without WordPress terms. The parent constructor is private; this
-	 * child defines its own and never calls it, which is enough because
-	 * run_sync_slice() only uses the properties/methods exercised here.
+	 * term-DB seams the categories loop depends on. get_location_categories_cached()
+	 * serves canned lists and tg_insert_or_update_term() returns the record's tg_id
+	 * (advancing the fake clock per upsert), so the REAL bounded-batch loop
+	 * (upsert_category_batch + run_sync_slice) is exercised without WordPress.
 	 */
 	private function make_probe( $client ) {
 		$this->inject_client( $client );
 
 		$probe         = new class( $this->clock ) extends Tapgoods_Connection {
 			public $clock;
-			public $advance = 0;                // seconds added per per-location call.
-			public $canned  = array();          // lid => {ok, category_ids, tag_ids}.
-			public $cat_calls      = array();   // lids passed, in order.
+			public $advance = 0;                // seconds added per term upsert.
+			public $lists   = array();          // lid(string) => array|false category list.
+			public $fetched = array();          // lids passed to get_location_categories_cached.
+			public $upserts = array();          // [{tax, id}] upsert calls, in order.
 			public $obsolete_calls = array();   // [{taxonomy, ids}].
 			public $client;                     // fake client (for inv_calls).
 
@@ -173,12 +192,19 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 				$this->clock = $clock;
 			}
 
-			public function sync_categories_for_location( $lid ) {
-				$this->cat_calls[] = $lid;
-				$this->clock->t   += $this->advance;
-				return isset( $this->canned[ $lid ] )
-					? $this->canned[ $lid ]
-					: array( 'ok' => true, 'category_ids' => array(), 'tag_ids' => array() );
+			public function get_location_categories_cached( $lid ) {
+				$this->fetched[] = (string) $lid;
+				$key             = (string) $lid;
+				if ( ! array_key_exists( $key, $this->lists ) ) {
+					return array();
+				}
+				return $this->lists[ $key ];
+			}
+			public function clear_location_categories_cache( $lid ) {}
+			public function tg_insert_or_update_term( $term, $tax, $parent = null ) {
+				$this->clock->t  += $this->advance;
+				$this->upserts[] = array( 'tax' => $tax, 'id' => $term['id'] );
+				return $term['id'];
 			}
 			public function remove_obsolete_terms( $taxonomy, $valid_ids ) {
 				$this->obsolete_calls[] = array(
@@ -206,7 +232,6 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	}
 
 	private function run_slice( $probe, Tapgoods_Sync_State $state ) {
-		// PHP 8.1+ needs no setAccessible() to invoke a private method by reflection.
 		$method = new ReflectionMethod( Tapgoods_Connection::class, 'run_sync_slice' );
 		return $method->invoke( $probe, $state );
 	}
@@ -218,21 +243,105 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		return $state;
 	}
 
+	/** category tg_ids upserted this run, in order. */
+	private function upsert_ids_for( $probe, $tax ) {
+		$ids = array();
+		foreach ( $probe->upserts as $u ) {
+			if ( $tax === $u['tax'] ) {
+				$ids[] = $u['id'];
+			}
+		}
+		return $ids;
+	}
+
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Budget spent after the FIRST location's categories: the slice must
-	 * checkpoint, leave categories_done false, NOT reconcile obsolete terms, and
-	 * NOT start paging. The next tick resumes at cat_location_index = 1.
+	 * upsert_category_batch() in isolation: it processes at most one budget's worth
+	 * of upserts, stops on a whole-category boundary, and reports the resume point.
+	 */
+	public function test_upsert_category_batch_is_bounded_and_reports_resume_point() {
+		$probe = $this->make_probe( $this->make_client() );
+
+		$categories = array(
+			$this->cat( 701 ),          // 1 upsert
+			$this->cat( 702, array( 811, 812 ) ), // 3 upserts (cat + 2 tags)
+			$this->cat( 703 ),          // 1 upsert
+			$this->cat( 704 ),          // 1 upsert
+		);
+
+		// Budget 2: category 701 (1) then category 702 (+3 => 4 >= 2) stops AFTER 702.
+		$batch = $probe->upsert_category_batch( $categories, 0, 2 );
+
+		$this->assertTrue( $batch['ok'] );
+		$this->assertFalse( $batch['done'], 'Two of four categories remain.' );
+		$this->assertSame( 2, $batch['next_index'], 'Resume at the third category.' );
+		$this->assertSame( array( 701, 702 ), $batch['category_ids'] );
+		$this->assertSame( array( 811, 812 ), $batch['tag_ids'] );
+
+		// Resume: the rest drains and reports done.
+		$rest = $probe->upsert_category_batch( $categories, $batch['next_index'], 2 );
+		$this->assertTrue( $rest['done'] );
+		$this->assertSame( 4, $rest['next_index'] );
+		$this->assertSame( array( 703, 704 ), $rest['category_ids'] );
+	}
+
+	/**
+	 * WITHIN-location checkpoint: one location whose categories exceed the slice
+	 * budget must checkpoint at a cat_item_index and NOT advance to the next
+	 * location, NOT set categories_done, NOT reconcile, NOT start paging. A second
+	 * (generous) slice resumes at that cat_item_index and finishes.
+	 */
+	public function test_large_location_checkpoints_within_itself_then_resumes() {
+		// 30 single-upsert categories; default batch (25) drains 25 per batch.
+		$big = array();
+		for ( $i = 1; $i <= 30; $i++ ) {
+			$big[] = $this->cat( 6000 + $i );
+		}
+
+		$probe1          = $this->make_probe( $this->make_client() );
+		$probe1->advance = 1; // 25 upserts => 25s, over the 18s budget.
+		$probe1->lists   = array( '6001' => $big );
+
+		$state  = $this->fresh_state( array( 6001 ) );
+		$result = $this->run_slice( $probe1, $state );
+
+		$this->assertTrue( ! empty( $result['in_progress'] ), 'A location too big for one slice hands off as in-progress.' );
+
+		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
+		$this->assertSame( 0, (int) $cursor['cat_location_index'], 'Still on the SAME location.' );
+		$this->assertSame( 25, (int) $cursor['cat_item_index'], 'Checkpointed a within-location position.' );
+		$this->assertFalse( $cursor['categories_done'], 'categories_done must NOT be set mid-location.' );
+		$this->assertCount( 25, $cursor['valid_category_ids'], 'Exactly one batch of ids accumulated so far.' );
+		$this->assertSame( array(), $probe1->obsolete_calls, 'No reconciliation on a partial pass.' );
+		$this->assertSame( 0, $probe1->client->inv_calls, 'Paging must not start until categories are done.' );
+
+		// Resume slice: generous budget, finishes the location + the whole run.
+		$probe2          = $this->make_probe( $this->make_client() );
+		$probe2->advance = 0;
+		$probe2->lists   = array( '6001' => $big );
+		$result2         = $this->run_slice( $probe2, Tapgoods_Sync_State::get_instance() );
+
+		$this->assertArrayNotHasKey( 'in_progress', $result2, 'The resumed slice completes the run.' );
+		// The resume must continue at index 25, upserting only the REMAINING 5.
+		$this->assertSame( 5, count( $probe2->upserts ), 'Resume processes only the 5 leftover categories.' );
+		// Reconciliation ran exactly once per taxonomy, only after the location finished.
+		$this->assertCount( 2, $probe2->obsolete_calls, 'Reconcile once per taxonomy, after the whole location is collected.' );
+		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
+	}
+
+	/**
+	 * Budget spent after the FIRST location's categories: the slice must checkpoint
+	 * at the next location, leave categories_done false, NOT reconcile obsolete
+	 * terms, and NOT start paging. The next tick resumes at cat_location_index = 1.
 	 */
 	public function test_categories_interrupt_defers_reconciliation_and_paging() {
-		$client         = $this->make_client();
-		$probe          = $this->make_probe( $client );
-		$probe->advance = 25; // each per-location call exceeds the 20s slice budget.
-		$probe->canned  = array(
-			'5001' => array( 'ok' => true, 'category_ids' => array( 701 ), 'tag_ids' => array( 801, 802 ) ),
-			'5002' => array( 'ok' => true, 'category_ids' => array( 703 ), 'tag_ids' => array() ),
-			'5003' => array( 'ok' => true, 'category_ids' => array( 704 ), 'tag_ids' => array( 805 ) ),
+		$probe          = $this->make_probe( $this->make_client() );
+		$probe->advance = 25; // each upsert exceeds the 18s slice budget on its own.
+		$probe->lists   = array(
+			'5001' => array( $this->cat( 701, array( 801, 802 ) ) ),
+			'5002' => array( $this->cat( 703 ) ),
+			'5003' => array( $this->cat( 704, array( 805 ) ) ),
 		);
 
 		$state  = $this->fresh_state( array( 5001, 5002, 5003 ) );
@@ -243,12 +352,13 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
 		$this->assertSame( 1, (int) $cursor['cat_location_index'], 'Only the first location was processed.' );
+		$this->assertSame( 0, (int) $cursor['cat_item_index'], 'Location boundary => within-location index reset.' );
 		$this->assertFalse( $cursor['categories_done'], 'categories_done must NOT be set on a partial pass.' );
 		$this->assertSame( array( 701 ), $cursor['valid_category_ids'], 'Only location 5001 category ids accumulated so far.' );
 		$this->assertSame( array( 801, 802 ), $cursor['valid_tag_ids'] );
 		$this->assertSame( 'paging', $cursor['phase'], 'Still in the paging phase (categories precede paging).' );
 
-		$this->assertSame( array( '5001' ), $probe->cat_calls, 'Exactly one location processed this slice.' );
+		$this->assertSame( array( '5001' ), $probe->fetched, 'Exactly one location processed this slice.' );
 		$this->assertSame( array(), $probe->obsolete_calls, 'Obsolete-term removal must NOT run on a partial pass.' );
 
 		$this->assertSame( 0, $probe->client->inv_calls, 'Paging must not start until categories are done.' );
@@ -263,12 +373,11 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	 * accumulated id set, set categories_done, then proceed to paging + complete.
 	 */
 	public function test_categories_resume_reconciles_once_with_full_set_then_pages() {
-		$client         = $this->make_client();
-		$probe          = $this->make_probe( $client );
+		$probe          = $this->make_probe( $this->make_client() );
 		$probe->advance = 0; // generous budget: the resumed slice finishes categories.
-		$probe->canned  = array(
-			'5002' => array( 'ok' => true, 'category_ids' => array( 703 ), 'tag_ids' => array() ),
-			'5003' => array( 'ok' => true, 'category_ids' => array( 704 ), 'tag_ids' => array( 805 ) ),
+		$probe->lists   = array(
+			'5002' => array( $this->cat( 703 ) ),
+			'5003' => array( $this->cat( 704, array( 805 ) ) ),
 		);
 
 		// Simulate "tick 1 already synced location 5001": seed the checkpoint.
@@ -285,7 +394,7 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertArrayNotHasKey( 'in_progress', $result, 'A generous slice completes the whole run.' );
 
 		// Resume continued at 5002/5003 and never reprocessed 5001.
-		$this->assertSame( array( '5002', '5003' ), $probe->cat_calls );
+		$this->assertSame( array( '5002', '5003' ), $probe->fetched );
 
 		// Reconciliation ran once per taxonomy, with the FULL accumulated set.
 		$this->assertCount( 2, $probe->obsolete_calls, 'Exactly one reconciliation per taxonomy.' );
@@ -302,24 +411,23 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	}
 
 	/**
-	 * A location whose categories fail to fetch (ok=false) is skipped: it must not
-	 * contribute ids, but cat_location_index must still advance so the pass cannot
-	 * loop forever on the failed location.
+	 * A location whose categories fail to fetch (list === false) is skipped: it must
+	 * not contribute ids, but cat_location_index must still advance so the pass
+	 * cannot loop forever on the failed location.
 	 */
 	public function test_failed_location_is_skipped_but_advances_the_index() {
-		$client         = $this->make_client();
-		$probe          = $this->make_probe( $client );
+		$probe          = $this->make_probe( $this->make_client() );
 		$probe->advance = 0;
-		$probe->canned  = array(
-			'5001' => array( 'ok' => true, 'category_ids' => array( 701 ), 'tag_ids' => array( 801 ) ),
-			'5002' => array( 'ok' => false, 'category_ids' => array(), 'tag_ids' => array() ),
-			'5003' => array( 'ok' => true, 'category_ids' => array( 704 ), 'tag_ids' => array() ),
+		$probe->lists   = array(
+			'5001' => array( $this->cat( 701, array( 801 ) ) ),
+			'5002' => false, // fetch failure.
+			'5003' => array( $this->cat( 704 ) ),
 		);
 
 		$state = $this->fresh_state( array( 5001, 5002, 5003 ) );
 		$this->run_slice( $probe, $state );
 
-		$this->assertSame( array( '5001', '5002', '5003' ), $probe->cat_calls, 'Every location was attempted, including the failed one.' );
+		$this->assertSame( array( '5001', '5002', '5003' ), $probe->fetched, 'Every location was attempted, including the failed one.' );
 
 		$by_tax = array();
 		foreach ( $probe->obsolete_calls as $call ) {
@@ -331,26 +439,35 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 	/**
 	 * The categories phase emits sync.categories.start exactly once (even though it
-	 * spans multiple slices), a sync.checkpoint stamped stage=categories when the
-	 * budget interrupts it, and sync.categories.done only when truly complete.
+	 * spans multiple slices AND is interrupted mid-location), a sync.checkpoint
+	 * stamped stage=categories when the budget interrupts it, and
+	 * sync.categories.done only when truly complete.
 	 */
 	public function test_category_lifecycle_log_events() {
-		// Slice 1: interrupt after the first location.
+		// A single big location, interrupted within itself on slice 1.
+		$big = array();
+		for ( $i = 1; $i <= 30; $i++ ) {
+			$big[] = $this->cat( 7000 + $i );
+		}
+
 		$probe1          = $this->make_probe( $this->make_client() );
-		$probe1->advance = 25;
-		$state           = $this->fresh_state( array( 5001, 5002, 5003 ) );
+		$probe1->advance = 1;
+		$probe1->lists   = array( '5001' => $big );
+		$state           = $this->fresh_state( array( 5001 ) );
 		$this->run_slice( $probe1, $state );
 
 		// Slice 2 (resume): generous budget, finishes categories + run.
 		$probe2          = $this->make_probe( $this->make_client() );
 		$probe2->advance = 0;
+		$probe2->lists   = array( '5001' => $big );
 		$this->run_slice( $probe2, Tapgoods_Sync_State::get_instance() );
 
 		$log = (string) file_get_contents( Tapgoods_Sync_Log::get_instance()->get_file_path() );
 
-		$this->assertSame( 1, substr_count( $log, ' sync.categories.start ' ), 'The categories phase announces itself exactly once.' );
+		$this->assertSame( 1, substr_count( $log, ' sync.categories.start ' ), 'The categories phase announces itself exactly once, even across a within-location interrupt.' );
 		$this->assertStringContainsString( 'sync.checkpoint', $log );
 		$this->assertStringContainsString( 'stage=categories', $log );
+		$this->assertStringContainsString( 'cat_item_index=', $log );
 		$this->assertStringContainsString( 'sync.categories.done', $log );
 	}
 }

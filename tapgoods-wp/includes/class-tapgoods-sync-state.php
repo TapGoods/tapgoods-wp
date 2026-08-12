@@ -109,6 +109,10 @@ class Tapgoods_Sync_State {
 	 *  - cat_location_index: how many of location_ids have had their categories synced
 	 *                        (the resume point for the bounded categories loop, mirroring
 	 *                        location_index for paging).
+	 *  - cat_item_index:     resume point WITHIN the current location's category list, so
+	 *                        one large location's category upserts are checkpointed in
+	 *                        bounded batches (mirrors next_page within a location for
+	 *                        paging). Reset to 0 whenever cat_location_index advances.
 	 *  - valid_category_ids: tg_category term ids upserted so far this run (durable across
 	 *                        ticks so obsolete-term reconciliation only runs once against
 	 *                        the FULL set, never on a partial pass).
@@ -127,6 +131,7 @@ class Tapgoods_Sync_State {
 			'total_items'        => 0,
 			'categories_done'    => false,
 			'cat_location_index' => 0,
+			'cat_item_index'     => 0,
 			'valid_category_ids' => array(),
 			'valid_tag_ids'      => array(),
 			'phase'              => 'paging',
@@ -134,6 +139,18 @@ class Tapgoods_Sync_State {
 	}
 
 	private function load() {
+		// On a persistent object cache (e.g. WP Engine) the sync state must be read
+		// from the source of truth at the start of each request, not from a stale
+		// cache entry. The failure this guards against: the cron self-ping writes
+		// mark_active()+init_cursor() during PREP, the request is then hard-killed
+		// mid-categories, and the NEXT cron tick reads back the PRE-prep value from a
+		// stale cache and wrongly restarts PREP instead of resuming (WPB-165/WPB-173).
+		// Dropping any cached copy before the read makes the resume decision reliable.
+		// Guarded by function_exists so the isolated unit suite (no WP) is unaffected.
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( self::OPTION, 'options' );
+		}
+
 		$stored = get_option( self::OPTION, array() );
 		if ( ! is_array( $stored ) ) {
 			$stored = array();
@@ -152,7 +169,12 @@ class Tapgoods_Sync_State {
 
 	private function save() {
 		$this->data['updated_at'] = $this->now();
-		update_option( self::OPTION, $this->data );
+		// Persist NON-autoloaded: the cursor can carry thousands of synced ids, and an
+		// autoloaded option is served from the single `alloptions` blob, which a
+		// persistent object cache (WP Engine) can truncate or serve stale - exactly
+		// the "state written in PREP not read back next tick" failure. A standalone,
+		// non-autoloaded option has its own cache key and is fetched on demand.
+		update_option( self::OPTION, $this->data, false );
 	}
 
 	private function now() {

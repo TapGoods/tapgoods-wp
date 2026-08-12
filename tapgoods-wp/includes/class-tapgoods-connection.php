@@ -39,8 +39,13 @@ class Tapgoods_Connection {
 	/** Max term IDs per query when chunking large term operations. */
 	const TERM_CHUNK_SIZE = 150;
 
-	/** Default wall-clock budget (seconds) for one bounded sync slice. */
-	const SYNC_TIME_BUDGET = 20;
+	/**
+	 * Default wall-clock budget (seconds) for one bounded sync slice. Deliberately
+	 * conservative: the failing WP Engine site hard-kills the cron self-ping request
+	 * at ~23s from the nginx/proxy layer (no PHP fatal), so a slice must finish and
+	 * checkpoint well under that. Overridable via TG_SYNC_TIME_BUDGET.
+	 */
+	const SYNC_TIME_BUDGET = 18;
 
 	/** Default hard cap on pages fetched per slice (belt-and-braces with the clock). */
 	const SYNC_MAX_PAGES_PER_RUN = 25;
@@ -51,6 +56,23 @@ class Tapgoods_Connection {
 	 * a slow API / large catalog (see WPB-165). Overridable via TG_SYNC_PAGE_SIZE.
 	 */
 	const SYNC_PAGE_SIZE = 25;
+
+	/**
+	 * Term upserts (categories + their sub-tags) processed per category batch before
+	 * the slice checkpoints its within-location position and re-checks the budget.
+	 * Small enough that a single batch stays well under the slice budget even on the
+	 * failing host, so a location with hundreds/thousands of categories can no longer
+	 * exceed the request window before its first checkpoint (WPB-165). Overridable via
+	 * TG_SYNC_CATEGORY_BATCH.
+	 */
+	const SYNC_CATEGORY_BATCH = 25;
+
+	/**
+	 * TTL (seconds) for the per-location category list cached during a sliced
+	 * categories pass, so a resume does not re-fetch it. Matches the sync-state stale
+	 * window; a dropped cache just means one harmless re-fetch on the next slice.
+	 */
+	const CAT_LIST_CACHE_TTL = 3600;
 
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
@@ -555,36 +577,72 @@ class Tapgoods_Connection {
 			// reconciliation runs ONLY after every location's categories are collected
 			// (the FULL accumulated valid-id set), never on a partial pass.
 			if (empty($cursor['categories_done'])) {
-				$location_ids = $cursor['location_ids'];
-				$cat_idx      = (int) $cursor['cat_location_index'];
+				$location_ids  = $cursor['location_ids'];
+				$cat_idx       = (int) $cursor['cat_location_index'];
+				$cat_item_idx  = (int) $cursor['cat_item_index'];
+				$upsert_budget = self::category_upserts_per_batch();
 
-				// Announce the categories phase exactly once, when it first begins.
-				if (0 === $cat_idx) {
+				// Announce the categories phase exactly once, at its very first batch.
+				// Gated on BOTH indexes so a resume that continues mid-location (or at a
+				// later location) does not re-announce.
+				if (0 === $cat_idx && 0 === $cat_item_idx) {
 					$log->info('sync.categories.start', array('pass' => 'sliced', 'locations' => count($location_ids)));
 				}
 
 				while ($cat_idx < count($location_ids)) {
-					$lid         = $location_ids[$cat_idx];
-					$cat_started = microtime(true);
-					$touched     = $this->sync_categories_for_location($lid);
+					$lid        = $location_ids[$cat_idx];
+					$categories = $this->get_location_categories_cached($lid);
 
-					if (! $touched['ok']) {
+					if (false === $categories) {
+						// Fetch failed for this location: it contributes no ids. Advance so
+						// the pass cannot loop forever on a bad location (mirrors the
+						// one-shot pass, which also continues past a failed location).
 						$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => 'sliced', 'status' => $this->client_http_status($client)));
-					} else {
-						// Accumulate this location's valid ids into the durable cursor so
-						// the eventual reconciliation sees the FULL set across every slice.
-						$cursor['valid_category_ids'] = array_values(array_unique(array_merge((array) $cursor['valid_category_ids'], $touched['category_ids'])));
-						$cursor['valid_tag_ids']      = array_values(array_unique(array_merge((array) $cursor['valid_tag_ids'], $touched['tag_ids'])));
+						$this->clear_location_categories_cache($lid);
+						++$cat_idx;
+						$cat_item_idx                 = 0;
+						$cursor['cat_location_index'] = $cat_idx;
+						$cursor['cat_item_index']     = 0;
+						$state->save_cursor($cursor);
+
+						if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+							$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+							$this->active_run = false;
+							return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+						}
+						continue;
 					}
 
-					++$cat_idx;
+					// Upsert a BOUNDED batch of this location's categories (+ their
+					// sub-tags), checkpointing a within-location position. This is the
+					// WPB-165 fix: one large location's full category upsert used to
+					// exceed the request window before any checkpoint, so cat_location_index
+					// never advanced and the next tick redid PREP forever.
+					$batch = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget);
+
+					// Accumulate this batch's ids into the durable cursor so the eventual
+					// reconciliation sees the FULL set across every slice.
+					$cursor['valid_category_ids'] = array_values(array_unique(array_merge((array) $cursor['valid_category_ids'], $batch['category_ids'])));
+					$cursor['valid_tag_ids']      = array_values(array_unique(array_merge((array) $cursor['valid_tag_ids'], $batch['tag_ids'])));
+
+					if ($batch['done']) {
+						// Location fully upserted: free its cached list and advance.
+						$this->clear_location_categories_cache($lid);
+						++$cat_idx;
+						$cat_item_idx = 0;
+					} else {
+						// More categories remain in THIS location: resume here next batch.
+						$cat_item_idx = (int) $batch['next_index'];
+					}
 					$cursor['cat_location_index'] = $cat_idx;
-					$state->save_cursor($cursor); // Checkpoint after each location.
+					$cursor['cat_item_index']     = $cat_item_idx;
+					$state->save_cursor($cursor); // Checkpoint after each bounded batch.
 
 					if ($this->slice_budget_spent($start_time, $pages_this_run)) {
-						// Budget spent mid-categories: resume at cat_location_index next
-						// tick. Do NOT set categories_done and do NOT reconcile removals.
-						$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+						// Budget spent mid-categories: resume at cat_location_index /
+						// cat_item_index next tick. Do NOT set categories_done and do NOT
+						// reconcile removals (that would delete not-yet-collected terms).
+						$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
 						$this->active_run = false;
 						return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
 					}
@@ -797,6 +855,18 @@ class Tapgoods_Connection {
 			return (int) TG_SYNC_PAGE_SIZE;
 		}
 		return self::SYNC_PAGE_SIZE;
+	}
+
+	/**
+	 * Term upserts processed per category batch. Overridable via TG_SYNC_CATEGORY_BATCH.
+	 *
+	 * @return int
+	 */
+	public static function category_upserts_per_batch() {
+		if (defined('TG_SYNC_CATEGORY_BATCH') && (int) TG_SYNC_CATEGORY_BATCH > 0) {
+			return (int) TG_SYNC_CATEGORY_BATCH;
+		}
+		return self::SYNC_CATEGORY_BATCH;
 	}
 
 	/**
@@ -1452,35 +1522,128 @@ class Tapgoods_Connection {
 	 * }
 	 */
 	public function sync_categories_for_location($lid) {
+		$categories = $this->get_location_categories_cached($lid);
+
+		if (false === $categories) {
+			return array('ok' => false, 'category_ids' => array(), 'tag_ids' => array());
+		}
+
+		// One-shot form: drain the whole location in a single unbounded batch. The
+		// sliced sync path (run_sync_slice) instead calls upsert_category_batch()
+		// directly with a bounded budget so it can checkpoint within a location.
+		$batch = $this->upsert_category_batch($categories, 0, PHP_INT_MAX);
+
+		return array('ok' => true, 'category_ids' => $batch['category_ids'], 'tag_ids' => $batch['tag_ids']);
+	}
+
+	/**
+	 * A location's storefront category list, fetched once and cached for the run.
+	 *
+	 * The sliced categories pass can span many cron ticks; caching the list in a
+	 * per-location transient means a resume continues upserting without re-fetching.
+	 * A dropped cache (object-cache eviction) just triggers one harmless re-fetch,
+	 * and upserts are idempotent (tg_insert_or_update_term dedups by tg_id), so a
+	 * re-fetch never corrupts the checkpointed within-location position.
+	 *
+	 * @param int|string $lid Location id.
+	 * @return array|false The category list, or false when the fetch failed.
+	 */
+	public function get_location_categories_cached($lid) {
+		$key    = 'tg_cat_list_' . $lid;
+		$cached = get_transient($key);
+		if (is_array($cached)) {
+			return $cached;
+		}
+
 		$client     = $this->get_connection();
 		$categories = $client->get_categories_from_graph($lid);
 
 		if (false === $categories || is_wp_error($categories)) {
-			return array('ok' => false, 'category_ids' => array(), 'tag_ids' => array());
+			return false;
 		}
 
+		set_transient($key, $categories, self::CAT_LIST_CACHE_TTL);
+		return $categories;
+	}
+
+	/**
+	 * Drop a location's cached category list (called once the location is fully
+	 * upserted, or when its fetch failed).
+	 *
+	 * @param int|string $lid Location id.
+	 * @return void
+	 */
+	public function clear_location_categories_cache($lid) {
+		delete_transient('tg_cat_list_' . $lid);
+	}
+
+	/**
+	 * Upsert a BOUNDED batch of one location's categories (and their sub-tags).
+	 *
+	 * Processes categories from $start_index until the upsert budget is spent, then
+	 * stops on a whole-category boundary so a category is never left half-linked to
+	 * its tags. Returns the resume point and whether the location is finished, plus
+	 * the term ids it touched, so the caller can checkpoint a within-location
+	 * position and accumulate the full valid-id set before reconciling removals.
+	 *
+	 * Pure over its inputs apart from the term-DB writes (tg_insert_or_update_term),
+	 * so the batching/resume arithmetic is unit-testable with that seam stubbed.
+	 *
+	 * @param array $categories    The location's category list.
+	 * @param int   $start_index   Category index to resume from (0-based).
+	 * @param int   $upsert_budget Max term upserts (categories + tags) this batch.
+	 * @return array {
+	 *     @type bool  $ok           Always true (fetch failures are handled upstream).
+	 *     @type int   $next_index   Category index to resume from next batch.
+	 *     @type bool  $done         Whether every category in the list is processed.
+	 *     @type int[] $category_ids tg_category term ids upserted this batch.
+	 *     @type int[] $tag_ids      tg_tags term ids upserted this batch.
+	 * }
+	 */
+	public function upsert_category_batch($categories, $start_index, $upsert_budget) {
+		$categories   = array_values((array) $categories);
+		$count        = count($categories);
 		$category_ids = array();
 		$tag_ids      = array();
+		$i            = max(0, (int) $start_index);
+		$budget       = max(1, (int) $upsert_budget);
+		$upserts      = 0;
 
-		foreach ($categories as $category) {
+		while ($i < $count) {
+			$category         = $categories[$i];
 			$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
+			++$upserts;
 			if ($category_term_id) {
 				$category_ids[] = $category_term_id;
 
-				// Process subcategories as tags and link them to their parent category
+				// Process subcategories as tags and link them to their parent category.
 				if (!empty($category['sfSubCategories'])) {
 					foreach ($category['sfSubCategories'] as $tag) {
-						// Pass the parent category term ID to establish the relationship
 						$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
+						++$upserts;
 						if ($tag_term_id) {
 							$tag_ids[] = $tag_term_id;
 						}
 					}
 				}
 			}
+
+			++$i;
+
+			// Stop only after a whole category (with its sub-tags) so the parent/child
+			// linkage is never left half-written across a checkpoint.
+			if ($upserts >= $budget) {
+				break;
+			}
 		}
 
-		return array('ok' => true, 'category_ids' => $category_ids, 'tag_ids' => $tag_ids);
+		return array(
+			'ok'           => true,
+			'next_index'   => $i,
+			'done'         => ($i >= $count),
+			'category_ids' => $category_ids,
+			'tag_ids'      => $tag_ids,
+		);
 	}
 	
 	
