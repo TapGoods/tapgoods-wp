@@ -1508,6 +1508,15 @@ add_action('tg_auto_sync_event', 'execute_auto_sync');
 function execute_auto_sync($trigger = 'cron_daily') {
     $tg_api = Tapgoods_Connection::get_instance();
 
+    // Prefer the Action Scheduler driver: enqueue a slice (guarded, so it never
+    // duplicates an in-flight chain) and let it chain the rest in the background,
+    // instead of running a single bounded slice inline in the cron/frontend
+    // request. Fall back to the inline slice when Action Scheduler is unavailable.
+    if (class_exists('Tapgoods_Sync_Scheduler') && Tapgoods_Sync_Scheduler::is_available()) {
+        Tapgoods_Sync_Scheduler::enqueue_slice();
+        return;
+    }
+
     if (method_exists($tg_api, 'sync_inventory_in_batches')) {
         $tg_api->sync_inventory_in_batches(false, $trigger);
         error_log('Auto-sync executed.');
@@ -1525,6 +1534,15 @@ function execute_manual_sync() {
     // that unauthenticated registration is tracked separately (WPB-176); it is
     // only labelled here, not fixed.
     $trigger = ( function_exists('is_user_logged_in') && is_user_logged_in() ) ? 'ajax_manual' : 'ajax_nopriv';
+
+    // Prefer the non-blocking Action Scheduler driver: enqueue the first slice and
+    // return immediately; the chain continues in the background. Fall back to an
+    // inline bounded slice when Action Scheduler is unavailable.
+    if (class_exists('Tapgoods_Sync_Scheduler') && Tapgoods_Sync_Scheduler::is_available()) {
+        Tapgoods_Sync_Scheduler::enqueue_slice();
+        // wp_send_json_success() calls wp_die(), so control never returns here.
+        wp_send_json_success('Sync started; it runs in the background.');
+    }
 
     if (method_exists($tg_api, 'sync_inventory_in_batches')) {
         $tg_api->sync_inventory_in_batches(false, $trigger);

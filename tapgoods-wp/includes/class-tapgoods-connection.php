@@ -2736,6 +2736,33 @@ class Tapgoods_Connection {
 		$location_info = $this->sync_location_settings(true);
 
 		if (current_user_can('manage_options')) {
+			// NON-BLOCKING: with Action Scheduler driving the sync, "Sync Now" just
+			// enqueues the FIRST slice and returns immediately; Action Scheduler then
+			// chains the rest in the background (see Tapgoods_Sync_Scheduler). This
+			// keeps the same non-blocking UX the bounded slices already gave, without
+			// running an ~18s slice inside this admin request.
+			if (Tapgoods_Sync_Scheduler::is_available()) {
+				$enqueued = Tapgoods_Sync_Scheduler::enqueue_slice();
+				$log->info('sync.as.enqueued', array('trigger' => 'admin_manual', 'enqueued' => $enqueued ? 1 : 0));
+				$log->end_run(
+					'ok',
+					array(
+						'location_settings' => $location_info ? 1 : 0,
+						'driver'            => 'action_scheduler',
+						'enqueued'          => $enqueued ? 1 : 0,
+					)
+				);
+				wp_send_json_success(
+					array(
+						'message'     => 'Sync started. It runs in the background; you can leave this page.',
+						'in_progress' => true,
+						'state'       => $this->sync_state()->get_summary(),
+					)
+				); // wp_send_json_* calls wp_die(), so control never returns here.
+			}
+
+			// FALLBACK (Action Scheduler unavailable): run one bounded slice inline;
+			// the five-minute cron self-ping continues the rest in the background.
 			$result = $this->sync_inventory_in_batches(true, 'admin_manual');
 
 			// Every branch below ends in wp_send_json_*(), which calls wp_die():
@@ -2748,11 +2775,9 @@ class Tapgoods_Connection {
 				)
 			);
 
-			// The manual sync is now NON-BLOCKING: it runs a single bounded slice and
-			// returns, cron continues the rest in the background. Send back the state
-			// machine summary so the admin screen can show "in progress / continues in
-			// the background" with planned-vs-completed pages instead of implying the
-			// whole sync finished in this one request.
+			// Send back the state machine summary so the admin screen can show
+			// "in progress / continues in the background" with planned-vs-completed
+			// pages instead of implying the whole sync finished in this one request.
 			$payload = array(
 				'message'     => isset($result['message']) ? $result['message'] : '',
 				'in_progress' => ! empty($result['in_progress']),

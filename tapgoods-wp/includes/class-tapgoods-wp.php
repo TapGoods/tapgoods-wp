@@ -45,6 +45,7 @@ class Tapgoods {
 			'includes/class-tapgoods-encryption.php',     // Class for encryption/decryption methods
 			'includes/class-tapgoods-sync-log.php',       // Sync activity log (file + error_log mirror)
 			'includes/class-tapgoods-sync-state.php',     // Sync flow state machine
+			'includes/class-tapgoods-sync-scheduler.php', // Action Scheduler driver for the sync
 			'includes/class-tapgoods-connection.php',     // API Connection Controller
 			'includes/class-tapgoods-api-exception.php',  // API Exception Classes
 			'includes/class-tapgoods-api-request.php',    // API Request Class
@@ -130,6 +131,11 @@ class Tapgoods {
 		$this->loader->add_action( 'tapgoods_cron_hook', $this, 'tapgrein_cron_exec' );
 		$this->loader->add_action( 'init', $this, 'tapgrein_cron_setup', 10, 0 );
 
+		// One Action Scheduler action == one bounded sync slice. The handler runs a
+		// single slice and chains the next while work remains (see
+		// Tapgoods_Sync_Scheduler). Registered even when Action Scheduler is not
+		// loaded (the action simply never fires in that case).
+		$this->loader->add_action( Tapgoods_Sync_Scheduler::HOOK, 'Tapgoods_Sync_Scheduler', 'run_slice' );
 	}
 
 	public function tapgrein_add_cron_interval( $schedules ) {
@@ -146,22 +152,58 @@ class Tapgoods {
 		}
 	}
 
+	/**
+	 * Five-minute WP-Cron tick: WATCHDOG, not the driver.
+	 *
+	 * Action Scheduler is the primary driver now (slices chain themselves, see
+	 * Tapgoods_Sync_Scheduler). This tick therefore no longer runs sync work or
+	 * fires the non-blocking self-ping; it only ensures a slice is enqueued so the
+	 * chain gets (re-)armed if it ever stalls or a fresh sync is due:
+	 *
+	 *   - not connected           => nothing to do.
+	 *   - latched ERROR           => do NOT re-arm; an admin must clear it first
+	 *                                (this is what keeps cron from storming on top
+	 *                                of the state machine's ERROR latch).
+	 *   - otherwise               => enqueue_slice(), which is guarded by
+	 *                                as_has_scheduled_action so an already
+	 *                                pending/running chain is never duplicated. If a
+	 *                                run is in progress this is a no-op; if the chain
+	 *                                stalled it resumes it; if idle it starts a fresh
+	 *                                run (the slice's own PREP).
+	 *
+	 * When Action Scheduler is unavailable the tick falls back to the legacy
+	 * self-ping driver so the sync still runs.
+	 *
+	 * @return void
+	 */
 	public function tapgrein_cron_exec() {
 		$api_connected = get_option( 'tg_api_connected', 0 );
 
-		if ( '1' === $api_connected ) {
-			// The five-minute heartbeat, at DEBUG so it costs nothing by default.
-			// It fires every 300s forever and is the one log write that happens
-			// outside the sync's own state guard, so it does not earn an INFO line
-			// on every site. Support can raise `tapgoods_sync_log_level` when the
-			// question is "did cron fire at all". Skipped entirely when the site is
-			// not connected: there is nothing to report about a sync that will
-			// never be attempted.
-			Tapgoods_Sync_Log::get_instance()->debug( 'sync.cron.tick', array( 'will_ping' => 1 ) );
-
-			$connection = Tapgoods_Connection::get_instance();
-			$sync       = $connection->tapgrein_async_sync_from_api();
+		if ( '1' !== $api_connected ) {
+			return;
 		}
+
+		$log = Tapgoods_Sync_Log::get_instance();
+
+		// Graceful fallback: no Action Scheduler => keep the old self-ping driver.
+		if ( ! Tapgoods_Sync_Scheduler::is_available() ) {
+			$log->debug( 'sync.cron.tick', array( 'driver' => 'selfping_fallback', 'will_ping' => 1 ) );
+			Tapgoods_Connection::get_instance()->tapgrein_async_sync_from_api();
+			return;
+		}
+
+		$state = Tapgoods_Connection::get_instance()->sync_state();
+
+		// Never re-arm a latched error: that is the state machine's terminal state
+		// until an admin clears it. Re-arming here would be the AS retry storm the
+		// design explicitly avoids.
+		if ( $state->has_error() && Tapgoods_Sync_State::STATE_ERROR === $state->get_state() ) {
+			$log->debug( 'sync.cron.tick', array( 'driver' => 'action_scheduler', 'skipped' => 'error_state' ) );
+			return;
+		}
+
+		$enqueued = Tapgoods_Sync_Scheduler::enqueue_slice();
+		$log->debug( 'sync.cron.tick', array( 'driver' => 'action_scheduler', 'enqueued' => $enqueued ? 1 : 0 ) );
 	}
 
 	public function tapgrein_disable_autop_blocks( $block_content, $block ) {
