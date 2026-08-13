@@ -26,6 +26,38 @@ class Tapgoods_Connection {
 	/** Whether the shutdown handler has already been registered this request. */
 	private $shutdown_registered = false;
 
+	/**
+	 * Token of the run currently executing in THIS request, or null outside a run.
+	 * Read by tg_insert_or_update_term() so a term upsert can stamp itself with the
+	 * run token (and skip work when it already carries it). Set from the cursor at
+	 * the start of run_sync_slice().
+	 *
+	 * @var string|null
+	 */
+	private $run_token = null;
+
+	/**
+	 * Set by tg_insert_or_update_term() to report whether its last call was a
+	 * run-token dedup skip (the term already carried the current run token) rather
+	 * than a real upsert. Lets upsert_category_batch() count skips without a growing
+	 * in-cursor set. Transient per-call flag; never persisted. Protected so a test
+	 * probe subclass that overrides tg_insert_or_update_term() can set it.
+	 *
+	 * @var bool
+	 */
+	protected $last_term_skipped = false;
+
+	/** Meta key stamping the run token onto each synced post / upserted term (WPB-172). */
+	const SYNC_RUN_META = 'tg_sync_run';
+
+	/**
+	 * Rows deleted per bounded finalize batch. Small so a single finalize slice
+	 * stays well under the per-request budget on any host, and the phase converges
+	 * over cron ticks instead of loading the whole catalog at once (the WPB-172 OOM).
+	 * Overridable via TG_FINALIZE_DELETE_BATCH.
+	 */
+	const FINALIZE_DELETE_BATCH = 100;
+
 	/** Execution mutex transient: one request processes a slice at a time. */
 	const RUN_LOCK = 'tapgrein_sync_lock';
 
@@ -567,15 +599,21 @@ class Tapgoods_Connection {
 
 		$cursor = $state->get_cursor();
 
+		// The run token stamped onto every post/term this run. Held on the instance
+		// so tg_insert_or_update_term() (and the finalize helpers) can read it without
+		// threading it through every signature. Reused across resumed slices.
+		$this->run_token = (string) $cursor['run_token'];
+
 		try {
 			// CATEGORIES PHASE: bounded and resumable, mirroring the paging loop.
 			// Terms are synced up front so they exist before items are paged and each
 			// item's own tapgrein_assign_terms() can find them. A large business has
 			// thousands of categories/tags across ~18 locations; doing them all in one
 			// request is what stalled sync on a request-time-limited host (WPB-165), so
-			// each location is done in isolation and checkpointed. Obsolete-term
-			// reconciliation runs ONLY after every location's categories are collected
-			// (the FULL accumulated valid-id set), never on a partial pass.
+			// each location is done in isolation and checkpointed. Each upserted term is
+			// stamped with the run token (self::SYNC_RUN_META); obsolete-term removal is
+			// deferred to the resumable finalize phase, which deletes whatever is NOT
+			// stamped with this run's token, so it never runs on a partial pass.
 			if (empty($cursor['categories_done'])) {
 				$location_ids  = $cursor['location_ids'];
 				$cat_idx       = (int) $cursor['cat_location_index'];
@@ -619,24 +657,13 @@ class Tapgoods_Connection {
 					// exceed the request window before any checkpoint, so cat_location_index
 					// never advanced and the next tick redid PREP forever.
 					//
-					// The processed-id sets are threaded BY REFERENCE and persisted in the
-					// cursor so a category/tag already upserted under an earlier location
-					// (this or a previous tick) is skipped here instead of re-upserted. A
-					// storefront's categories overlap heavily across its ~18 locations, so
-					// this collapses the phase to roughly one pass over the UNIQUE set.
-					$processed_cat = (array) $cursor['processed_category_ids'];
-					$processed_tag = (array) $cursor['processed_tag_ids'];
-					$batch         = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget, $processed_cat, $processed_tag);
-					$cursor['processed_category_ids'] = $processed_cat;
-					$cursor['processed_tag_ids']      = $processed_tag;
-					$cursor['cat_dupes_skipped']      = (int) $cursor['cat_dupes_skipped'] + (int) $batch['skipped'];
-
-					// Accumulate this batch's ids into the durable cursor so the eventual
-					// reconciliation sees the FULL set across every slice. Skipped duplicates
-					// contribute no ids here: their term_id is already in the accumulator
-					// from the location that first upserted them.
-					$cursor['valid_category_ids'] = array_values(array_unique(array_merge((array) $cursor['valid_category_ids'], $batch['category_ids'])));
-					$cursor['valid_tag_ids']      = array_values(array_unique(array_merge((array) $cursor['valid_tag_ids'], $batch['tag_ids'])));
+					// Cross-location dedup is by RUN TOKEN, not an in-cursor set (WPB-172):
+					// upsert_category_batch stamps each upserted term with the run token and
+					// skips a term already carrying it, so a category shared across a
+					// storefront's ~18 locations is written once. No growing collection is
+					// kept in the cursor; only the scalar dupes counter accumulates.
+					$batch                       = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget, $this->run_token);
+					$cursor['cat_dupes_skipped'] = (int) $cursor['cat_dupes_skipped'] + (int) $batch['skipped'];
 
 					if ($batch['done']) {
 						// Location fully upserted: free its cached list and advance.
@@ -661,17 +688,14 @@ class Tapgoods_Connection {
 					}
 				}
 
-				// Every location's categories are collected: NOW it is safe to reconcile
-				// obsolete terms against the FULL accumulated valid-id set. Doing this on
-				// a partial set would delete a not-yet-processed location's terms and
-				// re-add them next slice (churn + transient storefront 404s).
-				$this->remove_obsolete_terms('tg_category', $cursor['valid_category_ids']);
-				$this->remove_obsolete_terms('tg_tags', $cursor['valid_tag_ids']);
-
+				// Every location's categories are collected and stamped with the run
+				// token. Obsolete-term removal is NOT done here: it happens in the
+				// resumable finalize phase (delete terms not carrying this run's token),
+				// so it runs once, in bounded chunks, only after a full pass.
 				$cursor['categories_done'] = true;
 				$state->save_cursor($cursor);
 
-				$log->info('sync.categories.done', array('pass' => 'sliced', 'ok' => 1, 'categories' => count($cursor['valid_category_ids']), 'tags' => count($cursor['valid_tag_ids']), 'dupes_skipped' => (int) $cursor['cat_dupes_skipped']));
+				$log->info('sync.categories.done', array('pass' => 'sliced', 'ok' => 1, 'dupes_skipped' => (int) $cursor['cat_dupes_skipped']));
 
 				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
 					$log->info('sync.checkpoint', array('after' => 'categories', 'phase' => $cursor['phase'], 'pages_this_slice' => $pages_this_run, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
@@ -708,8 +732,9 @@ class Tapgoods_Connection {
 						$inventory  = $response['collection'];
 						$page_items = count($inventory);
 						foreach ($inventory as $item) {
-							$this->sync_inventory_item($item);
-							$cursor['synced_ids'][] = (string) $item['id'];
+							// Stamp each synced post with the run token instead of
+							// appending its id to a growing in-cursor array (WPB-172).
+							$this->sync_inventory_item($item, $this->run_token);
 						}
 						$cursor['total_items'] += $page_items;
 						$state->increment_pages_completed();
@@ -751,10 +776,18 @@ class Tapgoods_Connection {
 				}
 			}
 
-			// FINALIZE PHASE: only reached once a FULL pass is confirmed, so it is
-			// safe to reconcile removals against the accumulated synced-id set.
-			$this->finalize_sync($cursor['synced_ids']);
-			$this->update_sync_info($start_time);
+			// FINALIZE PHASE: only reached once a FULL pass is confirmed (categories
+			// done + every location paged). Reconciliation deletes whatever is NOT
+			// stamped with this run's token, in BOUNDED batches that checkpoint and
+			// resume across slices, so it never loads the whole catalog (the WPB-172
+			// OOM) and never has to finish in one request. finalize_slice() returns an
+			// in-progress envelope when its budget is spent, or null when finalize is
+			// fully done.
+			$finalize_result = $this->run_finalize_slice($state, $cursor, $start_time, $pages_this_run, $slice_started);
+			if (null !== $finalize_result) {
+				$this->active_run = false;
+				return $finalize_result;
+			}
 		} catch (Exception $e) {
 			$log->error('sync.error', array('stage' => 'inventory', 'class' => get_class($e), 'message' => $e->getMessage(), 'status' => $this->client_http_status($client)));
 			$will_retry = $state->mark_error($e->getMessage());
@@ -787,45 +820,245 @@ class Tapgoods_Connection {
 	}
 
 	/**
-	 * Finalize a completed full pass: reconcile removals and clean up terms.
+	 * Drive one bounded, resumable slice of the finalize phase.
 	 *
-	 * Runs ONLY after every location/page has been fetched, so the synced-id set
-	 * is complete and it is safe to delete WordPress items the API no longer
-	 * returns. All term operations here are chunked (see remove_unused_terms) so
-	 * no single query carries thousands of term IDs.
+	 * Reconciles a confirmed full pass WITHOUT ever loading the whole catalog into
+	 * memory (the WPB-172 OOM) and without having to finish in one request. It
+	 * deletes whatever this run did NOT stamp with its run token, in bounded
+	 * batches, checkpointing a finalize sub-step in the cursor so the next cron
+	 * tick resumes exactly where it left off. Steps, in order:
 	 *
-	 * @param array $synced_ids tg_ids seen during this run's full pass.
-	 * @return void
+	 *   items        -> delete tg_inventory posts not stamped with the run token
+	 *                   (SKIPPED entirely when the pass synced nothing: the scalar
+	 *                   total_items == 0 safety valve, so an empty/aborted pass can
+	 *                   never wipe the catalog).
+	 *   obsolete_cat -> delete tg_category terms not stamped with the run token.
+	 *   obsolete_tag -> delete tg_tags terms not stamped with the run token.
+	 *   cleanup      -> remove 0-post terms + duplicate posts (already chunked over
+	 *                   small integer id lists, not the catalog) and record sync info.
+	 *   done         -> finalize complete.
+	 *
+	 * DELETION SAFETY (WPB-172): every removal is keyed on the SAME run token that
+	 * stamped the rows during this run (persisted in the cursor, reused across
+	 * slices). An empty/blank token, an empty synced set, or a taxonomy the run
+	 * stamped no terms in all short-circuit their removal rather than deleting
+	 * everything. This method is only ever reached once categories are done and
+	 * every location has been paged (a confirmed full pass); a partial/aborted pass
+	 * throws earlier and never gets here.
+	 *
+	 * @param Tapgoods_Sync_State $state          The sync state machine.
+	 * @param array               $cursor         The current cursor (mutated locally + checkpointed).
+	 * @param int                 $start_time     current_time('timestamp') when the slice began.
+	 * @param int                 $pages_this_run Pages fetched so far this slice (for the budget check).
+	 * @param float               $slice_started  microtime(true) when the slice began (for elapsed_ms).
+	 * @return array|null In-progress envelope when the budget is spent, or null when finalize is done.
 	 */
-	private function finalize_sync($synced_ids) {
-		$log            = $this->sync_log();
-		$existing_items = $this->get_all_existing_inventory_ids();
+	private function run_finalize_slice($state, $cursor, $start_time, &$pages_this_run, $slice_started) {
+		$log   = $this->sync_log();
+		$token = (string) $cursor['run_token'];
+		$limit = self::finalize_delete_batch();
 
-		// Deletion safety valve: only reconcile item removals when this pass
-		// actually saw items. An empty synced set reaching finalize (e.g. a
-		// business that legitimately returned nothing, or an unexpected code
-		// path) must NOT wipe every existing item. Term cleanup (which only
-		// removes genuinely unused/obsolete terms) is still safe to run.
-		$removed_items = 0;
-		if (! empty($synced_ids)) {
-			$removed_items = $this->remove_missing_items_from_wordpress($existing_items, $synced_ids);
-		} else {
-			// The size of the mass deletion this safety valve just prevented is the
-			// first thing to look at if items ever vanish unexpectedly (WPB-165).
-			$log->warn('sync.cleanup.skipped', array('reason' => 'empty_synced_set', 'existing' => count($existing_items)));
+		$step = ('' !== (string) $cursor['finalize_step']) ? (string) $cursor['finalize_step'] : 'items';
+
+		if ('' === (string) $cursor['finalize_step']) {
+			$log->info('sync.finalize.start', array('has_token' => ('' !== $token) ? 1 : 0, 'total_items' => (int) $cursor['total_items']));
+			// A run resumed from a pre-token cursor has no token to reconcile against;
+			// skip straight to the safe cleanup rather than risk a token-less wipe.
+			if ('' === $token) {
+				$log->warn('sync.cleanup.skipped', array('reason' => 'no_run_token'));
+				$step = 'cleanup';
+			}
+			$cursor['finalize_step'] = $step;
+			$state->save_cursor($cursor);
 		}
 
-		$removed_terms  = $this->remove_unused_terms('tg_category');
-		$removed_terms += $this->remove_unused_terms('tg_tags');
-		$removed_duplicates = $this->remove_duplicate_items();
+		while (true) {
+			switch ($step) {
+				case 'items':
+					// Deletion safety valve: an empty/aborted pass (nothing synced) must
+					// never remove items. total_items is the scalar count for the run.
+					if (0 === (int) $cursor['total_items']) {
+						$log->warn('sync.cleanup.skipped', array('reason' => 'empty_synced_set'));
+						$step = 'obsolete_cat';
+						break;
+					}
+					$deleted = $this->remove_items_not_in_run($token, $limit);
+					$cursor['finalize_items_removed'] = (int) $cursor['finalize_items_removed'] + $deleted;
+					if ($deleted < $limit) {
+						$log->info('sync.cleanup.items_removed', array('count' => (int) $cursor['finalize_items_removed']));
+						$step = 'obsolete_cat';
+					}
+					break;
 
-		$log->info(
-			'sync.finalize.done',
-			array(
-				'items_removed'      => (int) $removed_items,
-				'terms_removed'      => (int) $removed_terms,
-				'duplicates_removed' => (int) $removed_duplicates,
-				'synced'             => count($synced_ids),
+				case 'obsolete_cat':
+					$deleted = $this->remove_terms_not_in_run('tg_category', $token, $limit);
+					$cursor['finalize_terms_removed'] = (int) $cursor['finalize_terms_removed'] + $deleted;
+					if ($deleted < $limit) {
+						$step = 'obsolete_tag';
+					}
+					break;
+
+				case 'obsolete_tag':
+					$deleted = $this->remove_terms_not_in_run('tg_tags', $token, $limit);
+					$cursor['finalize_terms_removed'] = (int) $cursor['finalize_terms_removed'] + $deleted;
+					if ($deleted < $limit) {
+						$step = 'cleanup';
+					}
+					break;
+
+				case 'cleanup':
+					// 0-post terms + duplicate posts. Both are already chunked and work
+					// over small integer id lists (not the catalog), so they are safe to
+					// run inside one bounded step.
+					$this->remove_unused_terms('tg_category');
+					$this->remove_unused_terms('tg_tags');
+					$this->remove_duplicate_items();
+					$this->update_sync_info($start_time);
+					$step = 'done';
+					break;
+
+				case 'done':
+				default:
+					$log->info(
+						'sync.finalize.done',
+						array(
+							'items_removed' => (int) $cursor['finalize_items_removed'],
+							'terms_removed' => (int) $cursor['finalize_terms_removed'],
+						)
+					);
+					return null; // Finalize complete; the caller marks the run COMPLETED.
+			}
+
+			$cursor['finalize_step'] = $step;
+			$state->save_cursor($cursor);
+
+			if ('done' !== $step && $this->slice_budget_spent($start_time, $pages_this_run)) {
+				$log->info('sync.checkpoint', array('phase' => 'finalize', 'finalize_step' => $step, 'items_removed' => (int) $cursor['finalize_items_removed'], 'terms_removed' => (int) $cursor['finalize_terms_removed'], 'elapsed_ms' => self::elapsed_ms($slice_started)));
+				return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+			}
+		}
+	}
+
+	/**
+	 * Delete a BOUNDED page of tg_inventory posts NOT stamped with the run token.
+	 *
+	 * The token-based replacement for get_all_existing_inventory_ids() +
+	 * remove_missing_items_from_wordpress(), which loaded every id (~26k) into
+	 * memory to diff and blew the 512 MB limit during finalize (WPB-172). This
+	 * fetches at most $limit ids per call, so the caller can loop it across slices
+	 * until it drains. A blank token deletes nothing (caller guards this too).
+	 *
+	 * @param string $run_token Current run's token.
+	 * @param int    $limit     Max posts to delete this batch.
+	 * @return int Number of posts deleted.
+	 */
+	public function remove_items_not_in_run($run_token, $limit) {
+		global $wpdb;
+
+		if ('' === (string) $run_token) {
+			return 0;
+		}
+		$limit = max(1, (int) $limit);
+
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT p.ID FROM {$wpdb->posts} p
+				LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = %s
+				WHERE p.post_type = %s
+				  AND ( m.meta_value IS NULL OR m.meta_value <> %s )
+				LIMIT %d",
+				self::SYNC_RUN_META,
+				'tg_inventory',
+				(string) $run_token,
+				$limit
+			)
+		);
+
+		$removed = 0;
+		$sample  = array();
+		foreach ( (array) $ids as $post_id ) {
+			wp_delete_post( (int) $post_id, true );
+			++$removed;
+			if ( count( $sample ) < 20 ) {
+				$sample[] = (int) $post_id;
+			}
+		}
+
+		if ( $removed > 0 ) {
+			$this->sync_log()->debug( 'sync.cleanup.items_batch', array( 'removed' => $removed, 'sample_ids' => implode( ',', $sample ) ) );
+		}
+
+		return $removed;
+	}
+
+	/**
+	 * Delete a BOUNDED page of terms in $taxonomy NOT stamped with the run token.
+	 *
+	 * The token-based, chunked replacement for remove_obsolete_terms(). Guarded so
+	 * it can never wipe a taxonomy when the run stamped none of its terms (e.g.
+	 * every category fetch failed): in that case the "valid" set is effectively
+	 * empty and deleting everything would be a catastrophic reconciliation.
+	 *
+	 * @param string $taxonomy  Taxonomy slug (tg_category / tg_tags).
+	 * @param string $run_token Current run's token.
+	 * @param int    $limit     Max terms to delete this batch.
+	 * @return int Number of terms deleted.
+	 */
+	public function remove_terms_not_in_run($taxonomy, $run_token, $limit) {
+		global $wpdb;
+
+		if ('' === (string) $run_token) {
+			return 0;
+		}
+		$limit = max(1, (int) $limit);
+
+		// Never reconcile a taxonomy the run stamped no terms in.
+		if (0 === $this->count_terms_in_run($taxonomy, $run_token)) {
+			$this->sync_log()->warn('sync.cleanup.skipped', array('reason' => 'no_stamped_terms', 'taxonomy' => $taxonomy));
+			return 0;
+		}
+
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT tt.term_id FROM {$wpdb->term_taxonomy} tt
+				LEFT JOIN {$wpdb->termmeta} tm ON tm.term_id = tt.term_id AND tm.meta_key = %s
+				WHERE tt.taxonomy = %s
+				  AND ( tm.meta_value IS NULL OR tm.meta_value <> %s )
+				LIMIT %d",
+				self::SYNC_RUN_META,
+				$taxonomy,
+				(string) $run_token,
+				$limit
+			)
+		);
+
+		$removed = 0;
+		foreach ( (array) $ids as $term_id ) {
+			wp_delete_term( (int) $term_id, $taxonomy );
+			++$removed;
+		}
+
+		return $removed;
+	}
+
+	/**
+	 * Count terms in a taxonomy stamped with the current run token.
+	 *
+	 * @param string $taxonomy  Taxonomy slug.
+	 * @param string $run_token Current run's token.
+	 * @return int
+	 */
+	private function count_terms_in_run($taxonomy, $run_token) {
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->term_taxonomy} tt
+				INNER JOIN {$wpdb->termmeta} tm ON tm.term_id = tt.term_id
+				WHERE tt.taxonomy = %s AND tm.meta_key = %s AND tm.meta_value = %s",
+				$taxonomy,
+				self::SYNC_RUN_META,
+				(string) $run_token
 			)
 		);
 	}
@@ -880,6 +1113,18 @@ class Tapgoods_Connection {
 			return (int) TG_SYNC_CATEGORY_BATCH;
 		}
 		return self::SYNC_CATEGORY_BATCH;
+	}
+
+	/**
+	 * Rows deleted per bounded finalize batch. Overridable via TG_FINALIZE_DELETE_BATCH.
+	 *
+	 * @return int
+	 */
+	public static function finalize_delete_batch() {
+		if (defined('TG_FINALIZE_DELETE_BATCH') && (int) TG_FINALIZE_DELETE_BATCH > 0) {
+			return (int) TG_FINALIZE_DELETE_BATCH;
+		}
+		return self::FINALIZE_DELETE_BATCH;
 	}
 
 	/**
@@ -1478,39 +1723,39 @@ class Tapgoods_Connection {
 			return false;
 		}
 
-		$valid_category_ids = array();
-		$valid_tag_ids = array();
-
-		// Cross-location dedup (same fix as the sliced path): a storefront's categories
-		// overlap heavily across its ~18 locations, so track the source ids already
-		// upserted this pass and skip re-upserting them. Bounded by the UNIQUE count.
-		$processed_category_ids = array();
-		$processed_tag_ids      = array();
+		// Cross-location dedup by RUN TOKEN (same mechanism as the sliced path,
+		// WPB-172): mint a token for this pass, stamp every upserted term with it,
+		// and skip a term already carrying it. A storefront's categories overlap
+		// heavily across its ~18 locations, so this writes each unique term once.
+		$run_token       = Tapgoods_Sync_State::generate_run_token();
+		$this->run_token = $run_token;
 
 		foreach ($location_ids as $lid) {
-			$touched = $this->sync_categories_for_location($lid, $processed_category_ids, $processed_tag_ids);
+			$touched = $this->sync_categories_for_location($lid, $run_token);
 
 			if (! $touched['ok']) {
 				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass, 'status' => $this->client_http_status($client)));
 				continue;
 			}
-
-			$valid_category_ids = array_merge($valid_category_ids, $touched['category_ids']);
-			$valid_tag_ids      = array_merge($valid_tag_ids, $touched['tag_ids']);
 		}
 
-		// Remove obsolete terms. Safe here because every location has been collected,
-		// so this reconciles against the FULL valid-id set (never a partial pass).
-		$this->remove_obsolete_terms('tg_category', $valid_category_ids);
-		$this->remove_obsolete_terms('tg_tags', $valid_tag_ids);
+		// Remove obsolete terms: everything NOT stamped with this pass's token, in
+		// bounded chunks. Guarded so a pass that stamped no terms never wipes a
+		// taxonomy. Safe here because every location has been collected.
+		do {
+			$removed = $this->remove_terms_not_in_run('tg_category', $run_token, self::finalize_delete_batch());
+		} while ($removed >= self::finalize_delete_batch());
+		do {
+			$removed = $this->remove_terms_not_in_run('tg_tags', $run_token, self::finalize_delete_batch());
+		} while ($removed >= self::finalize_delete_batch());
+
+		$this->run_token = null;
 
 		$log->info(
 			'sync.categories.done',
 			array(
 				'pass'       => $pass,
 				'ok'         => 1,
-				'categories' => count($valid_category_ids),
-				'tags'       => count($valid_tag_ids),
 				'elapsed_ms' => self::elapsed_ms($started),
 			)
 		);
@@ -1529,24 +1774,19 @@ class Tapgoods_Connection {
 	 * caller can accumulate a full valid-id set before reconciling obsolete terms.
 	 *
 	 * DELETION SAFETY: this method deliberately does NOT remove obsolete terms.
-	 * Removal must run only once EVERY location has been collected (the full
-	 * accumulated valid-id set), never on this one location's partial set, or a
-	 * not-yet-processed location's terms would be deleted and re-added next slice.
+	 * Removal must run only once EVERY location has been collected, never on this
+	 * one location's partial set. It is keyed on the run token stamped here.
 	 *
-	 * @param int|string $lid                    Location id.
-	 * @param array      $processed_category_ids By-ref set ([source id => true]) of category
-	 *                                           ids already upserted this pass; extended here
-	 *                                           so a category shared with an earlier location
-	 *                                           is not re-upserted. Defaults to a fresh set
-	 *                                           (no cross-call dedup) for standalone callers.
-	 * @param array      $processed_tag_ids      By-ref set for sub-tag source ids (same role).
+	 * @param int|string  $lid       Location id.
+	 * @param string|null $run_token Run token to stamp each upserted term with (and to
+	 *                               dedup against). Null skips stamping/dedup (standalone).
 	 * @return array {
 	 *     @type bool  $ok           Whether the location's categories were fetched.
 	 *     @type int[] $category_ids tg_category term ids upserted for this location.
 	 *     @type int[] $tag_ids      tg_tags term ids upserted for this location.
 	 * }
 	 */
-	public function sync_categories_for_location($lid, &$processed_category_ids = array(), &$processed_tag_ids = array()) {
+	public function sync_categories_for_location($lid, $run_token = null) {
 		$categories = $this->get_location_categories_cached($lid);
 
 		if (false === $categories) {
@@ -1556,7 +1796,7 @@ class Tapgoods_Connection {
 		// One-shot form: drain the whole location in a single unbounded batch. The
 		// sliced sync path (run_sync_slice) instead calls upsert_category_batch()
 		// directly with a bounded budget so it can checkpoint within a location.
-		$batch = $this->upsert_category_batch($categories, 0, PHP_INT_MAX, $processed_category_ids, $processed_tag_ids);
+		$batch = $this->upsert_category_batch($categories, 0, PHP_INT_MAX, $run_token);
 
 		return array('ok' => true, 'category_ids' => $batch['category_ids'], 'tag_ids' => $batch['tag_ids']);
 	}
@@ -1617,37 +1857,30 @@ class Tapgoods_Connection {
 	 * CROSS-LOCATION DEDUP (the perf fix): a storefront's categories overlap heavily
 	 * across its ~18 locations, so the same ~4,000 unique categories used to be
 	 * re-upserted up to ~18x, one location at a time (evidence: a single location
-	 * reached cat_item_index 3925+ and the phase ran 12+ hours). $processed_category_ids
-	 * / $processed_tag_ids are associative sets ([source id => true]) of the SOURCE
-	 * TapGoods ids already upserted THIS run. Before upserting a category (or a sub-tag)
-	 * this method checks that set: an already-processed id is SKIPPED entirely (it already
-	 * exists as a term and its term_id is already in the caller's valid-id accumulators),
-	 * so the expensive DB work happens once per UNIQUE id across all locations. The sets
-	 * are passed BY REFERENCE so the caller can persist them in the cursor across ticks;
-	 * they are bounded by the unique-category/tag count, never by locations x categories.
-	 * A skip does NOT consume the upsert budget (there is no DB work to bound), so a
-	 * location made entirely of already-seen categories drains in a single batch. Because
-	 * the sets default to fresh empty arrays, the one-shot callers that pass nothing keep
-	 * the exact pre-dedup behaviour within a single call.
+	 * reached cat_item_index 3925+ and the phase ran 12+ hours). Dedup is by RUN
+	 * TOKEN (WPB-172): tg_insert_or_update_term() stamps each upserted term with
+	 * $run_token, and when it finds a term already carrying that token it skips all
+	 * writes and reports the skip via $this->last_term_skipped. So the expensive
+	 * upsert happens once per UNIQUE id across all locations, with NO growing
+	 * in-cursor set to serialize (the old associative sets are gone; membership is a
+	 * per-term meta read). A skipped category is not descended into, so its duplicate
+	 * sub-tags are not separately processed. Passing $run_token = null (the default)
+	 * disables stamping/dedup, preserving pre-token behaviour for standalone callers.
 	 *
-	 * @param array $categories             The location's category list.
-	 * @param int   $start_index            Category index to resume from (0-based).
-	 * @param int   $upsert_budget          Max term upserts (categories + tags) this batch.
-	 * @param array $processed_category_ids By-ref set ([id => true]) of source category ids
-	 *                                      already upserted this run; read and extended here.
-	 * @param array $processed_tag_ids      By-ref set ([id => true]) of source tag ids already
-	 *                                      upserted this run; read and extended here.
+	 * @param array       $categories    The location's category list.
+	 * @param int         $start_index   Category index to resume from (0-based).
+	 * @param int         $upsert_budget Max term operations (categories + tags) this batch.
+	 * @param string|null $run_token     Token to stamp/dedup against; null disables both.
 	 * @return array {
 	 *     @type bool  $ok           Always true (fetch failures are handled upstream).
 	 *     @type int   $next_index   Category index to resume from next batch.
 	 *     @type bool  $done         Whether every category in the list is processed.
-	 *     @type int[] $category_ids tg_category term ids upserted this batch (excludes skips,
-	 *                               whose term_id is already in the accumulators).
+	 *     @type int[] $category_ids tg_category term ids upserted this batch (excludes skips).
 	 *     @type int[] $tag_ids      tg_tags term ids upserted this batch (excludes skips).
-	 *     @type int   $skipped      Category/tag upserts skipped as cross-location duplicates.
+	 *     @type int   $skipped      Category/tag operations skipped as cross-location duplicates.
 	 * }
 	 */
-	public function upsert_category_batch($categories, $start_index, $upsert_budget, &$processed_category_ids = array(), &$processed_tag_ids = array()) {
+	public function upsert_category_batch($categories, $start_index, $upsert_budget, $run_token = null) {
 		$categories   = array_values((array) $categories);
 		$count        = count($categories);
 		$category_ids = array();
@@ -1659,45 +1892,27 @@ class Tapgoods_Connection {
 
 		while ($i < $count) {
 			$category = $categories[$i];
-			$cat_id   = isset($category['id']) ? $category['id'] : null;
 
-			// Already upserted this category (and, at that time, its sub-tags) earlier
-			// this run, under this or another location: its term_id is already in the
-			// caller's accumulator, so skip the DB work entirely. Cheap O(1) check that
-			// does not consume the upsert budget.
-			if (null !== $cat_id && isset($processed_category_ids[$cat_id])) {
+			$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category', null, $run_token);
+			++$upserts; // Every term op (real upsert OR a token-skip resolve) is bounded.
+
+			if ($this->last_term_skipped) {
+				// Already stamped with this run's token under an earlier location: its
+				// term already exists and its sub-tags were handled then, so do not
+				// descend. Counts against the budget (it did a resolve query).
 				++$skipped;
-				++$i;
-				continue;
-			}
-
-			$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
-			++$upserts;
-			if ($category_term_id) {
+			} elseif ($category_term_id) {
 				$category_ids[] = $category_term_id;
-				if (null !== $cat_id) {
-					$processed_category_ids[$cat_id] = true;
-				}
 
 				// Process subcategories as tags and link them to their parent category.
 				if (!empty($category['sfSubCategories'])) {
 					foreach ($category['sfSubCategories'] as $tag) {
-						$tag_id = isset($tag['id']) ? $tag['id'] : null;
-
-						// Same dedup at the tag level: a sub-tag shared across categories
-						// (or already seen under another location) is upserted only once.
-						if (null !== $tag_id && isset($processed_tag_ids[$tag_id])) {
-							++$skipped;
-							continue;
-						}
-
-						$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
+						$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id, $run_token);
 						++$upserts;
-						if ($tag_term_id) {
+						if ($this->last_term_skipped) {
+							++$skipped;
+						} elseif ($tag_term_id) {
 							$tag_ids[] = $tag_term_id;
-							if (null !== $tag_id) {
-								$processed_tag_ids[$tag_id] = true;
-							}
 						}
 					}
 				}
@@ -1768,7 +1983,26 @@ class Tapgoods_Connection {
 
 	
 
-	public function tg_insert_or_update_term($term, $tax, $parent_category_id = null) {
+	/**
+	 * Upsert a term (category/tag) and, when a run token is given, stamp it and
+	 * dedup against it. Sets $this->last_term_skipped as a side effect, so callers
+	 * (upsert_category_batch) can tell a token-skip from a real upsert.
+	 *
+	 * @phpstan-impure This mutates $this->last_term_skipped; callers read it after calling.
+	 *
+	 * @param array       $term               Source term ({id, name, slug, ...}).
+	 * @param string      $tax                Taxonomy (tg_category / tg_tags).
+	 * @param int|null    $parent_category_id Parent tg_category term id for a tag.
+	 * @param string|null $run_token          Run token to stamp/dedup against; null disables both.
+	 * @return int|false Term id, or false on failure.
+	 */
+	public function tg_insert_or_update_term($term, $tax, $parent_category_id = null, $run_token = null) {
+		// Reset the per-call dedup flag: callers read it to tell a token-skip from a
+		// real upsert without keeping a growing in-cursor set (WPB-172).
+		$this->last_term_skipped = false;
+
+		$has_token = ( null !== $run_token && '' !== (string) $run_token );
+
 		$tg_id = $term['id']; // The unique ID of the term from the external source.
 		$name = $term['name']; // The name of the term.
 		$original_slug = $term['slug'] ?? sanitize_title($term['name']); // Use original slug from API
@@ -1797,13 +2031,22 @@ class Tapgoods_Connection {
 	
 		if (!empty($existing_term)) {
 			$term_id = $existing_term[0];
+
+			// RUN-TOKEN DEDUP: if this term already carries the current run's token it
+			// was upserted earlier this run (under another location), so skip all writes.
+			// One O(1) meta read replaces the old growing in-cursor processed-id set.
+			if ($has_token && (string) get_term_meta($term_id, self::SYNC_RUN_META, true) === (string) $run_token) {
+				$this->last_term_skipped = true;
+				return $term_id;
+			}
+
 			$existing_term_obj = get_term($term_id, $tax);
-			
+
 			if (is_wp_error($existing_term_obj)) {
 				$this->console_log("Error getting existing term: {$existing_term_obj->get_error_message()}");
 				return false;
 			}
-			
+
 			// Check if name or slug has changed
 			$name_changed = $existing_term_obj->name !== $name;
 			$slug_changed = $existing_term_obj->slug !== $slug;
@@ -1836,6 +2079,12 @@ class Tapgoods_Connection {
 			// Always update metadata hash
 			update_term_meta($term_id, 'tg_hash', $this->hash);
 
+			// Stamp the run token so finalize keeps this term and removes only terms
+			// NOT carrying it (the obsolete-term reconciliation, WPB-172).
+			if ($has_token) {
+				update_term_meta($term_id, self::SYNC_RUN_META, (string) $run_token);
+			}
+
 			// If this is a tag and has a parent category, update the relationship
 			if ($tax === 'tg_tags' && $parent_category_id) {
 				update_term_meta($term_id, 'tg_parent_category', $parent_category_id);
@@ -1864,6 +2113,11 @@ class Tapgoods_Connection {
 		// Save metadata for the term.
 		update_term_meta($term_id, 'tg_id', $tg_id);
 		update_term_meta($term_id, 'tg_hash', $this->hash);
+
+		// Stamp the run token (see the update branch above).
+		if ($has_token) {
+			update_term_meta($term_id, self::SYNC_RUN_META, (string) $run_token);
+		}
 
 		// If this is a tag and has a parent category, save the relationship
 		if ($tax === 'tg_tags' && $parent_category_id) {
@@ -2240,7 +2494,7 @@ class Tapgoods_Connection {
 		return $result;
 	}
 	
-	public function sync_inventory_item($item) {
+	public function sync_inventory_item($item, $run_token = null) {
 		try {
 			$existing_item_by_id = $this->get_existing_inventory_item_by_tg_id($item['id']);
 
@@ -2260,6 +2514,13 @@ class Tapgoods_Connection {
 			// per-item assignment is sufficient for both new and existing items.)
 			if ($post_id) {
 				$this->tapgrein_assign_terms($post_id);
+
+				// Stamp the run token so finalize keeps this post and removes only
+				// posts NOT carrying it. Replaces the old growing synced_ids array
+				// (~18k ids serialized into the cursor) that blew memory (WPB-172).
+				if (null !== $run_token && '' !== (string) $run_token) {
+					update_post_meta($post_id, self::SYNC_RUN_META, (string) $run_token);
+				}
 			}
 		} catch (Exception $e) {
 			$this->console_log('Error syncing item: ' . $item['id'] . ' - ' . $e->getMessage());
@@ -2338,6 +2599,9 @@ class Tapgoods_Connection {
 		// Define meta keys that should not be removed
 		$protected_meta_keys = [
 			'tg_custom_description',
+			// The run-token stamp (WPB-172): re-stamped by sync_inventory_item after
+			// this update; protecting it avoids a needless delete/re-write each run.
+			self::SYNC_RUN_META,
 			// Yoast SEO meta fields - proteger todos los campos de Yoast
 			'_yoast_wpseo_title',
 			'_yoast_wpseo_metadesc', 

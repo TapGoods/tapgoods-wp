@@ -74,10 +74,35 @@ final class SyncStateCursorTest extends TestCase {
 		$this->assertSame( array(), $cursor['location_ids'] );
 		$this->assertSame( 0, $cursor['location_index'] );
 		$this->assertSame( 1, $cursor['next_page'] );
-		$this->assertSame( array(), $cursor['synced_ids'] );
+		$this->assertSame( '', $cursor['run_token'] );
 		$this->assertSame( 0, $cursor['total_items'] );
 		$this->assertFalse( $cursor['categories_done'] );
 		$this->assertSame( 'paging', $cursor['phase'] );
+		$this->assertSame( '', $cursor['finalize_step'] );
+
+		// MEMORY BOUND (WPB-172): the old unbounded arrays are gone, and the only
+		// array field is the location-sized location_ids. Nothing grows with catalog.
+		foreach ( array( 'synced_ids', 'valid_category_ids', 'valid_tag_ids', 'processed_category_ids', 'processed_tag_ids' ) as $gone ) {
+			$this->assertArrayNotHasKey( $gone, $cursor );
+		}
+		foreach ( $cursor as $key => $value ) {
+			if ( 'location_ids' === $key ) {
+				continue;
+			}
+			$this->assertIsNotArray( $value, "Cursor field '$key' must be a scalar." );
+		}
+	}
+
+	public function test_init_cursor_mints_a_run_token_reused_across_reloads() {
+		$a = new Tapgoods_Sync_State();
+		$a->init_cursor( array( 5001 ) );
+		$token = $a->get_cursor()['run_token'];
+		$this->assertNotSame( '', $token, 'init_cursor mints a scalar run token.' );
+
+		// A fresh instance (next cron tick) reads back the SAME token: resumed slices
+		// must reconcile against the token that stamped the rows.
+		$b = new Tapgoods_Sync_State();
+		$this->assertSame( $token, $b->get_cursor()['run_token'] );
 	}
 
 	public function test_init_cursor_stringifies_and_seeds_location_ids() {
@@ -98,7 +123,6 @@ final class SyncStateCursorTest extends TestCase {
 		$cursor                    = $a->get_cursor();
 		$cursor['location_index']  = 1;
 		$cursor['next_page']       = 3;
-		$cursor['synced_ids']      = array( '11001', '11002' );
 		$cursor['total_items']     = 2;
 		$cursor['categories_done'] = true;
 		$a->save_cursor( $cursor );
@@ -111,7 +135,6 @@ final class SyncStateCursorTest extends TestCase {
 		$this->assertTrue( $b->is_running(), 'The run should still be ACTIVE for the next tick.' );
 		$this->assertSame( 1, $resumed['location_index'] );
 		$this->assertSame( 3, $resumed['next_page'] );
-		$this->assertSame( array( '11001', '11002' ), $resumed['synced_ids'] );
 		$this->assertSame( 2, $resumed['total_items'] );
 		$this->assertTrue( $resumed['categories_done'] );
 		$this->assertTrue( $b->cursor_has_remaining_paging() );

@@ -1,7 +1,8 @@
 <?php
 /**
  * Unit tests for the BOUNDED, RESUMABLE categories/tags pass in
- * Tapgoods_Connection::run_sync_slice() (WPB-165 sync-stuck fix).
+ * Tapgoods_Connection::run_sync_slice() (WPB-165 sync-stuck fix) and its
+ * MEMORY-BOUNDED, run-token dedup (WPB-172 OOM fix).
  *
  * Root cause fixed here: the old one-shot sync_categories_from_api() looped every
  * location, upserted thousands of terms, then removed obsolete ones, all in a
@@ -9,21 +10,17 @@
  * killed before categories_done was ever set, so paging never began and every
  * cron tick redid categories and was killed again (0/N forever).
  *
- * The fix mirrors the bounded paging loop at TWO granularities:
- *   - across locations (cat_location_index), and
- *   - WITHIN a location (cat_item_index): categories are upserted in bounded
- *     batches and checkpointed, so one large location can no longer exceed the
- *     request window before its first checkpoint.
- * Obsolete-term reconciliation is deferred until EVERY location has been collected
- * (the full accumulated valid-id set), never on a partial pass.
+ * The fix mirrors the bounded paging loop at TWO granularities (across locations
+ * via cat_location_index, and WITHIN a location via cat_item_index). Cross-location
+ * dedup is now by RUN TOKEN stamped on each term (self::SYNC_RUN_META), NOT by a
+ * growing in-cursor set: a term already carrying the current run's token is skipped.
+ * Obsolete-term removal is deferred to the resumable finalize phase, which deletes
+ * whatever is NOT stamped with this run's token, so it never runs on a partial pass.
  *
- * These tests drive the private run_sync_slice() via reflection against a probe
- * (an anonymous subclass) that stubs the term-DB seams so the loop's orchestration
- * is asserted in isolation:
- *   - categories resume across slices at the right cat_location_index / cat_item_index,
- *   - categories_done is set only after all locations,
- *   - obsolete-term removal runs once, with the full id set, never on a partial pass,
- *   - paging does not start until categories are done.
+ * These tests drive the private run_sync_slice() via reflection against a probe (an
+ * anonymous subclass) whose tg_insert_or_update_term() simulates the term DB with a
+ * SHARED in-memory stamp map (so cross-tick dedup, which is really a DB concern, can
+ * still be exercised in isolation), and whose finalize removal seams record calls.
  *
  * Isolated (no WordPress) via Brain\Monkey.
  *
@@ -49,6 +46,9 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	/** @var object Fake clock holder ({ t: int }). */
 	private $clock;
 
+	/** @var object Shared "term DB" stamp map ({ map: [tax][id] => token }). */
+	private $stamped;
+
 	/** @var string Temp directory the logger writes into. */
 	private $log_dir;
 
@@ -61,6 +61,7 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 		$this->clock   = (object) array( 't' => 1000 );
 		$clock         = $this->clock;
+		$this->stamped = (object) array( 'map' => array() );
 		$this->log_dir = sys_get_temp_dir() . '/tg-cats-' . uniqid( '', true );
 		mkdir( $this->log_dir, 0777, true );
 
@@ -170,26 +171,33 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 	/**
 	 * Build a probe: an anonymous subclass of Tapgoods_Connection that stubs the
-	 * term-DB seams the categories loop depends on. get_location_categories_cached()
-	 * serves canned lists and tg_insert_or_update_term() returns the record's tg_id
-	 * (advancing the fake clock per upsert), so the REAL bounded-batch loop
-	 * (upsert_category_batch + run_sync_slice) is exercised without WordPress.
+	 * term-DB seams the categories loop depends on. tg_insert_or_update_term()
+	 * simulates the term DB with a SHARED stamp map ($stamped): a term already
+	 * carrying the current run token is a skip (sets last_term_skipped, no upsert);
+	 * otherwise it records the upsert, advances the fake clock, and stamps the map.
+	 * The finalize removal seams record their calls so a test can assert removal is
+	 * token-based and runs only after a full pass. So the REAL bounded-batch loop
+	 * (upsert_category_batch + run_sync_slice + run_finalize_slice) is exercised
+	 * without WordPress.
 	 */
 	private function make_probe( $client ) {
 		$this->inject_client( $client );
 
-		$probe         = new class( $this->clock ) extends Tapgoods_Connection {
+		$probe          = new class( $this->clock, $this->stamped ) extends Tapgoods_Connection {
 			public $clock;
+			public $stamped;                    // shared { map: [tax][id] => token }.
 			public $advance = 0;                // seconds added per term upsert.
 			public $lists   = array();          // lid(string) => array|false category list.
 			public $fetched = array();          // lids passed to get_location_categories_cached.
-			public $upserts = array();          // [{tax, id}] upsert calls, in order.
-			public $obsolete_calls = array();   // [{taxonomy, ids}].
+			public $upserts = array();          // [{tax, id}] real upsert calls, in order.
+			public $term_removals = array();    // [{taxonomy, token}] remove_terms_not_in_run calls.
+			public $item_removals = array();    // [token] remove_items_not_in_run calls.
 			public $client;                     // fake client (for inv_calls).
 
 			// Note: intentionally does NOT call the private parent constructor.
-			public function __construct( $clock ) {
-				$this->clock = $clock;
+			public function __construct( $clock, $stamped ) {
+				$this->clock   = $clock;
+				$this->stamped = $stamped;
 			}
 
 			public function get_location_categories_cached( $lid ) {
@@ -201,24 +209,39 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 				return $this->lists[ $key ];
 			}
 			public function clear_location_categories_cache( $lid ) {}
-			public function tg_insert_or_update_term( $term, $tax, $parent = null ) {
-				$this->clock->t  += $this->advance;
-				$this->upserts[] = array( 'tax' => $tax, 'id' => $term['id'] );
-				return $term['id'];
+
+			// Token-aware fake of the term upsert: skips a term already stamped with
+			// the current run token (dedup), else records the upsert and stamps it.
+			public function tg_insert_or_update_term( $term, $tax, $parent = null, $run_token = null ) {
+				$this->last_term_skipped = false;
+				$id                      = $term['id'];
+				$has_token               = ( null !== $run_token && '' !== (string) $run_token );
+
+				if ( $has_token
+					&& isset( $this->stamped->map[ $tax ][ $id ] )
+					&& (string) $this->stamped->map[ $tax ][ $id ] === (string) $run_token ) {
+					$this->last_term_skipped = true;
+					return $id;
+				}
+
+				$this->clock->t += $this->advance;
+				$this->upserts[] = array( 'tax' => $tax, 'id' => $id );
+				if ( $has_token ) {
+					$this->stamped->map[ $tax ][ $id ] = (string) $run_token;
+				}
+				return $id;
 			}
-			public function remove_obsolete_terms( $taxonomy, $valid_ids ) {
-				$this->obsolete_calls[] = array(
-					'taxonomy' => $taxonomy,
-					'ids'      => array_values( (array) $valid_ids ),
-				);
-			}
-			// Neutralise the finalize machinery so a completing slice never hits the DB.
-			public function get_all_existing_inventory_ids() {
-				return array();
-			}
-			public function remove_missing_items_from_wordpress( $existing_items, $synced_items ) {
+
+			// Token-based finalize removal seams (record only; no DB).
+			public function remove_items_not_in_run( $run_token, $limit ) {
+				$this->item_removals[] = (string) $run_token;
 				return 0;
 			}
+			public function remove_terms_not_in_run( $taxonomy, $run_token, $limit ) {
+				$this->term_removals[] = array( 'taxonomy' => $taxonomy, 'token' => (string) $run_token );
+				return 0;
+			}
+			// Neutralise the rest of the finalize cleanup so it never hits the DB.
 			public function remove_unused_terms( $taxonomy ) {
 				return 0;
 			}
@@ -243,6 +266,10 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		return $state;
 	}
 
+	private function run_token(): string {
+		return (string) Tapgoods_Sync_State::get_instance()->get_cursor()['run_token'];
+	}
+
 	/** category tg_ids upserted this run, in order. */
 	private function upsert_ids_for( $probe, $tax ) {
 		$ids = array();
@@ -254,20 +281,58 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		return $ids;
 	}
 
+	/** taxonomies that finalize invoked token-based term removal on. */
+	private function removed_taxonomies( $probe ) {
+		$taxes = array();
+		foreach ( $probe->term_removals as $r ) {
+			$taxes[] = $r['taxonomy'];
+		}
+		return $taxes;
+	}
+
 	// -------------------------------------------------------------------------
 
 	/**
+	 * The cursor carries NO unbounded collection (WPB-172): every field is a scalar
+	 * or a small location-sized list. This is the invariant the whole fix rests on.
+	 */
+	public function test_cursor_has_no_unbounded_collections() {
+		$defaults = Tapgoods_Sync_State::cursor_defaults();
+
+		// The old giant-array fields are gone.
+		foreach ( array( 'synced_ids', 'valid_category_ids', 'valid_tag_ids', 'processed_category_ids', 'processed_tag_ids' ) as $gone ) {
+			$this->assertArrayNotHasKey( $gone, $defaults, "Cursor must not carry the unbounded field '$gone'." );
+		}
+
+		// The only array field is location_ids (bounded by the business's locations,
+		// not the catalog); everything else is a scalar.
+		foreach ( $defaults as $key => $value ) {
+			if ( 'location_ids' === $key ) {
+				$this->assertIsArray( $value );
+				continue;
+			}
+			$this->assertIsNotArray( $value, "Cursor field '$key' must be a scalar, not a growing collection." );
+		}
+
+		// The run token is a scalar, minted per run.
+		$this->assertSame( '', $defaults['run_token'] );
+		$token = Tapgoods_Sync_State::generate_run_token();
+		$this->assertIsString( $token );
+		$this->assertNotSame( '', $token );
+	}
+
+	/**
 	 * upsert_category_batch() in isolation: it processes at most one budget's worth
-	 * of upserts, stops on a whole-category boundary, and reports the resume point.
+	 * of operations, stops on a whole-category boundary, and reports the resume point.
 	 */
 	public function test_upsert_category_batch_is_bounded_and_reports_resume_point() {
 		$probe = $this->make_probe( $this->make_client() );
 
 		$categories = array(
-			$this->cat( 701 ),          // 1 upsert
-			$this->cat( 702, array( 811, 812 ) ), // 3 upserts (cat + 2 tags)
-			$this->cat( 703 ),          // 1 upsert
-			$this->cat( 704 ),          // 1 upsert
+			$this->cat( 701 ),          // 1 op
+			$this->cat( 702, array( 811, 812 ) ), // 3 ops (cat + 2 tags)
+			$this->cat( 703 ),          // 1 op
+			$this->cat( 704 ),          // 1 op
 		);
 
 		// Budget 2: category 701 (1) then category 702 (+3 => 4 >= 2) stops AFTER 702.
@@ -312,8 +377,8 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertSame( 0, (int) $cursor['cat_location_index'], 'Still on the SAME location.' );
 		$this->assertSame( 25, (int) $cursor['cat_item_index'], 'Checkpointed a within-location position.' );
 		$this->assertFalse( $cursor['categories_done'], 'categories_done must NOT be set mid-location.' );
-		$this->assertCount( 25, $cursor['valid_category_ids'], 'Exactly one batch of ids accumulated so far.' );
-		$this->assertSame( array(), $probe1->obsolete_calls, 'No reconciliation on a partial pass.' );
+		$this->assertCount( 25, $probe1->upserts, 'Exactly one batch upserted so far.' );
+		$this->assertSame( array(), $probe1->term_removals, 'No reconciliation on a partial pass.' );
 		$this->assertSame( 0, $probe1->client->inv_calls, 'Paging must not start until categories are done.' );
 
 		// Resume slice: generous budget, finishes the location + the whole run.
@@ -325,8 +390,8 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertArrayNotHasKey( 'in_progress', $result2, 'The resumed slice completes the run.' );
 		// The resume must continue at index 25, upserting only the REMAINING 5.
 		$this->assertSame( 5, count( $probe2->upserts ), 'Resume processes only the 5 leftover categories.' );
-		// Reconciliation ran exactly once per taxonomy, only after the location finished.
-		$this->assertCount( 2, $probe2->obsolete_calls, 'Reconcile once per taxonomy, after the whole location is collected.' );
+		// Token-based reconciliation ran once per taxonomy in finalize, after the full pass.
+		$this->assertSame( array( 'tg_category', 'tg_tags' ), $this->removed_taxonomies( $probe2 ), 'Reconcile once per taxonomy, in finalize.' );
 		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
 	}
 
@@ -354,12 +419,12 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertSame( 1, (int) $cursor['cat_location_index'], 'Only the first location was processed.' );
 		$this->assertSame( 0, (int) $cursor['cat_item_index'], 'Location boundary => within-location index reset.' );
 		$this->assertFalse( $cursor['categories_done'], 'categories_done must NOT be set on a partial pass.' );
-		$this->assertSame( array( 701 ), $cursor['valid_category_ids'], 'Only location 5001 category ids accumulated so far.' );
-		$this->assertSame( array( 801, 802 ), $cursor['valid_tag_ids'] );
+		$this->assertSame( array( 701 ), $this->upsert_ids_for( $probe, 'tg_category' ), 'Only location 5001 categories upserted so far.' );
+		$this->assertSame( array( 801, 802 ), $this->upsert_ids_for( $probe, 'tg_tags' ) );
 		$this->assertSame( 'paging', $cursor['phase'], 'Still in the paging phase (categories precede paging).' );
 
 		$this->assertSame( array( '5001' ), $probe->fetched, 'Exactly one location processed this slice.' );
-		$this->assertSame( array(), $probe->obsolete_calls, 'Obsolete-term removal must NOT run on a partial pass.' );
+		$this->assertSame( array(), $probe->term_removals, 'Obsolete-term removal must NOT run on a partial pass.' );
 
 		$this->assertSame( 0, $probe->client->inv_calls, 'Paging must not start until categories are done.' );
 		$this->assertSame( 0, Tapgoods_Sync_State::get_instance()->get_pages_completed(), 'No page was completed.' );
@@ -369,10 +434,10 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	/**
 	 * Resuming from a cursor that already did location 0 must continue at the next
 	 * location (never reprocess 0), and once every location is collected it must
-	 * reconcile obsolete terms EXACTLY ONCE per taxonomy against the FULL
-	 * accumulated id set, set categories_done, then proceed to paging + complete.
+	 * reconcile obsolete terms in finalize (token-based, once per taxonomy), set
+	 * categories_done, then proceed to paging + complete.
 	 */
-	public function test_categories_resume_reconciles_once_with_full_set_then_pages() {
+	public function test_categories_resume_reconciles_once_then_pages() {
 		$probe          = $this->make_probe( $this->make_client() );
 		$probe->advance = 0; // generous budget: the resumed slice finishes categories.
 		$probe->lists   = array(
@@ -380,12 +445,15 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 			'5003' => array( $this->cat( 704, array( 805 ) ) ),
 		);
 
-		// Simulate "tick 1 already synced location 5001": seed the checkpoint.
+		// Simulate "tick 1 already synced location 5001": seed the checkpoint and
+		// stamp 5001's terms with the run token in the shared "DB".
 		$state  = $this->fresh_state( array( 5001, 5002, 5003 ) );
+		$token  = $this->run_token();
+		$this->stamped->map['tg_category'][701] = $token;
+		$this->stamped->map['tg_tags'][801]     = $token;
+		$this->stamped->map['tg_tags'][802]     = $token;
 		$cursor = $state->get_cursor();
 		$cursor['cat_location_index'] = 1;
-		$cursor['valid_category_ids'] = array( 701 );
-		$cursor['valid_tag_ids']      = array( 801, 802 );
 		$state->save_cursor( $cursor );
 
 		$result = $this->run_slice( $probe, $state );
@@ -395,15 +463,14 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 		// Resume continued at 5002/5003 and never reprocessed 5001.
 		$this->assertSame( array( '5002', '5003' ), $probe->fetched );
+		$this->assertSame( array( 703, 704 ), $this->upsert_ids_for( $probe, 'tg_category' ) );
+		$this->assertSame( array( 805 ), $this->upsert_ids_for( $probe, 'tg_tags' ) );
 
-		// Reconciliation ran once per taxonomy, with the FULL accumulated set.
-		$this->assertCount( 2, $probe->obsolete_calls, 'Exactly one reconciliation per taxonomy.' );
-		$by_tax = array();
-		foreach ( $probe->obsolete_calls as $call ) {
-			$by_tax[ $call['taxonomy'] ] = $call['ids'];
+		// Token-based reconciliation ran once per taxonomy in finalize, with THIS run's token.
+		$this->assertSame( array( 'tg_category', 'tg_tags' ), $this->removed_taxonomies( $probe ) );
+		foreach ( $probe->term_removals as $r ) {
+			$this->assertSame( $token, $r['token'], 'Finalize reconciliation must use the run token that stamped the terms.' );
 		}
-		$this->assertSame( array( 701, 703, 704 ), $by_tax['tg_category'], 'Full accumulated category set across all locations.' );
-		$this->assertSame( array( 801, 802, 805 ), $by_tax['tg_tags'], 'Full accumulated tag set across all locations.' );
 
 		// Paging ran only after categories were done, and the run completed.
 		$this->assertGreaterThan( 0, $probe->client->inv_calls, 'Paging must run after categories complete.' );
@@ -415,8 +482,7 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	 * storefront's locations. A category id upserted while syncing location A must
 	 * NOT be re-upserted when it reappears under B or C. Proven by asserting
 	 * tg_insert_or_update_term runs exactly once per UNIQUE source id across all
-	 * locations, while the accumulators (and the obsolete-term reconciliation) still
-	 * see the FULL unique set.
+	 * locations, driven by the run-token stamp rather than an in-cursor set.
 	 */
 	public function test_categories_are_upserted_once_per_unique_id_across_locations() {
 		$probe          = $this->make_probe( $this->make_client() );
@@ -442,11 +508,6 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertSame( array( 701, 702, 703, 704 ), $cat_upserts, 'Every unique category upserted exactly once across locations.' );
 		$this->assertSame( array( 801, 802 ), $tag_upserts, 'Every unique tag upserted exactly once across locations.' );
 
-		// The upsert count equals the unique count, NOT locations x categories: 701
-		// appears 3x, 702 2x, 801 3x in the input, but each is written once.
-		$this->assertSame( 4, count( $cat_upserts ) );
-		$this->assertSame( 2, count( $tag_upserts ) );
-
 		// The dedup skip count is reported in the categories.done log (the completed run
 		// clears the cursor, so this is read from the log, not the cursor). Skips are
 		// counted at the category level; an already-processed category is not descended
@@ -456,23 +517,16 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertStringContainsString( 'sync.categories.done', $log );
 		$this->assertStringContainsString( 'dupes_skipped=3', $log, 'Three duplicate categories skipped across locations.' );
 
-		// DELETION SAFETY preserved: reconciliation runs once per taxonomy against the
-		// FULL unique valid-id set (the probe returns tg_id as term_id, so the term ids
-		// equal the source ids here).
-		$by_tax = array();
-		foreach ( $probe->obsolete_calls as $call ) {
-			$by_tax[ $call['taxonomy'] ] = $call['ids'];
-		}
-		$this->assertCount( 2, $probe->obsolete_calls, 'Reconcile once per taxonomy, after all locations.' );
-		$this->assertSame( array( 701, 702, 703, 704 ), $by_tax['tg_category'], 'Reconcile sees the full unique category set.' );
-		$this->assertSame( array( 801, 802 ), $by_tax['tg_tags'], 'Reconcile sees the full unique tag set.' );
+		// DELETION SAFETY preserved: reconciliation runs once per taxonomy in finalize.
+		$this->assertSame( array( 'tg_category', 'tg_tags' ), $this->removed_taxonomies( $probe ) );
 		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
 	}
 
 	/**
-	 * The dedup set is durable across ticks: a category upserted while syncing
-	 * location A on tick 1 must NOT be re-upserted when the SAME id appears under
-	 * location B on tick 2. The processed sets persist in the cursor between slices.
+	 * The dedup is durable across ticks THROUGH THE DB stamp (not the cursor): a
+	 * category upserted while syncing location A on tick 1 must NOT be re-upserted
+	 * when the SAME id appears under location B on tick 2. Modelled here by the
+	 * shared stamp map, which stands in for the persisted term meta.
 	 */
 	public function test_dedup_persists_across_slices() {
 		// Tick 1: only location 5001, budget interrupts after it (advance forces a
@@ -483,18 +537,15 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 			'5001' => array( $this->cat( 701, array( 801 ) ) ),
 			'5002' => array( $this->cat( 701, array( 801 ) ), $this->cat( 702 ) ),
 		);
-		$state  = $this->fresh_state( array( 5001, 5002 ) );
+		$state = $this->fresh_state( array( 5001, 5002 ) );
 		$this->run_slice( $probe1, $state );
 
 		// Tick 1 upserted 701 + 801 once (location 5001) and checkpointed.
 		$this->assertSame( array( 701 ), $this->upsert_ids_for( $probe1, 'tg_category' ) );
 		$this->assertSame( array( 801 ), $this->upsert_ids_for( $probe1, 'tg_tags' ) );
-		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
-		$this->assertSame( array( 701 ), array_keys( $cursor['processed_category_ids'] ) );
-		$this->assertSame( array( 801 ), array_keys( $cursor['processed_tag_ids'] ) );
 
 		// Tick 2: generous budget, resumes at location 5002. 701/801 must be SKIPPED
-		// (already processed on tick 1); only 702 is new.
+		// (already stamped on tick 1 in the shared "DB"); only 702 is new.
 		$probe2          = $this->make_probe( $this->make_client() );
 		$probe2->advance = 0;
 		$probe2->lists   = array(
@@ -502,36 +553,30 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		);
 		$this->run_slice( $probe2, Tapgoods_Sync_State::get_instance() );
 
-		$this->assertSame( array( 702 ), $this->upsert_ids_for( $probe2, 'tg_category' ), '701 already processed on tick 1 is not re-upserted.' );
-		$this->assertSame( array(), $this->upsert_ids_for( $probe2, 'tg_tags' ), '801 already processed on tick 1 is not re-upserted.' );
-
-		// Reconciliation on the resumed slice sees the FULL set (701 from tick 1 + 702).
-		$by_tax = array();
-		foreach ( $probe2->obsolete_calls as $call ) {
-			$by_tax[ $call['taxonomy'] ] = $call['ids'];
-		}
-		$this->assertSame( array( 701, 702 ), $by_tax['tg_category'], 'Full accumulated set across ticks.' );
-		$this->assertSame( array( 801 ), $by_tax['tg_tags'] );
+		$this->assertSame( array( 702 ), $this->upsert_ids_for( $probe2, 'tg_category' ), '701 already stamped on tick 1 is not re-upserted.' );
+		$this->assertSame( array(), $this->upsert_ids_for( $probe2, 'tg_tags' ), '801 already stamped on tick 1 is not re-upserted.' );
 		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
 	}
 
 	/**
-	 * upsert_category_batch() in isolation honours the by-ref processed sets: a source
-	 * id already in the set is skipped (no upsert, not counted against budget, no id
-	 * returned), and a newly upserted id is recorded into the set.
+	 * upsert_category_batch() in isolation honours the run-token dedup: a source id
+	 * whose term already carries the token is skipped (no upsert, still counts a skip),
+	 * and a newly upserted id is stamped into the shared map.
 	 */
-	public function test_upsert_category_batch_skips_already_processed_ids() {
+	public function test_upsert_category_batch_skips_already_stamped_ids() {
 		$probe = $this->make_probe( $this->make_client() );
+		$token = 'tok123';
+
+		// 701 (and its sub-tag 801) already stamped with this run's token.
+		$this->stamped->map['tg_category'][701] = $token;
+		$this->stamped->map['tg_tags'][801]     = $token;
 
 		$categories = array(
 			$this->cat( 701, array( 801 ) ),
 			$this->cat( 702 ),
 		);
 
-		$processed_cat = array( 701 => true ); // 701 already processed earlier this run.
-		$processed_tag = array( 801 => true ); // 801 already processed earlier this run.
-
-		$batch = $probe->upsert_category_batch( $categories, 0, PHP_INT_MAX, $processed_cat, $processed_tag );
+		$batch = $probe->upsert_category_batch( $categories, 0, PHP_INT_MAX, $token );
 
 		$this->assertTrue( $batch['done'] );
 		// 701 is skipped at the category level; its subtree (tag 801) is not descended
@@ -540,9 +585,8 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->assertSame( array(), $batch['tag_ids'] );
 		$this->assertSame( 1, $batch['skipped'], '701 skipped as a whole category (its subtree is not counted separately).' );
 		$this->assertSame( array( 702 ), $this->upsert_ids_for( $probe, 'tg_category' ), 'Only the new category hit the term DB.' );
-		// 702 is now recorded in the processed set (by reference); 801 untouched.
-		$this->assertSame( array( 701, 702 ), array_keys( $processed_cat ) );
-		$this->assertSame( array( 801 ), array_keys( $processed_tag ) );
+		// 702 is now stamped in the shared map; 801 untouched.
+		$this->assertSame( $token, $this->stamped->map['tg_category'][702] );
 	}
 
 	/**
@@ -563,12 +607,7 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$this->run_slice( $probe, $state );
 
 		$this->assertSame( array( '5001', '5002', '5003' ), $probe->fetched, 'Every location was attempted, including the failed one.' );
-
-		$by_tax = array();
-		foreach ( $probe->obsolete_calls as $call ) {
-			$by_tax[ $call['taxonomy'] ] = $call['ids'];
-		}
-		$this->assertSame( array( 701, 704 ), $by_tax['tg_category'], 'The failed location contributes no ids.' );
+		$this->assertSame( array( 701, 704 ), $this->upsert_ids_for( $probe, 'tg_category' ), 'The failed location contributes no ids.' );
 		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
 	}
 

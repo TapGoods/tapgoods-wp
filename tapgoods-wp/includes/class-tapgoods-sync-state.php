@@ -98,38 +98,44 @@ class Tapgoods_Sync_State {
 	/**
 	 * Default shape of the resumable paging cursor.
 	 *
-	 *  - location_ids:    ordered list of location IDs captured when the run began.
+	 * MEMORY BOUND (WPB-172): every field here is a SCALAR or a small
+	 * location-sized list. Nothing grows with the number of items, categories or
+	 * tags. The run's per-row bookkeeping lives in the DB instead: each synced
+	 * inventory post and each upserted term is stamped with the run's token
+	 * (Tapgoods_Connection::SYNC_RUN_META), so "did this run touch this row?" is a
+	 * per-row meta read, never an in-cursor collection. This is what keeps the
+	 * serialized state (and the per-slice memory) FLAT regardless of catalog size;
+	 * the old synced_ids / valid_*_ids / processed_*_ids arrays are what blew the
+	 * 512 MB limit during finalize on a large WP Engine catalog.
+	 *
+	 *  - location_ids:    ordered list of location IDs captured when the run began
+	 *                     (bounded by the business's location count, ~18, not catalog size).
 	 *  - location_index:  index into location_ids currently being paged.
 	 *  - next_page:       next 1-based page to fetch for that location.
-	 *  - synced_ids:         tg_ids written so far this run (durable across ticks so
-	 *                        removals only reconcile once a FULL pass is confirmed).
-	 *  - total_items:        running count of items written this run.
-	 *  - categories_done:    whether the (now bounded/resumable) category/tag pass has
-	 *                        finished for EVERY location.
+	 *  - run_token:       stable scalar token generated once at PREP and reused across
+	 *                     EVERY resumed slice of the run. Stamped onto every synced post
+	 *                     and upserted term; finalize deletes whatever is NOT stamped with
+	 *                     it. Replaces the old synced_ids / valid_*_ids / processed_*_ids.
+	 *  - total_items:     running count of items written this run (the scalar safety valve:
+	 *                     finalize skips item removal entirely when this is 0).
+	 *  - categories_done: whether the (bounded/resumable) category/tag pass has finished
+	 *                     for EVERY location.
 	 *  - cat_location_index: how many of location_ids have had their categories synced
-	 *                        (the resume point for the bounded categories loop, mirroring
-	 *                        location_index for paging).
-	 *  - cat_item_index:     resume point WITHIN the current location's category list, so
-	 *                        one large location's category upserts are checkpointed in
-	 *                        bounded batches (mirrors next_page within a location for
-	 *                        paging). Reset to 0 whenever cat_location_index advances.
-	 *  - valid_category_ids: tg_category term ids upserted so far this run (durable across
-	 *                        ticks so obsolete-term reconciliation only runs once against
-	 *                        the FULL set, never on a partial pass).
-	 *  - valid_tag_ids:      tg_tags term ids upserted so far this run (same rationale).
-	 *  - processed_category_ids: SOURCE (TapGoods) category ids already upserted THIS run,
-	 *                        as an associative set ([id => true]) for O(1) membership and
-	 *                        cheap serialization. A storefront's categories overlap heavily
-	 *                        across its ~18 locations, so this lets upsert_category_batch()
-	 *                        skip re-upserting a category it already wrote earlier this run
-	 *                        (under this or another location). Bounded by the number of
-	 *                        UNIQUE categories, NOT locations x categories.
-	 *  - processed_tag_ids:  SOURCE (TapGoods) sub-category ids already upserted as tg_tags
-	 *                        THIS run (same associative-set shape and rationale).
-	 *  - cat_dupes_skipped:  running count of category/tag upserts skipped because their
-	 *                        source id was already processed this run (visibility only).
-	 *  - phase:              'paging' while walking locations, 'finalize' once every
-	 *                        location/page is done (cleanup + reconciliation).
+	 *                     (resume point for the bounded categories loop, mirroring
+	 *                     location_index for paging).
+	 *  - cat_item_index:  resume point WITHIN the current location's category list, so one
+	 *                     large location's category upserts are checkpointed in bounded
+	 *                     batches. Reset to 0 whenever cat_location_index advances.
+	 *  - cat_dupes_skipped: running count of category/tag upserts skipped because a term
+	 *                     for that source id was already stamped with run_token this run
+	 *                     (visibility only).
+	 *  - phase:           'paging' while walking locations, 'finalize' once every
+	 *                     location/page is done (cleanup + reconciliation).
+	 *  - finalize_step:   which bounded finalize sub-step is in progress ('' until finalize
+	 *                     begins, then 'items' -> 'obsolete_cat' -> 'obsolete_tag' ->
+	 *                     'cleanup' -> 'done'). Makes finalize resumable across slices.
+	 *  - finalize_items_removed / finalize_terms_removed: running counters for the final
+	 *                     sync.finalize.done log line (scalars, accumulated across slices).
 	 *
 	 * @return array
 	 */
@@ -138,18 +144,31 @@ class Tapgoods_Sync_State {
 			'location_ids'           => array(),
 			'location_index'         => 0,
 			'next_page'              => 1,
-			'synced_ids'             => array(),
+			'run_token'              => '',
 			'total_items'            => 0,
 			'categories_done'        => false,
 			'cat_location_index'     => 0,
 			'cat_item_index'         => 0,
-			'valid_category_ids'     => array(),
-			'valid_tag_ids'          => array(),
-			'processed_category_ids' => array(),
-			'processed_tag_ids'      => array(),
 			'cat_dupes_skipped'      => 0,
 			'phase'                  => 'paging',
+			'finalize_step'          => '',
+			'finalize_items_removed' => 0,
+			'finalize_terms_removed' => 0,
 		);
+	}
+
+	/**
+	 * Generate a stable, unique token for one sync run.
+	 *
+	 * Scalar and self-contained (no WordPress dependency, so it stays usable in
+	 * the isolated unit suite). Generated once at PREP and persisted in the cursor;
+	 * every resumed slice of the run reuses the SAME token, which is what lets
+	 * finalize tell "touched this run" rows from stale ones by a per-row meta stamp.
+	 *
+	 * @return string
+	 */
+	public static function generate_run_token() {
+		return substr( md5( uniqid( (string) mt_rand(), true ) ), 0, 16 );
 	}
 
 	private function load() {
@@ -217,14 +236,19 @@ class Tapgoods_Sync_State {
 	// --- Resumable paging cursor --------------------------------------------
 
 	/**
-	 * Seed the cursor for a new run with the ordered list of location IDs to page.
+	 * Seed the cursor for a new run with the ordered list of location IDs to page,
+	 * and mint the run token that every synced post/term will be stamped with.
 	 *
-	 * @param array $location_ids Location IDs to page through, in order.
+	 * @param array       $location_ids Location IDs to page through, in order.
+	 * @param string|null $run_token    Token for this run; a fresh one is minted when omitted.
 	 * @return $this
 	 */
-	public function init_cursor( $location_ids ) {
+	public function init_cursor( $location_ids, $run_token = null ) {
 		$cursor                 = self::cursor_defaults();
 		$cursor['location_ids'] = array_values( array_map( 'strval', (array) $location_ids ) );
+		$cursor['run_token']    = ( null !== $run_token && '' !== (string) $run_token )
+			? (string) $run_token
+			: self::generate_run_token();
 		$this->data['cursor']   = $cursor;
 		$this->save();
 		return $this;

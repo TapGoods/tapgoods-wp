@@ -324,4 +324,69 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		);
 		$this->assertNotEmpty( $in_tables, 'The round table should be filed under Tables.' );
 	}
+
+	/**
+	 * WPB-172 end-to-end against real WordPress: a full run stamps every synced
+	 * post/term with the run token and the token-based, chunked finalize removes
+	 * exactly what the API no longer returns (a stale item), keeping the rest. This
+	 * proves the memory-bounded reconciliation replaces the old load-everything diff
+	 * without over- or under-deleting.
+	 */
+	public function test_full_sync_stamps_rows_and_reconciles_stale_items() {
+		// A stale item the API no longer returns (not in the fixtures). It carries no
+		// run-token stamp, so the token-based finalize must delete it.
+		$stale = self::factory()->post->create(
+			array(
+				'post_type'   => 'tg_inventory',
+				'post_status' => 'publish',
+				'post_title'  => 'Retired Widget',
+			)
+		);
+		update_post_meta( $stale, 'tg_id', '999999' );
+
+		$result = $this->connection()->sync_from_api();
+		$this->assertTrue( $result['success'] );
+		$this->assertSame(
+			Tapgoods_Sync_State::STATE_COMPLETED,
+			Tapgoods_Sync_State::get_instance()->get_state(),
+			'The run must reach COMPLETED (finalize converged).'
+		);
+
+		// The stale item is gone; only the two fixture items remain.
+		$this->assertNull( get_post( $stale ), 'A stale item not stamped by the run must be reconciled away.' );
+
+		$posts = get_posts(
+			array(
+				'post_type'   => 'tg_inventory',
+				'numberposts' => -1,
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertCount( 2, $posts, 'Exactly the two fixture items survive.' );
+
+		// Every surviving item carries THIS run's token stamp.
+		$token = '';
+		foreach ( $posts as $p ) {
+			$stamp = (string) get_post_meta( $p->ID, \Tapgoods_Connection::SYNC_RUN_META, true );
+			$this->assertNotSame( '', $stamp, 'Each synced item must be stamped with the run token.' );
+			if ( '' === $token ) {
+				$token = $stamp;
+			}
+			$this->assertSame( $token, $stamp, 'All items from one run share the same token.' );
+		}
+
+		// Terms are stamped with the same token too, so obsolete-term removal is
+		// keyed on it (and here nothing obsolete exists, so the fixture terms survive).
+		$cats = get_terms(
+			array(
+				'taxonomy'   => 'tg_category',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotEmpty( $cats );
+		foreach ( $cats as $term_id ) {
+			$this->assertSame( $token, (string) get_term_meta( $term_id, \Tapgoods_Connection::SYNC_RUN_META, true ), 'Each synced term shares the run token.' );
+		}
+	}
 }

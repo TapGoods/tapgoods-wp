@@ -91,13 +91,18 @@ final class ConnectionSyncLogTest extends TestCase {
 
 		global $wpdb;
 		$wpdb = new class() {
+			public $posts         = 'wp_posts';
 			public $postmeta      = 'wp_postmeta';
 			public $term_taxonomy = 'wp_term_taxonomy';
+			public $termmeta      = 'wp_termmeta';
 			public function prepare( $query, ...$args ) {
 				return $query;
 			}
 			public function get_col( $query ) {
-				return array();
+				return array(); // Nothing to reconcile: no unstamped posts/terms.
+			}
+			public function get_var( $query ) {
+				return 0; // count_terms_in_run(): no stamped terms in this stub.
 			}
 			public function get_results( $query, $output = null ) {
 				return array();
