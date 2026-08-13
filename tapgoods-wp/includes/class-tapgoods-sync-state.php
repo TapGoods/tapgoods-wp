@@ -117,6 +117,17 @@ class Tapgoods_Sync_State {
 	 *                        ticks so obsolete-term reconciliation only runs once against
 	 *                        the FULL set, never on a partial pass).
 	 *  - valid_tag_ids:      tg_tags term ids upserted so far this run (same rationale).
+	 *  - processed_category_ids: SOURCE (TapGoods) category ids already upserted THIS run,
+	 *                        as an associative set ([id => true]) for O(1) membership and
+	 *                        cheap serialization. A storefront's categories overlap heavily
+	 *                        across its ~18 locations, so this lets upsert_category_batch()
+	 *                        skip re-upserting a category it already wrote earlier this run
+	 *                        (under this or another location). Bounded by the number of
+	 *                        UNIQUE categories, NOT locations x categories.
+	 *  - processed_tag_ids:  SOURCE (TapGoods) sub-category ids already upserted as tg_tags
+	 *                        THIS run (same associative-set shape and rationale).
+	 *  - cat_dupes_skipped:  running count of category/tag upserts skipped because their
+	 *                        source id was already processed this run (visibility only).
 	 *  - phase:              'paging' while walking locations, 'finalize' once every
 	 *                        location/page is done (cleanup + reconciliation).
 	 *
@@ -124,17 +135,20 @@ class Tapgoods_Sync_State {
 	 */
 	public static function cursor_defaults() {
 		return array(
-			'location_ids'       => array(),
-			'location_index'     => 0,
-			'next_page'          => 1,
-			'synced_ids'         => array(),
-			'total_items'        => 0,
-			'categories_done'    => false,
-			'cat_location_index' => 0,
-			'cat_item_index'     => 0,
-			'valid_category_ids' => array(),
-			'valid_tag_ids'      => array(),
-			'phase'              => 'paging',
+			'location_ids'           => array(),
+			'location_index'         => 0,
+			'next_page'              => 1,
+			'synced_ids'             => array(),
+			'total_items'            => 0,
+			'categories_done'        => false,
+			'cat_location_index'     => 0,
+			'cat_item_index'         => 0,
+			'valid_category_ids'     => array(),
+			'valid_tag_ids'          => array(),
+			'processed_category_ids' => array(),
+			'processed_tag_ids'      => array(),
+			'cat_dupes_skipped'      => 0,
+			'phase'                  => 'paging',
 		);
 	}
 

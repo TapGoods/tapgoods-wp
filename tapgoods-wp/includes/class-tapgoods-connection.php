@@ -606,7 +606,7 @@ class Tapgoods_Connection {
 						$state->save_cursor($cursor);
 
 						if ($this->slice_budget_spent($start_time, $pages_this_run)) {
-							$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+							$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'dupes_skipped' => (int) $cursor['cat_dupes_skipped'], 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
 							$this->active_run = false;
 							return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
 						}
@@ -618,10 +618,23 @@ class Tapgoods_Connection {
 					// WPB-165 fix: one large location's full category upsert used to
 					// exceed the request window before any checkpoint, so cat_location_index
 					// never advanced and the next tick redid PREP forever.
-					$batch = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget);
+					//
+					// The processed-id sets are threaded BY REFERENCE and persisted in the
+					// cursor so a category/tag already upserted under an earlier location
+					// (this or a previous tick) is skipped here instead of re-upserted. A
+					// storefront's categories overlap heavily across its ~18 locations, so
+					// this collapses the phase to roughly one pass over the UNIQUE set.
+					$processed_cat = (array) $cursor['processed_category_ids'];
+					$processed_tag = (array) $cursor['processed_tag_ids'];
+					$batch         = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget, $processed_cat, $processed_tag);
+					$cursor['processed_category_ids'] = $processed_cat;
+					$cursor['processed_tag_ids']      = $processed_tag;
+					$cursor['cat_dupes_skipped']      = (int) $cursor['cat_dupes_skipped'] + (int) $batch['skipped'];
 
 					// Accumulate this batch's ids into the durable cursor so the eventual
-					// reconciliation sees the FULL set across every slice.
+					// reconciliation sees the FULL set across every slice. Skipped duplicates
+					// contribute no ids here: their term_id is already in the accumulator
+					// from the location that first upserted them.
 					$cursor['valid_category_ids'] = array_values(array_unique(array_merge((array) $cursor['valid_category_ids'], $batch['category_ids'])));
 					$cursor['valid_tag_ids']      = array_values(array_unique(array_merge((array) $cursor['valid_tag_ids'], $batch['tag_ids'])));
 
@@ -642,7 +655,7 @@ class Tapgoods_Connection {
 						// Budget spent mid-categories: resume at cat_location_index /
 						// cat_item_index next tick. Do NOT set categories_done and do NOT
 						// reconcile removals (that would delete not-yet-collected terms).
-						$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+						$log->info('sync.checkpoint', array('stage' => 'categories', 'phase' => $cursor['phase'], 'cat_location_index' => $cat_idx . '/' . count($location_ids), 'cat_item_index' => $cat_item_idx, 'dupes_skipped' => (int) $cursor['cat_dupes_skipped'], 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
 						$this->active_run = false;
 						return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
 					}
@@ -658,7 +671,7 @@ class Tapgoods_Connection {
 				$cursor['categories_done'] = true;
 				$state->save_cursor($cursor);
 
-				$log->info('sync.categories.done', array('pass' => 'sliced', 'ok' => 1, 'categories' => count($cursor['valid_category_ids']), 'tags' => count($cursor['valid_tag_ids'])));
+				$log->info('sync.categories.done', array('pass' => 'sliced', 'ok' => 1, 'categories' => count($cursor['valid_category_ids']), 'tags' => count($cursor['valid_tag_ids']), 'dupes_skipped' => (int) $cursor['cat_dupes_skipped']));
 
 				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
 					$log->info('sync.checkpoint', array('after' => 'categories', 'phase' => $cursor['phase'], 'pages_this_slice' => $pages_this_run, 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
@@ -1468,8 +1481,14 @@ class Tapgoods_Connection {
 		$valid_category_ids = array();
 		$valid_tag_ids = array();
 
+		// Cross-location dedup (same fix as the sliced path): a storefront's categories
+		// overlap heavily across its ~18 locations, so track the source ids already
+		// upserted this pass and skip re-upserting them. Bounded by the UNIQUE count.
+		$processed_category_ids = array();
+		$processed_tag_ids      = array();
+
 		foreach ($location_ids as $lid) {
-			$touched = $this->sync_categories_for_location($lid);
+			$touched = $this->sync_categories_for_location($lid, $processed_category_ids, $processed_tag_ids);
 
 			if (! $touched['ok']) {
 				$log->warn('sync.categories.fetch_failed', array('location' => $lid, 'pass' => $pass, 'status' => $this->client_http_status($client)));
@@ -1514,14 +1533,20 @@ class Tapgoods_Connection {
 	 * accumulated valid-id set), never on this one location's partial set, or a
 	 * not-yet-processed location's terms would be deleted and re-added next slice.
 	 *
-	 * @param int|string $lid Location id.
+	 * @param int|string $lid                    Location id.
+	 * @param array      $processed_category_ids By-ref set ([source id => true]) of category
+	 *                                           ids already upserted this pass; extended here
+	 *                                           so a category shared with an earlier location
+	 *                                           is not re-upserted. Defaults to a fresh set
+	 *                                           (no cross-call dedup) for standalone callers.
+	 * @param array      $processed_tag_ids      By-ref set for sub-tag source ids (same role).
 	 * @return array {
 	 *     @type bool  $ok           Whether the location's categories were fetched.
 	 *     @type int[] $category_ids tg_category term ids upserted for this location.
 	 *     @type int[] $tag_ids      tg_tags term ids upserted for this location.
 	 * }
 	 */
-	public function sync_categories_for_location($lid) {
+	public function sync_categories_for_location($lid, &$processed_category_ids = array(), &$processed_tag_ids = array()) {
 		$categories = $this->get_location_categories_cached($lid);
 
 		if (false === $categories) {
@@ -1531,7 +1556,7 @@ class Tapgoods_Connection {
 		// One-shot form: drain the whole location in a single unbounded batch. The
 		// sliced sync path (run_sync_slice) instead calls upsert_category_batch()
 		// directly with a bounded budget so it can checkpoint within a location.
-		$batch = $this->upsert_category_batch($categories, 0, PHP_INT_MAX);
+		$batch = $this->upsert_category_batch($categories, 0, PHP_INT_MAX, $processed_category_ids, $processed_tag_ids);
 
 		return array('ok' => true, 'category_ids' => $batch['category_ids'], 'tag_ids' => $batch['tag_ids']);
 	}
@@ -1589,40 +1614,90 @@ class Tapgoods_Connection {
 	 * Pure over its inputs apart from the term-DB writes (tg_insert_or_update_term),
 	 * so the batching/resume arithmetic is unit-testable with that seam stubbed.
 	 *
-	 * @param array $categories    The location's category list.
-	 * @param int   $start_index   Category index to resume from (0-based).
-	 * @param int   $upsert_budget Max term upserts (categories + tags) this batch.
+	 * CROSS-LOCATION DEDUP (the perf fix): a storefront's categories overlap heavily
+	 * across its ~18 locations, so the same ~4,000 unique categories used to be
+	 * re-upserted up to ~18x, one location at a time (evidence: a single location
+	 * reached cat_item_index 3925+ and the phase ran 12+ hours). $processed_category_ids
+	 * / $processed_tag_ids are associative sets ([source id => true]) of the SOURCE
+	 * TapGoods ids already upserted THIS run. Before upserting a category (or a sub-tag)
+	 * this method checks that set: an already-processed id is SKIPPED entirely (it already
+	 * exists as a term and its term_id is already in the caller's valid-id accumulators),
+	 * so the expensive DB work happens once per UNIQUE id across all locations. The sets
+	 * are passed BY REFERENCE so the caller can persist them in the cursor across ticks;
+	 * they are bounded by the unique-category/tag count, never by locations x categories.
+	 * A skip does NOT consume the upsert budget (there is no DB work to bound), so a
+	 * location made entirely of already-seen categories drains in a single batch. Because
+	 * the sets default to fresh empty arrays, the one-shot callers that pass nothing keep
+	 * the exact pre-dedup behaviour within a single call.
+	 *
+	 * @param array $categories             The location's category list.
+	 * @param int   $start_index            Category index to resume from (0-based).
+	 * @param int   $upsert_budget          Max term upserts (categories + tags) this batch.
+	 * @param array $processed_category_ids By-ref set ([id => true]) of source category ids
+	 *                                      already upserted this run; read and extended here.
+	 * @param array $processed_tag_ids      By-ref set ([id => true]) of source tag ids already
+	 *                                      upserted this run; read and extended here.
 	 * @return array {
 	 *     @type bool  $ok           Always true (fetch failures are handled upstream).
 	 *     @type int   $next_index   Category index to resume from next batch.
 	 *     @type bool  $done         Whether every category in the list is processed.
-	 *     @type int[] $category_ids tg_category term ids upserted this batch.
-	 *     @type int[] $tag_ids      tg_tags term ids upserted this batch.
+	 *     @type int[] $category_ids tg_category term ids upserted this batch (excludes skips,
+	 *                               whose term_id is already in the accumulators).
+	 *     @type int[] $tag_ids      tg_tags term ids upserted this batch (excludes skips).
+	 *     @type int   $skipped      Category/tag upserts skipped as cross-location duplicates.
 	 * }
 	 */
-	public function upsert_category_batch($categories, $start_index, $upsert_budget) {
+	public function upsert_category_batch($categories, $start_index, $upsert_budget, &$processed_category_ids = array(), &$processed_tag_ids = array()) {
 		$categories   = array_values((array) $categories);
 		$count        = count($categories);
 		$category_ids = array();
 		$tag_ids      = array();
+		$skipped      = 0;
 		$i            = max(0, (int) $start_index);
 		$budget       = max(1, (int) $upsert_budget);
 		$upserts      = 0;
 
 		while ($i < $count) {
-			$category         = $categories[$i];
+			$category = $categories[$i];
+			$cat_id   = isset($category['id']) ? $category['id'] : null;
+
+			// Already upserted this category (and, at that time, its sub-tags) earlier
+			// this run, under this or another location: its term_id is already in the
+			// caller's accumulator, so skip the DB work entirely. Cheap O(1) check that
+			// does not consume the upsert budget.
+			if (null !== $cat_id && isset($processed_category_ids[$cat_id])) {
+				++$skipped;
+				++$i;
+				continue;
+			}
+
 			$category_term_id = $this->tg_insert_or_update_term($category, 'tg_category');
 			++$upserts;
 			if ($category_term_id) {
 				$category_ids[] = $category_term_id;
+				if (null !== $cat_id) {
+					$processed_category_ids[$cat_id] = true;
+				}
 
 				// Process subcategories as tags and link them to their parent category.
 				if (!empty($category['sfSubCategories'])) {
 					foreach ($category['sfSubCategories'] as $tag) {
+						$tag_id = isset($tag['id']) ? $tag['id'] : null;
+
+						// Same dedup at the tag level: a sub-tag shared across categories
+						// (or already seen under another location) is upserted only once.
+						if (null !== $tag_id && isset($processed_tag_ids[$tag_id])) {
+							++$skipped;
+							continue;
+						}
+
 						$tag_term_id = $this->tg_insert_or_update_term($tag, 'tg_tags', $category_term_id);
 						++$upserts;
 						if ($tag_term_id) {
 							$tag_ids[] = $tag_term_id;
+							if (null !== $tag_id) {
+								$processed_tag_ids[$tag_id] = true;
+							}
 						}
 					}
 				}
@@ -1643,6 +1718,7 @@ class Tapgoods_Connection {
 			'done'         => ($i >= $count),
 			'category_ids' => $category_ids,
 			'tag_ids'      => $tag_ids,
+			'skipped'      => $skipped,
 		);
 	}
 	

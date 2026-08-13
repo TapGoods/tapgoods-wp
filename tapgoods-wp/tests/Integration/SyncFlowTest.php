@@ -84,6 +84,28 @@ final class SyncFlowTest extends WP_UnitTestCase {
 
 		$chairs = get_term_by( 'slug', 'chairs', 'tg_category' );
 		$this->assertNotFalse( $chairs, 'Expected a "chairs" category from the fixtures.' );
+
+		// CROSS-LOCATION DEDUP: the mock reports two locations (5001, 5002) that return
+		// the SAME category list. The sync must collapse them to a single set of terms:
+		// exactly the UNIQUE categories/tags, with no per-location duplicates. This
+		// proves the dedup threaded through sync_categories_from_api preserves the full
+		// unique set (deletion-safety) while doing the work once per unique id.
+		$categories = get_terms(
+			array(
+				'taxonomy'   => 'tg_category',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$tags = get_terms(
+			array(
+				'taxonomy'   => 'tg_tags',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertCount( 2, $categories, 'Two unique categories (Tables, Chairs) despite two locations returning them.' );
+		$this->assertCount( 2, $tags, 'Two unique sub-tags (Round Tables, Banquet Tables) despite two locations.' );
 	}
 
 	public function test_inventory_sync_creates_posts_with_meta() {

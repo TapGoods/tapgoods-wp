@@ -411,6 +411,141 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	}
 
 	/**
+	 * CROSS-LOCATION DEDUP (the perf fix): categories overlap heavily across a
+	 * storefront's locations. A category id upserted while syncing location A must
+	 * NOT be re-upserted when it reappears under B or C. Proven by asserting
+	 * tg_insert_or_update_term runs exactly once per UNIQUE source id across all
+	 * locations, while the accumulators (and the obsolete-term reconciliation) still
+	 * see the FULL unique set.
+	 */
+	public function test_categories_are_upserted_once_per_unique_id_across_locations() {
+		$probe          = $this->make_probe( $this->make_client() );
+		$probe->advance = 0; // generous budget: one slice drains all three locations.
+		// 701 (+ sub-tag 801) is shared by ALL three locations; 702 by two; 703/704
+		// are unique. Sub-tag 801 also reappears; 802 is unique to location 5003.
+		$probe->lists = array(
+			'5001' => array( $this->cat( 701, array( 801 ) ), $this->cat( 702 ) ),
+			'5002' => array( $this->cat( 701, array( 801 ) ), $this->cat( 702 ), $this->cat( 703 ) ),
+			'5003' => array( $this->cat( 701, array( 801 ) ), $this->cat( 704, array( 802 ) ) ),
+		);
+
+		$state  = $this->fresh_state( array( 5001, 5002, 5003 ) );
+		$result = $this->run_slice( $probe, $state );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertArrayNotHasKey( 'in_progress', $result, 'A generous slice completes the run.' );
+
+		// Each UNIQUE category/tag id hit the term DB exactly once, despite appearing
+		// under multiple locations.
+		$cat_upserts = $this->upsert_ids_for( $probe, 'tg_category' );
+		$tag_upserts = $this->upsert_ids_for( $probe, 'tg_tags' );
+		$this->assertSame( array( 701, 702, 703, 704 ), $cat_upserts, 'Every unique category upserted exactly once across locations.' );
+		$this->assertSame( array( 801, 802 ), $tag_upserts, 'Every unique tag upserted exactly once across locations.' );
+
+		// The upsert count equals the unique count, NOT locations x categories: 701
+		// appears 3x, 702 2x, 801 3x in the input, but each is written once.
+		$this->assertSame( 4, count( $cat_upserts ) );
+		$this->assertSame( 2, count( $tag_upserts ) );
+
+		// The dedup skip count is reported in the categories.done log (the completed run
+		// clears the cursor, so this is read from the log, not the cursor). Skips are
+		// counted at the category level; an already-processed category is not descended
+		// into, so its duplicate sub-tags are not separately counted: 701 under 5002,
+		// 702 under 5002, 701 under 5003 = 3.
+		$log = (string) file_get_contents( Tapgoods_Sync_Log::get_instance()->get_file_path() );
+		$this->assertStringContainsString( 'sync.categories.done', $log );
+		$this->assertStringContainsString( 'dupes_skipped=3', $log, 'Three duplicate categories skipped across locations.' );
+
+		// DELETION SAFETY preserved: reconciliation runs once per taxonomy against the
+		// FULL unique valid-id set (the probe returns tg_id as term_id, so the term ids
+		// equal the source ids here).
+		$by_tax = array();
+		foreach ( $probe->obsolete_calls as $call ) {
+			$by_tax[ $call['taxonomy'] ] = $call['ids'];
+		}
+		$this->assertCount( 2, $probe->obsolete_calls, 'Reconcile once per taxonomy, after all locations.' );
+		$this->assertSame( array( 701, 702, 703, 704 ), $by_tax['tg_category'], 'Reconcile sees the full unique category set.' );
+		$this->assertSame( array( 801, 802 ), $by_tax['tg_tags'], 'Reconcile sees the full unique tag set.' );
+		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
+	}
+
+	/**
+	 * The dedup set is durable across ticks: a category upserted while syncing
+	 * location A on tick 1 must NOT be re-upserted when the SAME id appears under
+	 * location B on tick 2. The processed sets persist in the cursor between slices.
+	 */
+	public function test_dedup_persists_across_slices() {
+		// Tick 1: only location 5001, budget interrupts after it (advance forces a
+		// checkpoint at the location boundary).
+		$probe1          = $this->make_probe( $this->make_client() );
+		$probe1->advance = 25; // each upsert exceeds the 18s slice budget.
+		$probe1->lists   = array(
+			'5001' => array( $this->cat( 701, array( 801 ) ) ),
+			'5002' => array( $this->cat( 701, array( 801 ) ), $this->cat( 702 ) ),
+		);
+		$state  = $this->fresh_state( array( 5001, 5002 ) );
+		$this->run_slice( $probe1, $state );
+
+		// Tick 1 upserted 701 + 801 once (location 5001) and checkpointed.
+		$this->assertSame( array( 701 ), $this->upsert_ids_for( $probe1, 'tg_category' ) );
+		$this->assertSame( array( 801 ), $this->upsert_ids_for( $probe1, 'tg_tags' ) );
+		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
+		$this->assertSame( array( 701 ), array_keys( $cursor['processed_category_ids'] ) );
+		$this->assertSame( array( 801 ), array_keys( $cursor['processed_tag_ids'] ) );
+
+		// Tick 2: generous budget, resumes at location 5002. 701/801 must be SKIPPED
+		// (already processed on tick 1); only 702 is new.
+		$probe2          = $this->make_probe( $this->make_client() );
+		$probe2->advance = 0;
+		$probe2->lists   = array(
+			'5002' => array( $this->cat( 701, array( 801 ) ), $this->cat( 702 ) ),
+		);
+		$this->run_slice( $probe2, Tapgoods_Sync_State::get_instance() );
+
+		$this->assertSame( array( 702 ), $this->upsert_ids_for( $probe2, 'tg_category' ), '701 already processed on tick 1 is not re-upserted.' );
+		$this->assertSame( array(), $this->upsert_ids_for( $probe2, 'tg_tags' ), '801 already processed on tick 1 is not re-upserted.' );
+
+		// Reconciliation on the resumed slice sees the FULL set (701 from tick 1 + 702).
+		$by_tax = array();
+		foreach ( $probe2->obsolete_calls as $call ) {
+			$by_tax[ $call['taxonomy'] ] = $call['ids'];
+		}
+		$this->assertSame( array( 701, 702 ), $by_tax['tg_category'], 'Full accumulated set across ticks.' );
+		$this->assertSame( array( 801 ), $by_tax['tg_tags'] );
+		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
+	}
+
+	/**
+	 * upsert_category_batch() in isolation honours the by-ref processed sets: a source
+	 * id already in the set is skipped (no upsert, not counted against budget, no id
+	 * returned), and a newly upserted id is recorded into the set.
+	 */
+	public function test_upsert_category_batch_skips_already_processed_ids() {
+		$probe = $this->make_probe( $this->make_client() );
+
+		$categories = array(
+			$this->cat( 701, array( 801 ) ),
+			$this->cat( 702 ),
+		);
+
+		$processed_cat = array( 701 => true ); // 701 already processed earlier this run.
+		$processed_tag = array( 801 => true ); // 801 already processed earlier this run.
+
+		$batch = $probe->upsert_category_batch( $categories, 0, PHP_INT_MAX, $processed_cat, $processed_tag );
+
+		$this->assertTrue( $batch['done'] );
+		// 701 is skipped at the category level; its subtree (tag 801) is not descended
+		// into, so it counts as a single skip. Only 702 is upserted.
+		$this->assertSame( array( 702 ), $batch['category_ids'] );
+		$this->assertSame( array(), $batch['tag_ids'] );
+		$this->assertSame( 1, $batch['skipped'], '701 skipped as a whole category (its subtree is not counted separately).' );
+		$this->assertSame( array( 702 ), $this->upsert_ids_for( $probe, 'tg_category' ), 'Only the new category hit the term DB.' );
+		// 702 is now recorded in the processed set (by reference); 801 untouched.
+		$this->assertSame( array( 701, 702 ), array_keys( $processed_cat ) );
+		$this->assertSame( array( 801 ), array_keys( $processed_tag ) );
+	}
+
+	/**
 	 * A location whose categories fail to fetch (list === false) is skipped: it must
 	 * not contribute ids, but cat_location_index must still advance so the pass
 	 * cannot loop forever on the failed location.
