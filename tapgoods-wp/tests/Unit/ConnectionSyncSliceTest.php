@@ -232,6 +232,42 @@ final class ConnectionSyncSliceTest extends TestCase {
 		$this->assertSame( 1, $this->deleted_transients, 'The run lock must be released.' );
 	}
 
+	public function test_shutdown_keeps_a_finalize_phase_run_resumable() {
+		// REGRESSION (the OOM reset loop): a fatal/OOM during FINALIZE has no remaining
+		// paging, but the run is fully resumable (finalize is its own checkpointed
+		// sub-state machine). It must stay ACTIVE with its cursor intact, NOT be reset
+		// to a fresh run - otherwise the next tick re-runs PREP from 0/N and loops.
+		$this->spy_transients();
+
+		$state = Tapgoods_Sync_State::get_instance();
+		$state->begin_prep( 5 )->mark_active();
+		$state->init_cursor( array( 5001, 5002 ) );
+
+		// Advance the run to the finalize phase, mid-cleanup, all locations paged.
+		$cursor                    = $state->get_cursor();
+		$cursor['location_index']  = 2; // == count(location_ids): no remaining paging.
+		$cursor['categories_done'] = true;
+		$cursor['phase']           = 'finalize';
+		$cursor['finalize_step']   = 'cleanup_terms_cat';
+		$cursor['total_items']     = 42;
+		$state->save_cursor( $cursor );
+
+		$this->assertFalse( $state->cursor_has_remaining_paging(), 'Finalize has no remaining paging (the old resumable check would fail here).' );
+
+		$conn = Tapgoods_Connection::get_instance();
+		$this->set_private( $conn, 'active_run', true );
+
+		$conn->on_sync_shutdown();
+
+		$after = Tapgoods_Sync_State::get_instance();
+		$this->assertSame( Tapgoods_Sync_State::STATE_ACTIVE, $after->get_state(), 'A finalize-phase run must stay ACTIVE (resumable), not reset.' );
+		$this->assertSame( 0, $after->get_failure_count(), 'An OOM in finalize must NOT count as a failure or reset progress.' );
+		$after_cursor = $after->get_cursor();
+		$this->assertSame( 'finalize', $after_cursor['phase'], 'The finalize cursor is preserved.' );
+		$this->assertSame( 'cleanup_terms_cat', $after_cursor['finalize_step'], 'The finalize sub-step is preserved so the next tick resumes it.' );
+		$this->assertSame( 1, $this->deleted_transients, 'The run lock must be released.' );
+	}
+
 	public function test_shutdown_is_a_noop_after_a_clean_slice() {
 		$this->spy_transients();
 

@@ -300,6 +300,33 @@ class Tapgoods_Sync_State {
 	}
 
 	/**
+	 * Whether an aborted run can safely be RESUMED from its checkpoint instead of
+	 * being restarted from scratch.
+	 *
+	 * This is broader than cursor_has_remaining_paging(): a run that crashed during
+	 * the FINALIZE phase (an OOM in cleanup, say) has no remaining paging yet is
+	 * fully resumable, because finalize itself is a bounded, checkpointed sub-state
+	 * machine (finalize_step + the cleanup keyset cursors). A resumable run is any
+	 * ACTIVE run that has a real cursor: a non-empty location list AND a run token
+	 * (both are minted together by init_cursor). That token guard is also the
+	 * deletion-safety valve - finalize only ever removes rows NOT stamped with it,
+	 * so resuming a tokened run can never wipe the catalog.
+	 *
+	 * The one ACTIVE state this excludes is a run that died mid-PREP before
+	 * init_cursor ran (empty location list / blank token): that one must start
+	 * fresh, and the entry point's resume guard already refuses it.
+	 *
+	 * @return bool
+	 */
+	public function cursor_is_resumable() {
+		if ( self::STATE_ACTIVE !== $this->data['state'] ) {
+			return false;
+		}
+		$cursor = $this->get_cursor();
+		return ! empty( $cursor['location_ids'] ) && '' !== (string) $cursor['run_token'];
+	}
+
+	/**
 	 * Record (or update) the planned number of paging calls computed during PREP.
 	 *
 	 * @param int $total_pages Number of paging calls.

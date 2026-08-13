@@ -481,6 +481,10 @@ class Tapgoods_Connection {
 		$this->maybe_register_shutdown();
 		$log->info('sync.lock.acquired', array('state' => $state->get_state()));
 
+		// NOTE: per-slice memory management (object-cache suspension + per-batch runtime
+		// resets) lives inside run_sync_slice(), which is where the memory-heavy paging /
+		// categories / finalize work runs. PREP below only reads a little per-location
+		// metadata, so it needs none.
 		$result  = array('success' => false, 'message' => 'Sync did not run.');
 		$proceed = true;
 
@@ -604,6 +608,15 @@ class Tapgoods_Connection {
 		// threading it through every signature. Reused across resumed slices.
 		$this->run_token = (string) $cursor['run_token'];
 
+		// Keep this slice's peak memory FLAT regardless of catalog size (the
+		// object-cache.php OOM). Suspend object-cache ADDITION for the whole slice so
+		// the posts/terms/meta touched while paging/upserting/cleaning up are not
+		// retained in the in-memory object cache, and reset the runtime object cache +
+		// query log between batches (below). $prev_suspend is restored in the finally so
+		// the suspension never leaks past this request: Action Scheduler runs several
+		// chained slices in a single runner request, and each must start/end neutral.
+		$prev_suspend = $this->suspend_cache_addition(true);
+
 		try {
 			// CATEGORIES PHASE: bounded and resumable, mirroring the paging loop.
 			// Terms are synced up front so they exist before items are paged and each
@@ -677,6 +690,7 @@ class Tapgoods_Connection {
 					$cursor['cat_location_index'] = $cat_idx;
 					$cursor['cat_item_index']     = $cat_item_idx;
 					$state->save_cursor($cursor); // Checkpoint after each bounded batch.
+					$this->reset_runtime_memory(); // Keep peak memory flat across the categories pass.
 
 					if ($this->slice_budget_spent($start_time, $pages_this_run)) {
 						// Budget spent mid-categories: resume at cat_location_index /
@@ -755,6 +769,7 @@ class Tapgoods_Connection {
 					$cursor['location_index'] = $idx;
 					$cursor['next_page']      = $page;
 					$state->save_cursor($cursor);
+					$this->reset_runtime_memory(); // Drop the runtime object cache so paging stays flat.
 
 					if ($this->slice_budget_spent($start_time, $pages_this_run)) {
 						// Slice budget spent mid-paging: persist where we stopped so the
@@ -794,6 +809,13 @@ class Tapgoods_Connection {
 			$log->warn('sync.retry', array('will_retry' => $will_retry ? 1 : 0, 'failures' => $state->get_failure_count(), 'state' => $state->get_state()));
 			$this->active_run = false;
 			return array('success' => false, 'message' => 'Sync failed: ' . $e->getMessage());
+		} finally {
+			// Flush any residue so a chained slice in the same Action Scheduler runner
+			// request starts clean, and restore the suspension flag to its prior value so
+			// nothing leaks past this slice. Runs on every exit path (checkpoint return,
+			// caught error, or fall-through to COMPLETED below).
+			$this->reset_runtime_memory();
+			$this->suspend_cache_addition((bool) $prev_suspend);
 		}
 
 		// SYNC COMPLETED.
@@ -973,6 +995,7 @@ class Tapgoods_Connection {
 
 			$cursor['finalize_step'] = $step;
 			$state->save_cursor($cursor);
+			$this->reset_runtime_memory(); // Keep cleanup's peak memory flat (the object-cache.php OOM).
 
 			if ('done' !== $step && $this->slice_budget_spent($start_time, $pages_this_run)) {
 				$log->info('sync.checkpoint', array('phase' => 'finalize', 'finalize_step' => $step, 'items_removed' => (int) $cursor['finalize_items_removed'], 'terms_removed' => (int) $cursor['finalize_terms_removed'], 'elapsed_ms' => self::elapsed_ms($slice_started)));
@@ -1190,6 +1213,83 @@ class Tapgoods_Connection {
 		return 'Sync in progress. It continues automatically in the background; you can leave this page.';
 	}
 
+	// --- Per-slice memory management ------------------------------------------
+
+	/**
+	 * Keep a slice's peak memory FLAT regardless of catalog size.
+	 *
+	 * The WPB-172 follow-up OOM (`Allowed memory size ... exhausted ... in
+	 * object-cache.php`) was NOT the cursor: it was WordPress's in-memory object
+	 * cache accumulating every post/term/meta the long run touched (~18k items plus
+	 * the cleanup). This is the standard WP bulk-import valve: after each bounded
+	 * page/batch, drop the RUNTIME object cache and the query log so nothing grows
+	 * across the slice.
+	 *
+	 * We deliberately do NOT call wp_cache_flush(): on a persistent object cache
+	 * (WP Engine) that flushes the SHARED backend for the whole site. We only reset
+	 * the in-process arrays (the same thing WP-CLI's wp_clear_object_cache() /
+	 * WP.com's stop_the_insanity() do). Combined with wp_suspend_cache_addition(true)
+	 * held for the slice (see run_sync_slice), the runtime cache cannot balloon.
+	 *
+	 * Protected so a unit-test probe can override it to assert the reset cadence, and
+	 * a no-op outside a WordPress runtime so the isolated unit suite is unaffected.
+	 *
+	 * @return void
+	 */
+	protected function reset_runtime_memory() {
+		global $wpdb, $wp_object_cache;
+
+		// The query log grows unbounded when SAVEQUERIES is on (some hosts force it).
+		// Cheap and safe to clear even when SAVEQUERIES is off (then it is empty).
+		if (isset($wpdb) && is_object($wpdb) && property_exists($wpdb, 'queries')) {
+			$wpdb->queries = array();
+		}
+
+		// Preferred path (WP 6.1+): drop ONLY the in-process/runtime object cache. On
+		// a persistent backend (WP Engine) this leaves the shared store intact, unlike
+		// wp_cache_flush(), which we deliberately never call here (it would thrash the
+		// whole site's cache). function_exists keeps the isolated unit suite (no
+		// WordPress) unaffected, and older WP falls through to the manual reset below.
+		if (function_exists('wp_cache_flush_runtime')) {
+			wp_cache_flush_runtime();
+		}
+
+		if (! is_object($wp_object_cache)) {
+			return;
+		}
+
+		// Fallback/backstop for a drop-in without a runtime flush (WP < 6.1, or an
+		// object cache that does not support flush_runtime): reset the in-process cache
+		// arrays directly. This is the same non-persistent reset WP-CLI's
+		// wp_clear_object_cache() / WP.com's stop_the_insanity() perform, and it never
+		// touches the persistent backend.
+		foreach (array('group_ops', 'stats', 'memcache_debug', 'cache') as $prop) {
+			if (property_exists($wp_object_cache, $prop)) {
+				$wp_object_cache->$prop = array();
+			}
+		}
+		if (method_exists($wp_object_cache, '__remoteset')) {
+			$wp_object_cache->__remoteset();
+		}
+	}
+
+	/**
+	 * Suspend WP object-cache ADDITION for the duration of a slice, returning the
+	 * previous flag so the caller can restore it. A no-op (returns null) outside a
+	 * WordPress runtime. Pairs with reset_runtime_memory() to keep the slice flat.
+	 *
+	 * @param bool $suspend Whether to suspend cache additions.
+	 * @return bool|null Previous suspend flag, or null when unavailable.
+	 */
+	protected function suspend_cache_addition($suspend) {
+		if (! function_exists('wp_suspend_cache_addition')) {
+			return null;
+		}
+		$previous = wp_suspend_cache_addition();
+		wp_suspend_cache_addition((bool) $suspend);
+		return $previous;
+	}
+
 	// --- Execution mutex ------------------------------------------------------
 
 	/**
@@ -1227,13 +1327,24 @@ class Tapgoods_Connection {
 
 	/**
 	 * Runs on request shutdown. If the request ended WHILE a slice was executing
-	 * (a PHP fatal such as the max-execution-time timeout, which a try/catch can't
-	 * catch), recover gracefully:
-	 *   - resumable run (paging still has work, checkpoint intact): leave the
-	 *     cursor so the next cron tick resumes; just free the lock.
-	 *   - otherwise (died in PREP, or in finalize with no remaining paging):
-	 *     record the abnormal end so the retry budget applies, then free the lock.
+	 * (a PHP fatal such as the max-execution-time timeout OR an out-of-memory, which
+	 * a try/catch can't catch), recover gracefully:
+	 *   - resumable run (a real checkpointed cursor: ACTIVE with a location list and a
+	 *     run token, in ANY phase incl. finalize): leave the cursor untouched so the
+	 *     next cron tick resumes from exactly where it stopped; just free the lock.
+	 *     Critically this path writes NOTHING, so it also survives an OOM shutdown
+	 *     where no further allocation is possible.
+	 *   - otherwise (died mid-PREP before the cursor was initialised): record the
+	 *     abnormal end so the retry budget applies, then free the lock.
 	 * A clean slice clears $active_run before returning, so this is a no-op then.
+	 *
+	 * WHY THIS MATTERS (the OOM reset loop): the old check only treated a run with
+	 * REMAINING PAGING as resumable. A fatal during FINALIZE (phase='finalize', no
+	 * remaining paging) fell through to mark_error(), which drops the state to IDLE;
+	 * the next tick then saw "not running", re-ran PREP and restarted the whole sync
+	 * at 0/N - so an OOM in cleanup reset progress and the sync looped forever. A
+	 * finalize-phase run is fully resumable (finalize is its own checkpointed sub-state
+	 * machine), so it must be kept, not reset.
 	 *
 	 * @return void
 	 */
@@ -1245,12 +1356,14 @@ class Tapgoods_Connection {
 		$state = $this->sync_state();
 		$st    = $state->get_state();
 
-		if (Tapgoods_Sync_State::STATE_ACTIVE === $st && $state->cursor_has_remaining_paging()) {
-			// Resumable: keep the checkpointed cursor; the next tick continues.
+		if ($state->cursor_is_resumable()) {
+			// Resumable in ANY phase (paging, categories, or finalize): keep the
+			// checkpointed cursor and stay ACTIVE; the next tick continues. No write
+			// happens here, so this is safe even under an OOM shutdown.
 			$this->console_log('Sync request ended mid-slice; run is resumable and will continue on the next cron tick.');
 		} elseif (in_array($st, array(Tapgoods_Sync_State::STATE_PREP, Tapgoods_Sync_State::STATE_ACTIVE), true)) {
-			// Abnormal end with no resumable work left (PREP, or finalize): let the
-			// retry budget decide whether the next tick starts fresh or latches ERROR.
+			// Abnormal end with no resumable cursor (died mid-PREP): let the retry
+			// budget decide whether the next tick starts fresh or latches ERROR.
 			$state->mark_error('Sync ended unexpectedly (request terminated).');
 			$this->console_log('Sync request ended abnormally with no resumable work; recorded for retry.');
 		}

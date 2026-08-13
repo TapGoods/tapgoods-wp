@@ -261,10 +261,14 @@ final class ConnectionFinalizeTest extends TestCase {
 			public $dupe_calls   = array();      // cursors passed to remove_duplicate_items_batch.
 			public $cleanup_ran  = false;
 			public $item_advance = 0;            // seconds added per item-removal call.
+			public $memory_resets = 0;           // reset_runtime_memory() calls (per-batch cadence).
 
 			public function __construct( $clock, $item_returns ) {
 				$this->clock        = $clock;
 				$this->item_returns = $item_returns;
+			}
+			protected function reset_runtime_memory() {
+				++$this->memory_resets; // Count per-batch memory resets (proves flat memory).
 			}
 			public function remove_items_not_in_run( $run_token, $limit ) {
 				$this->item_calls[] = (string) $run_token;
@@ -348,6 +352,26 @@ final class ConnectionFinalizeTest extends TestCase {
 		}
 		$this->assertSame( array( 'tg_category', 'tg_tags' ), $taxes );
 		$this->assertTrue( $probe->cleanup_ran );
+	}
+
+	public function test_finalize_resets_runtime_memory_once_per_bounded_batch() {
+		// MEMORY BOUND (object-cache.php OOM): the runtime object cache must be dropped
+		// after EACH bounded batch, not once for the whole finalize. Item removal loops
+		// three times (limit, limit, drained), so the reset cadence must scale per batch
+		// - at least once per item batch plus the term/cleanup sub-steps.
+		$limit = Tapgoods_Connection::finalize_delete_batch();
+		$state = $this->finalize_state( 5, 'tok-MEM' );
+		$probe = $this->make_finalize_probe( array( $limit, $limit, 0 ) );
+
+		$result = $this->invoke_finalize( $probe, $state );
+
+		$this->assertNull( $result, 'Finalize completes in one slice here.' );
+		$this->assertGreaterThanOrEqual(
+			count( $probe->item_calls ),
+			$probe->memory_resets,
+			'Runtime memory is reset per bounded batch, not once for the whole finalize.'
+		);
+		$this->assertGreaterThan( 1, $probe->memory_resets, 'The reset must fire multiple times across the sub-steps.' );
 	}
 
 	public function test_finalize_resumes_across_a_budget_interrupt() {

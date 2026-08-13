@@ -152,6 +152,31 @@ final class SyncStateCursorTest extends TestCase {
 		$this->assertFalse( $s->cursor_has_remaining_paging() );
 	}
 
+	public function test_cursor_is_resumable_across_phases_but_not_during_prep() {
+		$s = new Tapgoods_Sync_State();
+
+		// PREP (no cursor yet): NOT resumable - such a run must start fresh.
+		$s->begin_prep( 3 );
+		$this->assertFalse( $s->cursor_is_resumable(), 'A run that died mid-PREP is not resumable.' );
+
+		// ACTIVE with a real cursor (location list + run token): resumable while paging.
+		$s->init_cursor( array( 5001, 5002 ) );
+		$s->mark_active();
+		$this->assertTrue( $s->cursor_is_resumable(), 'An ACTIVE run with a cursor is resumable.' );
+
+		// Still resumable once it reaches the FINALIZE phase (no remaining paging) -
+		// this is the case the old cursor_has_remaining_paging() check wrongly rejected.
+		$cursor          = $s->get_cursor();
+		$cursor['phase'] = 'finalize';
+		$s->save_cursor( $cursor );
+		$this->assertFalse( $s->cursor_has_remaining_paging() );
+		$this->assertTrue( $s->cursor_is_resumable(), 'A finalize-phase run is still resumable.' );
+
+		// A completed run drops its cursor: not resumable.
+		$s->mark_completed();
+		$this->assertFalse( $s->cursor_is_resumable(), 'A completed run is not resumable.' );
+	}
+
 	public function test_begin_prep_resets_a_stale_cursor() {
 		$s = new Tapgoods_Sync_State();
 		$s->init_cursor( array( 5001, 5002 ) );
