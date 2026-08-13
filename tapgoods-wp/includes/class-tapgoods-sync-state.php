@@ -133,9 +133,17 @@ class Tapgoods_Sync_State {
 	 *                     location/page is done (cleanup + reconciliation).
 	 *  - finalize_step:   which bounded finalize sub-step is in progress ('' until finalize
 	 *                     begins, then 'items' -> 'obsolete_cat' -> 'obsolete_tag' ->
-	 *                     'cleanup' -> 'done'). Makes finalize resumable across slices.
+	 *                     'cleanup_terms_cat' -> 'cleanup_terms_tag' -> 'cleanup_dupes' ->
+	 *                     'done'). Makes finalize resumable across slices.
 	 *  - finalize_items_removed / finalize_terms_removed: running counters for the final
 	 *                     sync.finalize.done log line (scalars, accumulated across slices).
+	 *  - cleanup_term_id: keyset resume point for the bounded 0-post-term cleanup (the last
+	 *                     term_id examined). A SCALAR cursor (not an offset) so deleting a
+	 *                     term mid-pass can never make the next batch skip a term. Reused by
+	 *                     the cat then the tag sub-step (reset to 0 when advancing to tag).
+	 *  - cleanup_dup_cursor: keyset resume point for the bounded duplicate-item cleanup (the
+	 *                     last tg_id meta_value processed). A SCALAR string; nothing per-row
+	 *                     is held in the cursor, so the memory bound is preserved.
 	 *
 	 * @return array
 	 */
@@ -154,6 +162,8 @@ class Tapgoods_Sync_State {
 			'finalize_step'          => '',
 			'finalize_items_removed' => 0,
 			'finalize_terms_removed' => 0,
+			'cleanup_term_id'        => 0,
+			'cleanup_dup_cursor'     => '',
 		);
 	}
 

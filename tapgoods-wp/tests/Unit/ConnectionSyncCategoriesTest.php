@@ -242,11 +242,11 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 				return 0;
 			}
 			// Neutralise the rest of the finalize cleanup so it never hits the DB.
-			public function remove_unused_terms( $taxonomy ) {
-				return 0;
+			public function remove_unused_terms_batch( $taxonomy, $after_term_id, $limit ) {
+				return array( 'removed' => 0, 'last_term_id' => (int) $after_term_id, 'exhausted' => true );
 			}
-			public function remove_duplicate_items() {
-				return 0;
+			public function remove_duplicate_items_batch( $after_value, $group_limit ) {
+				return array( 'removed' => 0, 'cursor' => (string) $after_value, 'exhausted' => true );
 			}
 			public function update_sync_info( $start_time ) {}
 		};

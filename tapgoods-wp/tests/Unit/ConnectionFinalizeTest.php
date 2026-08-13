@@ -257,6 +257,8 @@ final class ConnectionFinalizeTest extends TestCase {
 			public $item_returns;                // queued return values.
 			public $item_calls   = array();      // tokens passed to remove_items_not_in_run.
 			public $term_calls   = array();      // [{taxonomy, token}].
+			public $unused_term_calls = array(); // taxonomies passed to remove_unused_terms_batch.
+			public $dupe_calls   = array();      // cursors passed to remove_duplicate_items_batch.
 			public $cleanup_ran  = false;
 			public $item_advance = 0;            // seconds added per item-removal call.
 
@@ -273,11 +275,15 @@ final class ConnectionFinalizeTest extends TestCase {
 				$this->term_calls[] = array( 'taxonomy' => $taxonomy, 'token' => (string) $run_token );
 				return 0;
 			}
-			public function remove_unused_terms( $taxonomy ) {
-				return 0;
+			// Bounded cleanup seams: report "exhausted" so the sub-steps advance in one
+			// pass unless a test overrides them. Recorded so orchestration is asserted.
+			public function remove_unused_terms_batch( $taxonomy, $after_term_id, $limit ) {
+				$this->unused_term_calls[] = $taxonomy;
+				return array( 'removed' => 0, 'last_term_id' => (int) $after_term_id, 'exhausted' => true );
 			}
-			public function remove_duplicate_items() {
-				return 0;
+			public function remove_duplicate_items_batch( $after_value, $group_limit ) {
+				$this->dupe_calls[] = (string) $after_value;
+				return array( 'removed' => 0, 'cursor' => (string) $after_value, 'exhausted' => true );
 			}
 			public function update_sync_info( $start_time ) {
 				$this->cleanup_ran = true;
@@ -371,6 +377,206 @@ final class ConnectionFinalizeTest extends TestCase {
 		$this->assertNull( $result2, 'The resumed finalize completes.' );
 		$this->assertSame( 'tok-RES', $probe2->item_calls[0], 'The resumed finalize uses the SAME run token.' );
 		$this->assertTrue( $probe2->cleanup_ran );
+		$this->assertStringContainsString( 'sync.finalize.done', $this->log_contents() );
+	}
+
+	// --- Layer 1: the bounded cleanup helpers in isolation -------------------
+
+	public function test_remove_unused_terms_batch_is_bounded_keyset_and_deletes_only_empty() {
+		// A keyset window of 3 terms; only the 0-count ones are deleted, and the query is
+		// bounded (LIMIT) and resumes past the last term_id examined - never an OFFSET.
+		$deleted = array();
+
+		global $wpdb;
+		$wpdb = new class() {
+			public $term_taxonomy = 'wp_term_taxonomy';
+			public $last_sql      = '';
+			public $last_args     = array();
+			public function prepare( $query, ...$args ) {
+				$this->last_sql  = $query;
+				$this->last_args = $args;
+				return $query;
+			}
+			public function get_results( $query ) {
+				return array(
+					(object) array( 'term_id' => 10, 'count' => 0 ),
+					(object) array( 'term_id' => 11, 'count' => 5 ),
+					(object) array( 'term_id' => 12, 'count' => 0 ),
+				);
+			}
+		};
+
+		Functions\when( 'wp_delete_term' )->alias(
+			static function ( $term_id, $tax ) use ( &$deleted ) {
+				$deleted[] = (int) $term_id;
+				return true;
+			}
+		);
+
+		$conn   = Tapgoods_Connection::get_instance();
+		$result = $conn->remove_unused_terms_batch( 'tg_category', 5, 3 );
+
+		$this->assertSame( array( 10, 12 ), $deleted, 'Only 0-post terms are deleted.' );
+		$this->assertSame( 2, $result['removed'] );
+		$this->assertSame( 12, $result['last_term_id'], 'The keyset cursor advances to the highest term_id examined.' );
+		$this->assertFalse( $result['exhausted'], 'A full window means more terms may remain.' );
+
+		$this->assertStringContainsStringIgnoringCase( 'LIMIT', $wpdb->last_sql );
+		$this->assertStringContainsStringIgnoringCase( 'term_id >', $wpdb->last_sql, 'Resume is by keyset, not OFFSET.' );
+		$this->assertStringNotContainsStringIgnoringCase( 'OFFSET', $wpdb->last_sql );
+		$this->assertContains( 5, $wpdb->last_args, 'The keyset cursor is bound.' );
+		$this->assertContains( 3, $wpdb->last_args, 'The batch LIMIT is bound.' );
+	}
+
+	public function test_remove_unused_terms_batch_reports_exhausted_on_a_short_window() {
+		global $wpdb;
+		$wpdb = new class() {
+			public $term_taxonomy = 'wp_term_taxonomy';
+			public function prepare( $query, ...$args ) {
+				return $query;
+			}
+			public function get_results( $query ) {
+				return array( (object) array( 'term_id' => 20, 'count' => 0 ) ); // 1 row < limit 3.
+			}
+		};
+		Functions\when( 'wp_delete_term' )->justReturn( true );
+
+		$result = Tapgoods_Connection::get_instance()->remove_unused_terms_batch( 'tg_tags', 0, 3 );
+		$this->assertTrue( $result['exhausted'], 'Fewer rows than the limit means the pass is complete.' );
+		$this->assertSame( 20, $result['last_term_id'] );
+	}
+
+	public function test_remove_duplicate_items_batch_is_bounded_keyset_and_keeps_min() {
+		// One duplicate group in the window: keep MIN(post_id), delete the rest. The
+		// grouped query is bounded (LIMIT) and resumes by keyset on meta_value.
+		$deleted = array();
+
+		global $wpdb;
+		$wpdb = new class() {
+			public $postmeta  = 'wp_postmeta';
+			public $last_sql  = '';
+			public $get_col_arg = null;
+			public function prepare( $query, ...$args ) {
+				// Record the grouped (get_results) SQL; the per-group get_col uses its own.
+				if ( false !== stripos( $query, 'GROUP BY' ) ) {
+					$this->last_sql = $query;
+				} else {
+					$this->get_col_arg = $args;
+				}
+				return $query;
+			}
+			public function get_results( $query ) {
+				return array( (object) array( 'tg_id' => 'ITEM-7', 'keep_id' => 100 ) );
+			}
+			public function get_col( $query ) {
+				return array( 200, 300 ); // the non-keep duplicates.
+			}
+		};
+
+		Functions\when( 'wp_delete_post' )->alias(
+			static function ( $id, $force ) use ( &$deleted ) {
+				$deleted[] = (int) $id;
+				return true;
+			}
+		);
+
+		$conn   = Tapgoods_Connection::get_instance();
+		$result = $conn->remove_duplicate_items_batch( '', 100 );
+
+		$this->assertSame( array( 200, 300 ), $deleted, 'The non-MIN posts are removed; MIN (100) is kept.' );
+		$this->assertSame( 2, $result['removed'] );
+		$this->assertSame( 'ITEM-7', $result['cursor'], 'The keyset cursor advances to the last group meta_value.' );
+		$this->assertTrue( $result['exhausted'], '1 group < the group limit => no more duplicates remain.' );
+
+		$this->assertStringContainsStringIgnoringCase( 'LIMIT', $wpdb->last_sql );
+		$this->assertStringContainsStringIgnoringCase( 'meta_value >', $wpdb->last_sql, 'Resume is by keyset on meta_value.' );
+	}
+
+	// --- Layer 2: the cleanup phase is bounded and resumable -----------------
+
+	/**
+	 * Probe whose bounded cleanup seams are programmable, so the cleanup phase's
+	 * budget-bounded resume is asserted without a database. Item and obsolete-term
+	 * removal drain immediately (return 0), so finalize reaches the cleanup sub-steps.
+	 */
+	private function make_cleanup_probe( $unused_exhausted, $dupe_exhausted, $cleanup_advance = 0 ) {
+		$clock = $this->clock;
+		$probe = new class( $clock, $unused_exhausted, $dupe_exhausted, $cleanup_advance ) extends Tapgoods_Connection {
+			public $clock;
+			public $unused_exhausted;
+			public $dupe_exhausted;
+			public $cleanup_advance;
+			public $unused_term_calls = array();
+			public $dupe_calls        = array();
+			public $cleanup_ran       = false;
+
+			public function __construct( $clock, $unused_exhausted, $dupe_exhausted, $cleanup_advance ) {
+				$this->clock            = $clock;
+				$this->unused_exhausted = $unused_exhausted;
+				$this->dupe_exhausted   = $dupe_exhausted;
+				$this->cleanup_advance  = $cleanup_advance;
+			}
+			public function remove_items_not_in_run( $run_token, $limit ) {
+				return 0; // drains immediately.
+			}
+			public function remove_terms_not_in_run( $taxonomy, $run_token, $limit ) {
+				return 0; // drains immediately.
+			}
+			public function remove_unused_terms_batch( $taxonomy, $after_term_id, $limit ) {
+				$this->unused_term_calls[] = $taxonomy;
+				$this->clock->t           += $this->cleanup_advance;
+				return array( 'removed' => 0, 'last_term_id' => (int) $after_term_id + 1, 'exhausted' => $this->unused_exhausted );
+			}
+			public function remove_duplicate_items_batch( $after_value, $group_limit ) {
+				$this->dupe_calls[] = (string) $after_value;
+				$this->clock->t    += $this->cleanup_advance;
+				return array( 'removed' => 0, 'cursor' => (string) $after_value, 'exhausted' => $this->dupe_exhausted );
+			}
+			public function update_sync_info( $start_time ) {
+				$this->cleanup_ran = true;
+			}
+		};
+		return $probe;
+	}
+
+	public function test_a_single_slice_never_runs_the_whole_cleanup_unbounded() {
+		// The cleanup batch never reports exhausted AND each call spends the whole slice
+		// budget. The slice must run exactly ONE bounded batch, checkpoint at a cleanup
+		// sub-step, and hand off in-progress - never loop the cleanup to completion.
+		$state = $this->finalize_state( 5, 'tok-CL' );
+		$probe = $this->make_cleanup_probe( false, false, Tapgoods_Connection::sync_time_budget() + 1 );
+
+		$result = $this->invoke_finalize( $probe, $state );
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( ! empty( $result['in_progress'] ), 'A budget-interrupted cleanup hands off as in-progress.' );
+		$this->assertSame( 1, count( $probe->unused_term_calls ), 'Exactly one bounded cleanup batch ran before the budget tripped.' );
+		$this->assertFalse( $probe->cleanup_ran, 'update_sync_info must NOT run until every cleanup sub-step is exhausted.' );
+
+		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
+		$this->assertSame( 'finalize', $cursor['phase'] );
+		$this->assertSame( 'cleanup_terms_cat', $cursor['finalize_step'], 'Cleanup checkpointed at the first cleanup sub-step.' );
+	}
+
+	public function test_cleanup_phase_resumes_across_a_budget_interrupt_and_completes() {
+		// Slice 1: cleanup batches never exhaust and burn the budget => checkpoints mid-cleanup.
+		$state  = $this->finalize_state( 5, 'tok-CL2' );
+		$probe1 = $this->make_cleanup_probe( false, false, Tapgoods_Connection::sync_time_budget() + 1 );
+
+		$result1 = $this->invoke_finalize( $probe1, $state );
+		$this->assertIsArray( $result1 );
+		$this->assertTrue( ! empty( $result1['in_progress'] ) );
+		$this->assertSame( 'cleanup_terms_cat', Tapgoods_Sync_State::get_instance()->get_cursor()['finalize_step'] );
+
+		// Slice 2: batches now exhaust, so every cleanup sub-step advances and finalize
+		// converges to done. The cat/tag/dupe sub-steps each run once.
+		$probe2  = $this->make_cleanup_probe( true, true, 0 );
+		$result2 = $this->invoke_finalize( $probe2, Tapgoods_Sync_State::get_instance() );
+
+		$this->assertNull( $result2, 'The resumed cleanup completes.' );
+		$this->assertSame( array( 'tg_category', 'tg_tags' ), $probe2->unused_term_calls, 'Both taxonomies are cleaned, in order.' );
+		$this->assertSame( 1, count( $probe2->dupe_calls ), 'The duplicate sub-step runs once.' );
+		$this->assertTrue( $probe2->cleanup_ran, 'update_sync_info runs only after all cleanup sub-steps are exhausted.' );
 		$this->assertStringContainsString( 'sync.finalize.done', $this->log_contents() );
 	}
 }

@@ -136,6 +136,49 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertSame( '12.00', get_post_meta( $table->ID, 'tg_dailyPrice', true ) );
 	}
 
+	public function test_finalize_cleanup_converges_with_many_stale_terms() {
+		// Regression guard for the AS 300s finalize loop: seed far more stale
+		// (0-post) terms than one bounded cleanup batch (FINALIZE_DELETE_BATCH),
+		// then run the sync to completion. The finalize phase must drain them across
+		// its bounded, resumable cleanup sub-steps and reach COMPLETED - never spin
+		// on an un-budgeted single-shot cleanup as it did before.
+		$stale = Tapgoods_Connection::finalize_delete_batch() + 50; // > one bounded batch.
+		for ( $i = 0; $i < $stale; $i++ ) {
+			wp_insert_term( "stale-cat-$i", 'tg_category', array( 'slug' => "stale-cat-$i" ) );
+			wp_insert_term( "stale-tag-$i", 'tg_tags', array( 'slug' => "stale-tag-$i" ) );
+		}
+
+		$conn      = $this->connection();
+		$ticks     = 0;
+		$max_ticks = 40; // safety net against an infinite loop (the bug).
+		do {
+			$result = $conn->sync_from_api( 'cron_selfping' );
+			++$ticks;
+			$in_progress = ! empty( $result['in_progress'] );
+		} while ( $in_progress && $ticks < $max_ticks );
+
+		$this->assertLessThan( $max_ticks, $ticks, 'The finalize must converge, not spin (the AS 300s loop).' );
+		$this->assertSame(
+			Tapgoods_Sync_State::STATE_COMPLETED,
+			Tapgoods_Sync_State::get_instance()->get_state(),
+			'The run must end COMPLETED once cleanup drains.'
+		);
+
+		// Every seeded stale term is gone; the real fixture terms survive.
+		$remaining = get_terms(
+			array(
+				'taxonomy'   => array( 'tg_category', 'tg_tags' ),
+				'hide_empty' => false,
+				'fields'     => 'slugs',
+			)
+		);
+		$remaining = is_wp_error( $remaining ) ? array() : $remaining;
+		foreach ( $remaining as $slug ) {
+			$this->assertStringStartsNotWith( 'stale-', (string) $slug, "Stale term '$slug' must be reconciled away." );
+		}
+		$this->assertNotFalse( get_term_by( 'slug', 'tables', 'tg_category' ), 'A real fixture category must survive cleanup.' );
+	}
+
 	public function test_sync_writes_the_run_lifecycle_to_the_activity_log() {
 		$log = Tapgoods_Sync_Log::get_instance();
 		$this->assertNotSame( '', $log->get_file_path(), 'The log needs a target under wp-content/uploads.' );

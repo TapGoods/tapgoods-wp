@@ -834,9 +834,19 @@ class Tapgoods_Connection {
 	 *                   never wipe the catalog).
 	 *   obsolete_cat -> delete tg_category terms not stamped with the run token.
 	 *   obsolete_tag -> delete tg_tags terms not stamped with the run token.
-	 *   cleanup      -> remove 0-post terms + duplicate posts (already chunked over
-	 *                   small integer id lists, not the catalog) and record sync info.
+	 *   cleanup_terms_cat -> delete 0-post tg_category terms in bounded, keyset-resumable
+	 *                   batches (was an un-budgeted delete of every unused term).
+	 *   cleanup_terms_tag -> the same for tg_tags.
+	 *   cleanup_dupes -> delete duplicate tg_inventory posts in bounded, keyset-resumable
+	 *                   batches (was an unbounded GROUP BY over all postmeta), then record
+	 *                   the sync info once every cleanup sub-step is exhausted.
 	 *   done         -> finalize complete.
+	 *
+	 * BUDGET SAFETY (WPB-172 follow-up): every cleanup sub-step does a BOUNDED amount of
+	 * work per call, checkpoints its keyset position in the cursor, and honours
+	 * slice_budget_spent(), so a finalize slice always returns well within the ~18s slice
+	 * budget and can never approach Action Scheduler's 300s time limit (the infinite
+	 * "marked as failed after 300 seconds" loop this fix removes).
 	 *
 	 * DELETION SAFETY (WPB-172): every removal is keyed on the SAME run token that
 	 * stamped the rows during this run (persisted in the cursor, reused across
@@ -902,19 +912,51 @@ class Tapgoods_Connection {
 					$deleted = $this->remove_terms_not_in_run('tg_tags', $token, $limit);
 					$cursor['finalize_terms_removed'] = (int) $cursor['finalize_terms_removed'] + $deleted;
 					if ($deleted < $limit) {
-						$step = 'cleanup';
+						$step                       = 'cleanup_terms_cat';
+						$cursor['cleanup_term_id']  = 0; // Fresh keyset cursor for the 0-post-term scan.
 					}
 					break;
 
-				case 'cleanup':
-					// 0-post terms + duplicate posts. Both are already chunked and work
-					// over small integer id lists (not the catalog), so they are safe to
-					// run inside one bounded step.
-					$this->remove_unused_terms('tg_category');
-					$this->remove_unused_terms('tg_tags');
-					$this->remove_duplicate_items();
-					$this->update_sync_info($start_time);
-					$step = 'done';
+				case 'cleanup_terms_cat':
+					// Remove 0-post tg_category terms in a BOUNDED, keyset-resumable batch.
+					// The old cleanup deleted every unused term (thousands, ~6,387) in one
+					// un-budgeted shot, which is what pushed finalize past AS's 300s limit.
+					$batch                            = $this->remove_unused_terms_batch('tg_category', (int) $cursor['cleanup_term_id'], $limit);
+					$cursor['finalize_terms_removed'] = (int) $cursor['finalize_terms_removed'] + (int) $batch['removed'];
+					$cursor['cleanup_term_id']        = (int) $batch['last_term_id'];
+					if ($batch['exhausted']) {
+						$log->info('sync.cleanup.unused_terms_done', array('taxonomy' => 'tg_category'));
+						$step                      = 'cleanup_terms_tag';
+						$cursor['cleanup_term_id'] = 0; // Reset the shared keyset cursor for the tag pass.
+					}
+					break;
+
+				case 'cleanup_terms_tag':
+					$batch                            = $this->remove_unused_terms_batch('tg_tags', (int) $cursor['cleanup_term_id'], $limit);
+					$cursor['finalize_terms_removed'] = (int) $cursor['finalize_terms_removed'] + (int) $batch['removed'];
+					$cursor['cleanup_term_id']        = (int) $batch['last_term_id'];
+					if ($batch['exhausted']) {
+						$log->info('sync.cleanup.unused_terms_done', array('taxonomy' => 'tg_tags'));
+						$step                         = 'cleanup_dupes';
+						$cursor['cleanup_dup_cursor'] = ''; // Fresh keyset cursor for the duplicate scan.
+					}
+					break;
+
+				case 'cleanup_dupes':
+					// Remove duplicate tg_inventory posts in a BOUNDED, keyset-resumable
+					// batch. Replaces the old unbounded "GROUP BY meta_value over ALL
+					// postmeta then delete every extra" one-shot. Duplicates are rare
+					// (items upsert by tg_id), so this is cheap and usually a no-op.
+					$batch                            = $this->remove_duplicate_items_batch((string) $cursor['cleanup_dup_cursor'], $limit);
+					$cursor['finalize_items_removed'] = (int) $cursor['finalize_items_removed'] + (int) $batch['removed'];
+					$cursor['cleanup_dup_cursor']     = (string) $batch['cursor'];
+					if ($batch['exhausted']) {
+						$log->info('sync.cleanup.duplicates_done', array('removed' => (int) $cursor['finalize_items_removed']));
+						// Only once EVERY cleanup sub-step is exhausted do we record the
+						// sync info and finish.
+						$this->update_sync_info($start_time);
+						$step = 'done';
+					}
 					break;
 
 				case 'done':
@@ -2311,13 +2353,75 @@ class Tapgoods_Connection {
 
 		return $removed;
 	}
-	
-	
-	
-	
-	
 
-	
+	/**
+	 * Delete a BOUNDED, keyset-resumable page of 0-post terms in $taxonomy.
+	 *
+	 * The bounded replacement for remove_unused_terms(), which scanned EVERY term in
+	 * the taxonomy (thousands, ~6,387 on the failing catalog) and deleted the unused
+	 * ones in a single un-budgeted call - the finalize step that pushed the sync past
+	 * Action Scheduler's 300s limit into an infinite retry loop.
+	 *
+	 * Resume is by KEYSET (term_id > $after_term_id), not OFFSET: because we only ever
+	 * advance the cursor to term_ids we have examined, deleting a 0-post term mid-pass
+	 * can never shift positions and make the next batch skip a term. The post-count is
+	 * read straight from wp_term_taxonomy.count (the same value get_terms() would
+	 * surface), so no get_terms() call and no oversized IN() list is built.
+	 *
+	 * @param string $taxonomy       Taxonomy slug (tg_category / tg_tags).
+	 * @param int    $after_term_id  Resume point: only terms with term_id greater than this.
+	 * @param int    $limit          Max terms to EXAMINE this batch (bounds the query + deletes).
+	 * @return array {
+	 *   @type int  $removed       Terms deleted this batch.
+	 *   @type int  $last_term_id  Highest term_id examined (the next keyset cursor).
+	 *   @type bool $exhausted     True when fewer than $limit terms remained (pass is complete).
+	 * }
+	 */
+	public function remove_unused_terms_batch($taxonomy, $after_term_id, $limit) {
+		global $wpdb;
+
+		$limit         = max(1, (int) $limit);
+		$after_term_id = (int) $after_term_id;
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT term_id, count FROM {$wpdb->term_taxonomy}
+				WHERE taxonomy = %s AND term_id > %d
+				ORDER BY term_id ASC
+				LIMIT %d",
+				$taxonomy,
+				$after_term_id,
+				$limit
+			)
+		);
+
+		$log      = $this->sync_log();
+		$removed  = 0;
+		$examined = 0;
+		$last     = $after_term_id;
+
+		foreach ((array) $rows as $row) {
+			$last = (int) $row->term_id;
+			++$examined;
+			if (0 === (int) $row->count) {
+				$deleted = wp_delete_term($last, $taxonomy);
+				if (is_wp_error($deleted)) {
+					$log->warn('sync.cleanup.term_error', array('taxonomy' => $taxonomy, 'term' => $last, 'message' => $deleted->get_error_message()));
+				} else {
+					++$removed;
+					$log->debug('sync.cleanup.term_removed', array('taxonomy' => $taxonomy, 'term' => $last));
+				}
+			}
+		}
+
+		return array(
+			'removed'      => $removed,
+			'last_term_id' => $last,
+			'exhausted'    => ($examined < $limit),
+		);
+	}
+
+
 	public function sync_terms_from_api($taxonomy, $data) {
 		$api_ids = array();
 	
@@ -2572,9 +2676,96 @@ class Tapgoods_Connection {
 
 		return $removed;
 	}
-	
-	
-	
+
+	/**
+	 * Delete duplicate tg_inventory posts in a BOUNDED, keyset-resumable batch.
+	 *
+	 * The bounded replacement for remove_duplicate_items(), whose "GROUP BY meta_value
+	 * over ALL postmeta, then delete every extra" ran unbounded in one shot inside the
+	 * un-budgeted cleanup step (part of the >300s finalize that AS killed).
+	 *
+	 * Bounded/resumable design:
+	 *  - The grouped query is capped with LIMIT %d, so it returns at most $group_limit
+	 *    duplicate groups (bounded result set, bounded memory) and the per-slice deletes
+	 *    are bounded.
+	 *  - Resume is by KEYSET on meta_value (meta_value > $after_value ORDER BY meta_value):
+	 *    each successive slice scans a strictly smaller range and picks up where the last
+	 *    left off. A group's rows all share one meta_value, so no group ever straddles the
+	 *    cursor.
+	 *  - For each returned group the lowest post_id (MIN) is kept and the rest force-deleted.
+	 *
+	 * Because items upsert by tg_id, duplicates are rare: the common case returns zero
+	 * groups and finishes in one bounded query. NOTE (for review): finding duplicates
+	 * still needs a GROUP BY over the remaining meta_value range - meta_value is a longtext
+	 * column WordPress does not index, so a fully index-free per-query bound is not possible
+	 * without a schema change. It is result-bounded (LIMIT), delete-bounded (budget loop),
+	 * and resumable; at ~18k rows the grouped scan is sub-second, far under any query killer.
+	 *
+	 * @param string $after_value Resume point: only tg_id meta_values greater than this.
+	 * @param int    $group_limit Max duplicate groups to process this batch.
+	 * @return array {
+	 *   @type int    $removed   Posts deleted this batch.
+	 *   @type string $cursor    Highest meta_value processed (the next keyset cursor).
+	 *   @type bool   $exhausted True when fewer than $group_limit groups remained (pass complete).
+	 * }
+	 */
+	public function remove_duplicate_items_batch($after_value, $group_limit) {
+		global $wpdb;
+
+		$group_limit = max(1, (int) $group_limit);
+		$after_value = (string) $after_value;
+		$log         = $this->sync_log();
+
+		$duplicates = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT meta_value AS tg_id, MIN(post_id) AS keep_id
+				FROM {$wpdb->postmeta}
+				WHERE meta_key = %s AND meta_value > %s
+				GROUP BY meta_value
+				HAVING COUNT(*) > 1
+				ORDER BY meta_value ASC
+				LIMIT %d",
+				'tg_id',
+				$after_value,
+				$group_limit
+			)
+		);
+
+		$duplicates = (array) $duplicates;
+		$removed    = 0;
+		$cursor     = $after_value;
+
+		foreach ($duplicates as $duplicate) {
+			$cursor = (string) $duplicate->tg_id;
+
+			$duplicate_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT post_id
+					FROM {$wpdb->postmeta}
+					WHERE meta_key = %s AND meta_value = %s AND post_id != %d",
+					'tg_id',
+					$duplicate->tg_id,
+					$duplicate->keep_id
+				)
+			);
+
+			foreach ((array) $duplicate_ids as $post_id) {
+				wp_delete_post((int) $post_id, true);
+				++$removed;
+				$log->debug('sync.cleanup.duplicate_removed', array('post' => (int) $post_id, 'tg_id' => $duplicate->tg_id));
+			}
+		}
+
+		// Fewer than a full page of duplicate groups means the scan reached the end of the
+		// remaining meta_value range: no more duplicates exist above the cursor.
+		return array(
+			'removed'   => $removed,
+			'cursor'    => $cursor,
+			'exhausted' => (count($duplicates) < $group_limit),
+		);
+	}
+
+
 	public function get_existing_inventory_item_by_title($title) {
 		$args = array(
 			'post_type' => 'tg_inventory',
