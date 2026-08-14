@@ -183,6 +183,129 @@ final class SyncSchedulerTest extends TestCase {
 		$this->assertSame( 0, $this->enqueued );
 	}
 
+	// --- fresh-sync throttle (cron watchdog only) -----------------------------
+
+	public function test_min_interval_defaults_to_15_minutes() {
+		$this->assertSame( 900, Tapgoods_Sync_Scheduler::min_interval() );
+		$this->assertSame(
+			Tapgoods_Sync_Scheduler::DEFAULT_MIN_INTERVAL,
+			Tapgoods_Sync_Scheduler::min_interval()
+		);
+	}
+
+	/**
+	 * The TG_SYNC_MIN_INTERVAL constant overrides the default. Run in a separate
+	 * process so the define() cannot leak into the other tests (which assert the
+	 * 900s default).
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_min_interval_honours_the_override_constant() {
+		define( 'TG_SYNC_MIN_INTERVAL', 120 );
+		$this->assertSame( 120, Tapgoods_Sync_Scheduler::min_interval() );
+	}
+
+	public function test_fresh_sync_is_due_when_never_synced() {
+		// A brand-new IDLE state has no last_success yet.
+		$state = Tapgoods_Sync_State::get_instance();
+		$this->assertNull( $state->get_last_success() );
+
+		$this->assertTrue( Tapgoods_Sync_Scheduler::should_start_fresh( $state ) );
+		$this->assertSame( 0, Tapgoods_Sync_Scheduler::seconds_until_due( $state ) );
+	}
+
+	public function test_fresh_sync_is_due_when_last_success_older_than_interval() {
+		$state = Tapgoods_Sync_State::get_instance();
+		$this->complete_run_at( 1000 );
+
+		// Interval fully elapsed (900s later, to the second): due.
+		$this->clock = 1900;
+		$this->assertTrue( Tapgoods_Sync_Scheduler::should_start_fresh( $state ) );
+		$this->assertSame( 0, Tapgoods_Sync_Scheduler::seconds_until_due( $state ) );
+
+		// Well past the interval: still due.
+		$this->clock = 5000;
+		$this->assertTrue( Tapgoods_Sync_Scheduler::should_start_fresh( $state ) );
+	}
+
+	public function test_fresh_sync_is_not_due_when_within_the_interval() {
+		$state = Tapgoods_Sync_State::get_instance();
+		$this->complete_run_at( 1000 );
+
+		// Only 400s since the last success: throttled for another 500s.
+		$this->clock = 1400;
+		$this->assertFalse( Tapgoods_Sync_Scheduler::should_start_fresh( $state ) );
+		$this->assertSame( 500, Tapgoods_Sync_Scheduler::seconds_until_due( $state ) );
+	}
+
+	// --- cron_plan: the watchdog decision (idle / running / error) ------------
+
+	public function test_cron_plan_always_enqueues_while_a_run_is_in_progress() {
+		$state = Tapgoods_Sync_State::get_instance();
+		// A completed run stamps a very recent last_success ...
+		$this->complete_run_at( 1000 );
+		// ... then a new run is started and is in progress: the throttle must NOT
+		// stall it even though last_success is well within the interval.
+		$state->begin_prep()->mark_active();
+		$this->assertTrue( $state->is_running() );
+
+		$plan = Tapgoods_Sync_Scheduler::cron_plan( $state );
+
+		$this->assertTrue( $plan['enqueue'], 'An in-progress run is ALWAYS re-armed.' );
+		$this->assertSame( array( 'in_progress' => 1 ), $plan['context'] );
+	}
+
+	public function test_cron_plan_skips_when_the_run_is_error_latched() {
+		$state = Tapgoods_Sync_State::get_instance();
+		$state->begin_prep()->mark_active();
+		for ( $i = 0; $i <= Tapgoods_Sync_State::MAX_RETRIES; $i++ ) {
+			$state->mark_error( 'boom' );
+		}
+		$this->assertSame( Tapgoods_Sync_State::STATE_ERROR, $state->get_state() );
+
+		$plan = Tapgoods_Sync_Scheduler::cron_plan( $state );
+
+		$this->assertFalse( $plan['enqueue'], 'A latched ERROR must not be re-armed.' );
+		$this->assertSame( array( 'skipped' => 'error_state' ), $plan['context'] );
+	}
+
+	public function test_cron_plan_starts_a_fresh_run_when_idle_and_due() {
+		$state = Tapgoods_Sync_State::get_instance();
+		$this->complete_run_at( 1000 );
+		$this->clock = 2000; // > 900s later: due.
+
+		$plan = Tapgoods_Sync_Scheduler::cron_plan( $state );
+
+		$this->assertTrue( $plan['enqueue'] );
+		$this->assertSame( array(), $plan['context'], 'A fresh due run has no skip context.' );
+	}
+
+	public function test_cron_plan_throttles_a_fresh_run_when_idle_and_within_the_interval() {
+		$state = Tapgoods_Sync_State::get_instance();
+		$this->complete_run_at( 1000 );
+		$this->clock = 1100; // Only 100s later: throttled.
+
+		$plan = Tapgoods_Sync_Scheduler::cron_plan( $state );
+
+		$this->assertFalse( $plan['enqueue'] );
+		$this->assertSame( 'throttled', $plan['context']['skipped'] );
+		$this->assertSame( 800, $plan['context']['retry_in'], 'Reports the seconds remaining.' );
+	}
+
+	/**
+	 * Drive the shared state to COMPLETED with last_success stamped at $when.
+	 *
+	 * @param int $when Clock value to stamp the successful completion at.
+	 * @return void
+	 */
+	private function complete_run_at( int $when ): void {
+		$this->clock = $when;
+		$state       = Tapgoods_Sync_State::get_instance();
+		$state->begin_prep()->mark_active()->mark_completed();
+		$this->assertSame( $when, $state->get_last_success() );
+	}
+
 	// --- run_slice: one slice per action, then chain --------------------------
 
 	public function test_run_slice_runs_exactly_one_slice_then_chains_when_in_progress() {

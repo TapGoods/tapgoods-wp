@@ -50,6 +50,21 @@ class Tapgoods_Sync_Scheduler {
 	const GROUP = 'tapgoods-sync';
 
 	/**
+	 * Minimum seconds between one FULL sync completing and the next FRESH one
+	 * starting (default 15 minutes). Overridable with the TG_SYNC_MIN_INTERVAL
+	 * constant.
+	 *
+	 * This is the cron watchdog's throttle. Because a full catalog sync takes
+	 * longer than the five-minute cron interval, without it the tick that fires
+	 * right after a run COMPLETES would immediately start a brand-new run, so the
+	 * plugin would re-sync continuously. The throttle applies ONLY to starting a
+	 * fresh run from idle/completed: it never stalls an in-progress chain, and it
+	 * never touches the manual "Sync Now" button or the direct auto-triggers,
+	 * which all enqueue directly (not through tapgrein_cron_exec).
+	 */
+	const DEFAULT_MIN_INTERVAL = 900;
+
+	/**
 	 * Whether Action Scheduler is loaded and its API is callable.
 	 *
 	 * Everything this class does is gated on this, so a site where the bundled
@@ -62,6 +77,114 @@ class Tapgoods_Sync_Scheduler {
 		return function_exists( 'as_enqueue_async_action' )
 			&& function_exists( 'as_unschedule_all_actions' )
 			&& ( function_exists( 'as_has_scheduled_action' ) || function_exists( 'as_next_scheduled_action' ) );
+	}
+
+	// --- Fresh-sync throttle (cron watchdog only) ----------------------------
+
+	/**
+	 * Minimum seconds between a completed full sync and the next fresh one.
+	 *
+	 * Reads the TG_SYNC_MIN_INTERVAL constant when defined, otherwise the default.
+	 * Clamped to >= 0 so a nonsensical negative override degrades to "no throttle"
+	 * rather than making everything look perpetually due in the past.
+	 *
+	 * @return int
+	 */
+	public static function min_interval() {
+		if ( defined( 'TG_SYNC_MIN_INTERVAL' ) ) {
+			return max( 0, (int) TG_SYNC_MIN_INTERVAL );
+		}
+		return self::DEFAULT_MIN_INTERVAL;
+	}
+
+	/**
+	 * How many seconds remain before a fresh sync is due again.
+	 *
+	 * Uses current_time( 'timestamp' ), the SAME clock Tapgoods_Sync_State stamps
+	 * last_success with (see Tapgoods_Sync_State::now()), so the comparison is
+	 * apples-to-apples. Returns 0 when a fresh sync is already due (never synced,
+	 * or the interval has fully elapsed).
+	 *
+	 * @param Tapgoods_Sync_State $state Sync state (source of last_success).
+	 * @return int Seconds remaining (0 when due now).
+	 */
+	public static function seconds_until_due( $state ) {
+		$last_success = $state->get_last_success();
+		if ( empty( $last_success ) ) {
+			return 0;
+		}
+		$elapsed   = (int) current_time( 'timestamp' ) - (int) $last_success; // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+		$remaining = self::min_interval() - $elapsed;
+		return $remaining > 0 ? $remaining : 0;
+	}
+
+	/**
+	 * Whether the cron watchdog should START a FRESH full sync now.
+	 *
+	 * This is the throttle decision, and it is only meaningful for an idle/
+	 * completed run: a fresh sync is due when there is no recorded success yet, or
+	 * when the minimum interval since the last success has fully elapsed. It says
+	 * nothing about an in-progress or error-latched run; the caller
+	 * (cron_plan / tapgrein_cron_exec) decides those first.
+	 *
+	 * @param Tapgoods_Sync_State $state Sync state.
+	 * @return bool
+	 */
+	public static function should_start_fresh( $state ) {
+		$last_success = $state->get_last_success();
+		if ( empty( $last_success ) ) {
+			return true; // Never synced: always due.
+		}
+		return 0 === self::seconds_until_due( $state );
+	}
+
+	/**
+	 * Decide what the five-minute cron watchdog should do this tick.
+	 *
+	 * Pure and WP-light (it only calls the state machine and current_time), so the
+	 * whole watchdog decision is unit-testable in isolation without booting
+	 * WordPress. tapgrein_cron_exec is the thin wrapper that executes the plan
+	 * (enqueue + log). Ordering matters and is deliberate:
+	 *
+	 *   1. latched ERROR  => enqueue nothing (terminal until an admin clears it;
+	 *                        re-arming would be the retry storm the design avoids).
+	 *   2. in progress     => ALWAYS enqueue (keep the chain alive). The throttle
+	 *                        must never stall a run that is already flowing.
+	 *   3. idle, throttled => enqueue nothing yet; a fresh sync is not due.
+	 *   4. idle, due       => enqueue the first slice of a fresh run.
+	 *
+	 * @param Tapgoods_Sync_State $state Sync state.
+	 * @return array{enqueue:bool,context:array} enqueue flag + extra log context.
+	 */
+	public static function cron_plan( $state ) {
+		if ( Tapgoods_Sync_State::STATE_ERROR === $state->get_state() && $state->has_error() ) {
+			return array(
+				'enqueue' => false,
+				'context' => array( 'skipped' => 'error_state' ),
+			);
+		}
+
+		if ( $state->is_running() ) {
+			return array(
+				'enqueue' => true,
+				'context' => array( 'in_progress' => 1 ),
+			);
+		}
+
+		if ( ! self::should_start_fresh( $state ) ) {
+			return array(
+				'enqueue' => false,
+				'context' => array(
+					'skipped'  => 'throttled',
+					'retry_in' => self::seconds_until_due( $state ),
+				),
+			);
+		}
+
+		return array(
+			'enqueue' => true,
+			'context' => array(),
+		);
 	}
 
 	/**

@@ -164,12 +164,24 @@ class Tapgoods {
 	 *   - latched ERROR           => do NOT re-arm; an admin must clear it first
 	 *                                (this is what keeps cron from storming on top
 	 *                                of the state machine's ERROR latch).
-	 *   - otherwise               => enqueue_slice(), which is guarded by
+	 *   - in progress             => ALWAYS enqueue_slice() to keep the chain
+	 *                                alive. enqueue_slice() is guarded by
 	 *                                as_has_scheduled_action so an already
-	 *                                pending/running chain is never duplicated. If a
-	 *                                run is in progress this is a no-op; if the chain
-	 *                                stalled it resumes it; if idle it starts a fresh
-	 *                                run (the slice's own PREP).
+	 *                                pending/running chain is never duplicated;
+	 *                                the fresh-sync throttle must NOT stall a run
+	 *                                that is already flowing.
+	 *   - idle, throttled         => a run finished less than the minimum interval
+	 *                                ago (Tapgoods_Sync_Scheduler::min_interval,
+	 *                                default 15 min): skip so a completed full sync
+	 *                                does not immediately restart every tick.
+	 *   - idle, due               => enqueue_slice() to start a fresh run (its
+	 *                                own PREP).
+	 *
+	 * The whole decision lives in Tapgoods_Sync_Scheduler::cron_plan() so it is
+	 * unit-testable without booting WordPress; this method just executes the plan.
+	 * The throttle is applied ONLY here (the cron watchdog); the manual "Sync Now"
+	 * button and the direct auto-triggers enqueue slices directly and are
+	 * deliberately not throttled.
 	 *
 	 * When Action Scheduler is unavailable the tick falls back to the legacy
 	 * self-ping driver so the sync still runs.
@@ -193,17 +205,13 @@ class Tapgoods {
 		}
 
 		$state = Tapgoods_Connection::get_instance()->sync_state();
+		$plan  = Tapgoods_Sync_Scheduler::cron_plan( $state );
 
-		// Never re-arm a latched error: that is the state machine's terminal state
-		// until an admin clears it. Re-arming here would be the AS retry storm the
-		// design explicitly avoids.
-		if ( $state->has_error() && Tapgoods_Sync_State::STATE_ERROR === $state->get_state() ) {
-			$log->debug( 'sync.cron.tick', array( 'driver' => 'action_scheduler', 'skipped' => 'error_state' ) );
-			return;
+		$context = array_merge( array( 'driver' => 'action_scheduler' ), $plan['context'] );
+		if ( $plan['enqueue'] ) {
+			$context['enqueued'] = Tapgoods_Sync_Scheduler::enqueue_slice() ? 1 : 0;
 		}
-
-		$enqueued = Tapgoods_Sync_Scheduler::enqueue_slice();
-		$log->debug( 'sync.cron.tick', array( 'driver' => 'action_scheduler', 'enqueued' => $enqueued ? 1 : 0 ) );
+		$log->debug( 'sync.cron.tick', $context );
 	}
 
 	public function tapgrein_disable_autop_blocks( $block_content, $block ) {
