@@ -81,7 +81,7 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 					// COMMENTED: Subcategory display temporarily disabled
 					// if ( $has_subcategories ) :
 					?>
-						<!-- <div class="subcategory-list" data-parent-category="<?php echo esc_attr( $category->term_id ); ?>"> -->
+						<!-- <div class="subcategory-list" data-parent-category="<?php echo esc_attr( (string) $category->term_id ); ?>"> -->
 							<?php // foreach ( $subcategories as $subcategory ) : ?>
 								<!-- <a class="subcategory-link" href="#" data-tag-id="<?php echo esc_attr( $subcategory->slug ); ?>"> -->
 									<?php // echo esc_html( $subcategory->name ); ?>

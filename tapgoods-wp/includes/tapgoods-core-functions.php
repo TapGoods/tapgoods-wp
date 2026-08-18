@@ -476,56 +476,135 @@ function tapgrein_output_location_styles() {
 
 
 
+/**
+ * Categories that have at least one published item in a location.
+ *
+ * Bounded by design, and that is the whole point. The previous implementation
+ * materialised every item id for the location ( 'posts_per_page' => -1 ) and fed
+ * the entire list to get_terms( 'object_ids' => ... ), which becomes a single
+ * statement carrying an IN() list of every item in the catalog. On the shop's
+ * default location (~18k items) that query came back empty on the customer host,
+ * so tg-filter.php rendered a category menu with nothing in it, silently, while
+ * smaller locations on the same site kept working. Same failure shape as the
+ * sync's killed queries in WPB-165.
+ *
+ * The location filter now happens in SQL, so what comes back scales with the
+ * number of categories (tens) instead of the number of items (tens of
+ * thousands), and term hydration is chunked so no single query grows with the
+ * catalog either.
+ *
+ * @param string|int|null $location_id TapGoods location id, or null to resolve the current one.
+ * @return WP_Term[] Terms ordered by name; empty when the location has no items.
+ */
 function tapgrein_get_categories( $location_id = null ) {
 	// If no location is specified, try to get the current user's location
 	if ( null === $location_id ) {
 		$location_id = tapgrein_get_wp_location_id();
 	}
 
-	// If we still don't have a location, return all categories
+	// No location to scope by: every category that actually holds items. Matches
+	// the per-location branch below, and keeps the menu from listing the
+	// thousands of item-named placeholder terms the API returns with no items.
 	if ( empty( $location_id ) ) {
 		$terms = get_terms(
 			array(
 				'taxonomy'   => 'tg_category',
-				'hide_empty' => false,
+				'hide_empty' => true,
 			)
 		);
-		return $terms;
+
+		$terms = is_wp_error( $terms ) ? array() : $terms;
+
+		return apply_filters( 'tg_shop_categories', $terms, null );
 	}
 
-	// Get all items for this location
-	$items_query = new WP_Query(
-		array(
-			'post_type'      => 'tg_inventory',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'meta_query'     => array(
-				array(
-					'key'     => 'tg_locationId',
-					'value'   => $location_id,
-					'compare' => '=',
-				),
-			),
+	$term_ids = tapgrein_get_category_ids_for_location( $location_id );
+
+	if ( empty( $term_ids ) ) {
+		return apply_filters( 'tg_shop_categories', array(), $location_id );
+	}
+
+	// Hydrate in chunks so the IN() list stays bounded however many categories a
+	// business ends up with.
+	$chunk_size = class_exists( 'Tapgoods_Connection' ) ? Tapgoods_Connection::TERM_CHUNK_SIZE : 150;
+	$terms      = array();
+
+	foreach ( array_chunk( $term_ids, $chunk_size ) as $chunk ) {
+		$batch = get_terms(
+			array(
+				'taxonomy'   => 'tg_category',
+				'hide_empty' => false, // The location filter already proved each of these has items.
+				'include'    => $chunk,
+			)
+		);
+
+		if ( ! is_wp_error( $batch ) ) {
+			$terms = array_merge( $terms, $batch );
+		}
+	}
+
+	usort(
+		$terms,
+		function ( $a, $b ) {
+			return strcasecmp( $a->name, $b->name );
+		}
+	);
+
+	return apply_filters( 'tg_shop_categories', $terms, $location_id );
+}
+
+/**
+ * Term ids for a taxonomy that have at least one published tg_inventory item in
+ * a location.
+ *
+ * One query whose result set is the number of terms, not the number of items, so
+ * it behaves the same on a 200-item catalog and an 18,000-item one. Kept
+ * separate from tapgrein_get_categories() so the location-to-terms resolution
+ * can be exercised on its own.
+ *
+ * Results are memoised in the object cache for five minutes. Where no persistent
+ * cache exists that is per-request only, which is exactly where the query is
+ * cheap anyway; hosts that do run one (and where the catalog is large enough for
+ * this to matter) get the benefit.
+ *
+ * @param string|int $location_id TapGoods location id.
+ * @param string     $taxonomy    Taxonomy to resolve. Defaults to tg_category.
+ * @return int[] Term ids, empty when the location has no categorised items.
+ */
+function tapgrein_get_category_ids_for_location( $location_id, $taxonomy = 'tg_category' ) {
+	global $wpdb;
+
+	$cache_key = 'tg_cat_ids_' . $taxonomy . '_' . md5( (string) $location_id );
+	$cached    = wp_cache_get( $cache_key, 'tapgoods' );
+
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
+
+	$ids = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT DISTINCT tt.term_id
+			FROM {$wpdb->term_relationships} tr
+			INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+			INNER JOIN {$wpdb->posts} p ON p.ID = tr.object_id
+			INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = tr.object_id AND pm.meta_key = %s
+			WHERE tt.taxonomy = %s
+			  AND p.post_type = %s
+			  AND p.post_status = %s
+			  AND pm.meta_value = %s",
+			'tg_locationId',
+			$taxonomy,
+			'tg_inventory',
+			'publish',
+			(string) $location_id
 		)
 	);
 
-	// If no items found for this location, return empty array
-	if ( empty( $items_query->posts ) ) {
-		wp_reset_postdata();
-		return array();
-	}
+	$ids = array_map( 'intval', (array) $ids );
 
-	// Get categories that are assigned to these items
-	$terms = get_terms(
-		array(
-			'taxonomy'   => 'tg_category',
-			'hide_empty' => true, // Only show categories with items
-			'object_ids' => $items_query->posts, // Filter by items in this location
-		)
-	);
+	wp_cache_set( $cache_key, $ids, 'tapgoods', 300 );
 
-	wp_reset_postdata();
-	return $terms;
+	return $ids;
 }
 
 function tapgrein_get_tg_location_id( $post_id = false ) {
