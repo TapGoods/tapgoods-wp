@@ -131,6 +131,12 @@ final class ConnectionFinalizeTest extends TestCase {
 				$this->last_args = $args;
 				return $query;
 			}
+			public function get_var( $query ) {
+				// Both COUNT queries the cleanup guard asks (stored total, stamped by
+				// this run) answer the same, i.e. the run stamped the whole store, so
+				// the guard passes and this test keeps testing the bounded page.
+				return 50;
+			}
 			public function get_col( $query ) {
 				// Two ids in this LIMIT page (fewer than the batch => caller stops).
 				return array( 11, 22 );

@@ -1013,6 +1013,12 @@ class Tapgoods_Connection {
 	 * fetches at most $limit ids per call, so the caller can loop it across slices
 	 * until it drains. A blank token deletes nothing (caller guards this too).
 	 *
+	 * Deletion is permanent (wp_delete_post with $force_delete), and on a live
+	 * store it can be thousands of posts in one run, so it is guarded the same way
+	 * remove_terms_not_in_run() is: a run that stamped only a small fraction of the
+	 * catalog is treated as incomplete rather than as evidence that the rest is
+	 * obsolete. See cleanup_min_stamped_ratio().
+	 *
 	 * @param string $run_token Current run's token.
 	 * @param int    $limit     Max posts to delete this batch.
 	 * @return int Number of posts deleted.
@@ -1024,6 +1030,10 @@ class Tapgoods_Connection {
 			return 0;
 		}
 		$limit = max(1, (int) $limit);
+
+		if (! $this->run_stamped_enough_items($run_token)) {
+			return 0;
+		}
 
 		$ids = $wpdb->get_col(
 			$wpdb->prepare(
@@ -1104,6 +1114,111 @@ class Tapgoods_Connection {
 		}
 
 		return $removed;
+	}
+
+	/**
+	 * Whether a run stamped enough of the catalog to be trusted to reconcile it.
+	 *
+	 * The item cleanup deletes permanently and at scale: on the first successful
+	 * sync of a store that had been failing for months, it removes every post the
+	 * run did not touch, which measured 8,408 posts out of 26,596 on one live site.
+	 * That is correct when the run really did see the whole catalog. It is
+	 * destructive if the run only got part way and still reached finalize, because
+	 * then "not stamped" means "not reached yet", not "gone from TapGoods".
+	 *
+	 * So require the stamped set to be at least cleanup_min_stamped_ratio() of what
+	 * is currently stored before deleting anything. Skipping is the safe outcome:
+	 * obsolete posts linger one more cycle and the reason is logged, where deleting
+	 * cannot be undone.
+	 *
+	 * Note this is intentionally proportional, not just a zero check. A run that
+	 * stamped 500 of 18,000 items passes a zero check and would then delete 17,500
+	 * live items.
+	 *
+	 * @param string $run_token Current run's token.
+	 * @return bool True when cleanup may proceed.
+	 */
+	private function run_stamped_enough_items($run_token) {
+		$total = $this->count_items_total();
+
+		// Nothing stored means nothing to reconcile.
+		if (0 === $total) {
+			return true;
+		}
+
+		$stamped = $this->count_items_in_run($run_token);
+		$ratio   = $stamped / $total;
+		$minimum = self::cleanup_min_stamped_ratio();
+
+		if ($ratio < $minimum) {
+			$this->sync_log()->warn(
+				'sync.cleanup.skipped',
+				array(
+					'reason'    => 'run_stamped_too_few_items',
+					'stamped'   => $stamped,
+					'stored'    => $total,
+					'ratio'     => round($ratio, 3),
+					'min_ratio' => $minimum,
+				)
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Minimum share of stored items a run must have stamped before the item
+	 * cleanup is allowed to delete anything.
+	 *
+	 * Default 0.5. Set generously low on purpose: a catalog that genuinely halved
+	 * still gets reconciled, and the live site carrying 8,408 obsolete posts out of
+	 * 26,596 sits at 0.68, so a real backlog still clears. Overridable via the
+	 * TG_SYNC_CLEANUP_MIN_RATIO constant, clamped to a sane range.
+	 *
+	 * @return float
+	 */
+	public static function cleanup_min_stamped_ratio() {
+		$ratio = defined('TG_SYNC_CLEANUP_MIN_RATIO') ? (float) TG_SYNC_CLEANUP_MIN_RATIO : 0.5;
+
+		return max(0.0, min(1.0, $ratio));
+	}
+
+	/**
+	 * Count tg_inventory posts currently stored, in any status.
+	 *
+	 * @return int
+	 */
+	private function count_items_total() {
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = %s",
+				'tg_inventory'
+			)
+		);
+	}
+
+	/**
+	 * Count tg_inventory posts stamped with the current run token.
+	 *
+	 * @param string $run_token Current run's token.
+	 * @return int
+	 */
+	private function count_items_in_run($run_token) {
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->posts} p
+				INNER JOIN {$wpdb->postmeta} m ON m.post_id = p.ID
+				WHERE p.post_type = %s AND m.meta_key = %s AND m.meta_value = %s",
+				'tg_inventory',
+				self::SYNC_RUN_META,
+				(string) $run_token
+			)
+		);
 	}
 
 	/**
