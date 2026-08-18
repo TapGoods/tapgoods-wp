@@ -27,10 +27,24 @@ $today       = wp_date( $date_format );
 <?php do_action( 'tg_after_date_filter' ); ?>
 
 <?php
-$is_mobile        = wp_is_mobile();
-$button_classes   = 'accordion-button' . ( $is_mobile ? ' collapsed' : '' );
-$aria_expanded    = $is_mobile ? 'false' : 'true';
-$collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' );
+/*
+ * WPB-179: the categories accordion must start closed on mobile, where it
+ * otherwise pushes the items off the screen, and open on desktop.
+ *
+ * This used to be decided here with wp_is_mobile(). That cannot work on a cached
+ * site: the HTML is stored per URL with no device variance, so whichever device
+ * happens to warm the cache decides what every later visitor sees. Verified on
+ * WP Engine in both directions on the same URL: warmed from a phone, desktop
+ * visitors got the closed accordion; warmed from a desktop, phones got the open
+ * one. The server-side branch was not just unreliable, it was a coin flip.
+ *
+ * So render one cache-safe variant, closed, and let the client open it when the
+ * viewport is wide enough. Closed is the safe default: on the wrong device it
+ * costs one tap, where wrongly-open buries the products.
+ */
+$button_classes   = 'accordion-button collapsed';
+$aria_expanded    = 'false';
+$collapse_classes = 'accordion-collapse collapse';
 ?>
 
 <div class="categories">
@@ -94,6 +108,35 @@ $collapse_classes = 'accordion-collapse collapse' . ( $is_mobile ? '' : ' show' 
 		</div>
 	</div>
 </div>
+<script>
+(function () {
+	// Second half of the WPB-179 fix (see the note above): the markup ships closed
+	// so it is cache-safe, and the viewport decides whether to open it.
+	//
+	// Inline and immediately after the accordion on purpose. It runs while the
+	// parser is still here, before first paint, so a desktop visitor never sees the
+	// panel flash shut. 768px is Bootstrap's md breakpoint, the width at which the
+	// filter sits beside the grid instead of stacking on top of it.
+	//
+	// Load time only, deliberately: re-running on resize would reopen a panel the
+	// visitor had just closed. Without JavaScript, desktop opens it in one click.
+	if ( ! window.matchMedia || ! window.matchMedia( '(min-width: 768px)' ).matches ) {
+		return;
+	}
+
+	var panel  = document.getElementById( 'collapseOne' );
+	var button = document.querySelector( '[data-bs-target="#collapseOne"]' );
+
+	if ( panel ) {
+		panel.classList.add( 'show' );
+	}
+
+	if ( button ) {
+		button.classList.remove( 'collapsed' );
+		button.setAttribute( 'aria-expanded', 'true' );
+	}
+})();
+</script>
 
 <?php do_action( 'tg_after_inventory_filter' ); ?>
 </aside>
