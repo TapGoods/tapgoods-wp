@@ -52,6 +52,11 @@ function initClearSyncErrors() {
                 if (label && response.data && response.data.state) {
                     label.textContent = response.data.state.label;
                 }
+                // Keep the "Currently" line in step with the state it describes.
+                const activity = document.getElementById('tapgrein_sync_activity');
+                if (activity && response.data && response.data.state && response.data.state.activity) {
+                    activity.textContent = response.data.state.activity;
+                }
                 showConnectionNotice('Sync errors cleared.', 'success');
             } else {
                 clearButton.disabled = false;

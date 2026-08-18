@@ -551,14 +551,93 @@ class Tapgoods_Sync_State {
 	}
 
 	/**
+	 * Plain-language description of what the run is doing right now.
+	 *
+	 * The state label alone ("Syncing") plus the page counter was reported as
+	 * confusing: a run sits at "734 / 734" for the whole finalize phase, which read
+	 * as finished-but-stuck, and it sits at "0 / 734" for the whole category pass,
+	 * which read as not-started. Neither is wrong, they just describe paging, which
+	 * is only one of three phases. This says which phase is actually running.
+	 *
+	 * Phase order is categories, then item paging, then finalize. Derived purely
+	 * from the state and the cursor, so it needs no extra bookkeeping and is
+	 * testable on its own.
+	 *
+	 * @return string
+	 */
+	public function get_activity_label() {
+		$state = $this->data['state'];
+
+		if ( self::STATE_IDLE === $state ) {
+			return 'Idle';
+		}
+		if ( self::STATE_COMPLETED === $state ) {
+			return 'Completed';
+		}
+		if ( self::STATE_ERROR === $state ) {
+			return 'Stopped after repeated failures';
+		}
+		if ( self::STATE_PREP === $state ) {
+			return 'Preparing: counting locations and pages';
+		}
+
+		$cursor = $this->get_cursor();
+
+		if ( 'finalize' === $cursor['phase'] ) {
+			return $this->finalize_activity_label( (string) $cursor['finalize_step'] );
+		}
+
+		if ( empty( $cursor['categories_done'] ) ) {
+			$total = count( (array) $cursor['location_ids'] );
+			$done  = (int) $cursor['cat_location_index'];
+
+			return $total > 0
+				? sprintf( 'Syncing categories and tags (location %d of %d)', min( $done + 1, $total ), $total )
+				: 'Syncing categories and tags';
+		}
+
+		$total = $this->get_total_pages();
+		$done  = $this->get_pages_completed();
+
+		return $total > 0
+			? sprintf( 'Syncing items (page %d of %d)', min( $done + 1, $total ), $total )
+			: 'Syncing items';
+	}
+
+	/**
+	 * Copy for one finalize sub-step.
+	 *
+	 * @param string $step Value of the cursor's finalize_step.
+	 * @return string
+	 */
+	private function finalize_activity_label( $step ) {
+		$labels = array(
+			'items'             => 'Finishing up: removing items no longer in TapGoods',
+			'obsolete_cat'      => 'Finishing up: removing categories no longer in TapGoods',
+			'obsolete_tag'      => 'Finishing up: removing tags no longer in TapGoods',
+			'cleanup_terms_cat' => 'Finishing up: clearing out categories with no items',
+			'cleanup_terms_tag' => 'Finishing up: clearing out tags with no items',
+			'cleanup_dupes'     => 'Finishing up: removing duplicate items',
+		);
+
+		return isset( $labels[ $step ] ) ? $labels[ $step ] : 'Finishing up';
+	}
+
+	/**
 	 * Snapshot of the state for display in the admin screen.
 	 *
 	 * @return array
 	 */
 	public function get_summary() {
+		$cursor = $this->get_cursor();
+
 		return array(
 			'state'           => $this->data['state'],
 			'label'           => $this->get_label(),
+			'activity'        => $this->get_activity_label(),
+			'phase'           => $cursor['phase'],
+			'finalize_step'   => $cursor['finalize_step'],
+			'categories_done' => (bool) $cursor['categories_done'],
 			'total_pages'     => $this->get_total_pages(),
 			'pages_completed' => $this->get_pages_completed(),
 			'failure_count'   => $this->get_failure_count(),

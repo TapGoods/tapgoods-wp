@@ -109,7 +109,16 @@ if ( $connected ) :
                     <td><span id="tapgrein_sync_state_label"><?php echo esc_html( $tg_summary['label'] ); ?></span></td>
                 </tr>
                 <tr>
-                    <th scope="row">Planned paging calls</th>
+                    <th scope="row">Currently</th>
+                    <td><span id="tapgrein_sync_activity"><?php echo esc_html( $tg_summary['activity'] ); ?></span></td>
+                </tr>
+                <tr>
+                    <?php
+                    // Deliberately not called "progress": this counts item pages only, and a
+                    // run spends whole phases (categories, then finalize) at 0/N and N/N. The
+                    // "Currently" row above is what says where the run actually is.
+                    ?>
+                    <th scope="row">Item pages fetched</th>
                     <td><?php echo esc_html( $tg_summary['pages_completed'] . ' / ' . $tg_summary['total_pages'] ); ?></td>
                 </tr>
                 <tr>
