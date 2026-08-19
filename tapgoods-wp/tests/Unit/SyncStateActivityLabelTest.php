@@ -168,6 +168,41 @@ final class SyncStateActivityLabelTest extends TestCase {
 		);
 	}
 
+	public function test_every_state_yields_a_non_empty_activity() {
+		// The invariant the admin row depends on. It rendered blank once on a live
+		// site, and while that turned out to be a stale compiled file rather than a
+		// missing branch, "some state produces an empty string" has to be impossible
+		// by construction, not by inspection.
+		$state = $this->state();
+
+		$this->assertNotSame( '', $state->get_activity_label(), 'IDLE' );
+
+		$state->begin_prep();
+		$this->assertNotSame( '', $state->get_activity_label(), 'PREP' );
+
+		$state->mark_active();
+		$this->assertNotSame( '', $state->get_activity_label(), 'ACTIVE with a default cursor' );
+
+		$state->init_cursor( array( 5001, 5002 ) );
+		$this->assertNotSame( '', $state->get_activity_label(), 'ACTIVE mid-categories' );
+
+		$cursor                    = $state->get_cursor();
+		$cursor['categories_done'] = true;
+		$state->save_cursor( $cursor );
+		$this->assertNotSame( '', $state->get_activity_label(), 'ACTIVE mid-paging' );
+
+		$cursor['phase'] = 'finalize';
+		$state->save_cursor( $cursor );
+		$this->assertNotSame( '', $state->get_activity_label(), 'ACTIVE in finalize' );
+
+		$cursor['phase'] = 'something-nobody-has-written-yet';
+		$state->save_cursor( $cursor );
+		$this->assertNotSame( '', $state->get_activity_label(), 'ACTIVE in an unknown phase' );
+
+		$state->mark_completed();
+		$this->assertNotSame( '', $state->get_activity_label(), 'COMPLETED' );
+	}
+
 	public function test_summary_carries_the_activity_and_the_phase() {
 		// The admin partial reads only the summary, so the new fields have to be in it.
 		$state = $this->active_with(

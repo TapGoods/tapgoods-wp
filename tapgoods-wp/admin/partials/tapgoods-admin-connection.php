@@ -110,7 +110,22 @@ if ( $connected ) :
                 </tr>
                 <tr>
                     <th scope="row">Currently</th>
-                    <td><span id="tapgrein_sync_activity"><?php echo esc_html( $tg_summary['activity'] ); ?></span></td>
+                    <td>
+                        <span id="tapgrein_sync_activity">
+                            <?php
+                            // Fall back to the state label rather than rendering an empty
+                            // row. A plugin distributed as a zip gets unpacked over a
+                            // running site, and a host with a persistent opcache can serve
+                            // a stale compiled copy of one file while another is already
+                            // new, which is exactly how this row showed up blank once.
+                            echo esc_html(
+                                isset( $tg_summary['activity'] ) && '' !== $tg_summary['activity']
+                                    ? $tg_summary['activity']
+                                    : $tg_summary['label']
+                            );
+                            ?>
+                        </span>
+                    </td>
                 </tr>
                 <tr>
                     <?php
