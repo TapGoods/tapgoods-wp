@@ -2087,7 +2087,16 @@ class Tapgoods_Connection {
 		$key    = 'tg_cat_list_' . $lid;
 		$cached = get_transient($key);
 		if (is_array($cached)) {
-			return $cached;
+			// Filter on the way out as well as on the way in. Filtering only before
+			// set_transient() is not enough: this cache outlives a plugin upgrade (on a
+			// host with a persistent object cache the transient is not even in the
+			// database), so a list cached by an older build keeps being replayed, with
+			// its hidden buckets, for the rest of the TTL. That is exactly what happened
+			// on the first upgrade carrying the filter: 6,379 hidden categories were
+			// still being recreated from an hour-old cache entry. filter_storefront_visible()
+			// is idempotent, so running it at both ends costs nothing and makes the
+			// cached shape independent of which build wrote it.
+			return self::filter_storefront_visible($cached);
 		}
 
 		$client     = $this->get_connection();
@@ -2097,8 +2106,8 @@ class Tapgoods_Connection {
 			return false;
 		}
 
-		// Filter before caching, so the batch cursor indexes the same list on every
-		// slice of the run.
+		// Filter before caching too, so what is stored is already the list the batch
+		// cursor will index on every slice of the run.
 		$categories = self::filter_storefront_visible($categories);
 
 		set_transient($key, $categories, self::CAT_LIST_CACHE_TTL);

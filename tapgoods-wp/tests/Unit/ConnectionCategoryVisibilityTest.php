@@ -179,6 +179,48 @@ final class ConnectionCategoryVisibilityTest extends TestCase {
 		$this->assertSame( array( 0, 1 ), array_keys( $filtered ) );
 	}
 
+	public function test_filtering_is_idempotent() {
+		// Relied on by get_location_categories_cached(), which filters both before
+		// writing the transient and after reading it.
+		$input = array(
+			array( 'id' => 1, 'name' => 'Tables', 'visibleOnSf' => true,
+				'sfSubCategories' => array(
+					array( 'id' => 11, 'name' => 'Round', 'visibleOnSf' => true ),
+					array( 'id' => 12, 'name' => 'Hidden', 'visibleOnSf' => false ),
+				),
+			),
+			array( 'id' => 2, 'name' => 'Hidden Bucket', 'visibleOnSf' => false ),
+		);
+
+		$once  = Tapgoods_Connection::filter_storefront_visible( $input );
+		$twice = Tapgoods_Connection::filter_storefront_visible( $once );
+
+		$this->assertSame( $once, $twice );
+	}
+
+	public function test_a_list_cached_by_an_older_build_is_still_filtered() {
+		// The upgrade path that bit on the live site: the per-location list is cached
+		// for an hour, and on a host with a persistent object cache that entry outlives
+		// the plugin upgrade. Filtering only before the write let an old, unfiltered
+		// entry keep recreating hidden categories for the rest of the TTL.
+		$unfiltered = array(
+			array( 'id' => 1, 'name' => 'Tables', 'visibleOnSf' => true ),
+			array( 'id' => 2, 'name' => 'Linens (Uncategorized)', 'visibleOnSf' => false ),
+		);
+
+		Functions\when( 'get_transient' )->justReturn( $unfiltered );
+		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'apply_filters' )->justReturn( null );
+
+		$result = Tapgoods_Connection::get_instance()->get_location_categories_cached( 5001 );
+
+		$this->assertSame(
+			array( 'Tables' ),
+			$this->names( $result ),
+			'A cached list written by an older build must still be filtered on read.'
+		);
+	}
+
 	public function test_junk_input_is_survivable() {
 		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_visible( false ) );
 		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_visible( null ) );
