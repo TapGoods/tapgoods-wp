@@ -43,9 +43,33 @@ final class MockApiClientTest extends TestCase {
 	public function test_get_categories_returns_category_tree() {
 		$categories = $this->client()->get_categories_from_graph( 5001 );
 
-		$this->assertCount( 2, $categories );
+		// The mock stands in for the API, so it returns what the API returns:
+		// storefront categories AND the internal buckets alongside them. Filtering
+		// is the consumer's job (Tapgoods_Connection::filter_storefront_visible).
+		$this->assertCount( 3, $categories );
 		$this->assertSame( 'Tables', $categories[0]['name'] );
-		$this->assertCount( 2, $categories[0]['sfSubCategories'] );
+		$this->assertCount( 3, $categories[0]['sfSubCategories'] );
+	}
+
+	public function test_categories_carry_the_storefront_visibility_flag() {
+		$categories = $this->client()->get_categories_from_graph( 5001 );
+
+		$by_name = array();
+		foreach ( $categories as $category ) {
+			$by_name[ $category['name'] ] = $category;
+		}
+
+		// The fixture has to keep exercising both sides of the flag, on categories and
+		// on sub-categories, or the filter has nothing to bite on end to end.
+		$this->assertTrue( $by_name['Tables']['visibleOnSf'] );
+		$this->assertFalse( $by_name['Linens (Uncategorized)']['visibleOnSf'] );
+
+		$subs = array();
+		foreach ( $by_name['Tables']['sfSubCategories'] as $sub ) {
+			$subs[ $sub['name'] ] = $sub;
+		}
+		$this->assertTrue( $subs['Round Tables']['visibleOnSf'] );
+		$this->assertFalse( $subs['Hidden Sub Bucket']['visibleOnSf'] );
 	}
 
 	public function test_get_location_details_adds_derived_fields() {

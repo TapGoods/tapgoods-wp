@@ -1,21 +1,61 @@
 {
-    "data": {
-        "getStorefrontCagetories": [
-            {
-                "id": 701,
-                "name": "Tables",
-                "slug": "tables",
-                "sfSubCategories": [
-                    { "id": 801, "name": "Round Tables", "sfCategories": { "id": 701 } },
-                    { "id": 802, "name": "Banquet Tables", "sfCategories": { "id": 701 } }
-                ]
-            },
-            {
-                "id": 702,
-                "name": "Chairs",
-                "slug": "chairs",
-                "sfSubCategories": []
+  "data": {
+    "getStorefrontCagetories": [
+      {
+        "id": 701,
+        "name": "Tables",
+        "slug": "tables",
+        "visibleOnSf": true,
+        "sfSubCategories": [
+          {
+            "id": 801,
+            "name": "Round Tables",
+            "visibleOnSf": true,
+            "sfCategories": {
+              "id": 701
             }
+          },
+          {
+            "id": 802,
+            "name": "Banquet Tables",
+            "visibleOnSf": true,
+            "sfCategories": {
+              "id": 701
+            }
+          },
+          {
+            "id": 803,
+            "name": "Hidden Sub Bucket",
+            "visibleOnSf": false,
+            "sfCategories": {
+              "id": 701
+            }
+          }
         ]
-    }
+      },
+      {
+        "id": 702,
+        "name": "Chairs",
+        "slug": "chairs",
+        "visibleOnSf": true,
+        "sfSubCategories": []
+      },
+      {
+        "id": 703,
+        "name": "Linens (Uncategorized)",
+        "slug": "linens-uncategorized",
+        "visibleOnSf": false,
+        "sfSubCategories": [
+          {
+            "id": 804,
+            "name": "Linens",
+            "visibleOnSf": true,
+            "sfCategories": {
+              "id": 703
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -202,11 +202,15 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 		$url = $this->build_url( $endpoint );
 
+		// visibleOnSf separates real storefront categories from the internal buckets
+		// TapGoods keeps alongside them. Without asking for it a client has no way to
+		// tell them apart; see Tapgoods_Connection::filter_storefront_visible().
 		$fields = array(
 			'id',
 			'name',
 			'slug',
-			'sfSubCategories {id,name,sfCategories{id}}',
+			'visibleOnSf',
+			'sfSubCategories {id,name,visibleOnSf,sfCategories{id}}',
 		);
 
 		$variables = new stdClass();

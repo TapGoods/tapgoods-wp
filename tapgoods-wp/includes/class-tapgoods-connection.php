@@ -2097,8 +2097,81 @@ class Tapgoods_Connection {
 			return false;
 		}
 
+		// Filter before caching, so the batch cursor indexes the same list on every
+		// slice of the run.
+		$categories = self::filter_storefront_visible($categories);
+
 		set_transient($key, $categories, self::CAT_LIST_CACHE_TTL);
 		return $categories;
+	}
+
+	/**
+	 * Drop the storefront categories TapGoods marks as not visible on a storefront.
+	 *
+	 * getStorefrontCagetories returns every NestedSfCategory for the location,
+	 * including internal buckets that are not meant to be shown. Most of them come
+	 * from one migration in the API (db/data/20250831153417_migrate_sub_categories_without_parent.rb),
+	 * which gave every parentless storefront sub-category a synthetic parent named
+	 * "<sub-category> (Uncategorized)" with visible_on_sf: false. On one live site
+	 * that is 6,343 of them, imported as real categories on every pass and then
+	 * deleted again by finalize because nothing ends up in them. Pure churn, plus a
+	 * Categories admin screen carrying thousands of rows mid-sync.
+	 *
+	 * Filtering on the flag is what TapGoods' own customer-facing storefront does:
+	 * portal/inventories_controller.rb#sf_categories queries the same model with
+	 * `visible_on_sf: true`. Items whose only category is a hidden bucket are already
+	 * not browsable by category there, so this brings the plugin to parity rather
+	 * than hiding something customers can see today. (The "Uncategorized Tags"
+	 * grouping in tapgoods_front_end belongs to the PRO inventory-management view, a
+	 * different audience, and is deliberately not copied here.)
+	 *
+	 * A missing flag means visible: a response from an older API, or a fixture that
+	 * does not carry the field, has to keep behaving exactly as before. Only an
+	 * explicit false hides a category.
+	 *
+	 * @param mixed $categories Category list as returned by the API client.
+	 * @return array Storefront categories, with sub-categories pruned the same way.
+	 */
+	public static function filter_storefront_visible($categories) {
+		if (!is_array($categories)) {
+			return array();
+		}
+
+		$visible = array();
+
+		foreach ($categories as $category) {
+			if (!is_array($category) || !self::is_storefront_visible($category)) {
+				continue;
+			}
+
+			if (isset($category['sfSubCategories']) && is_array($category['sfSubCategories'])) {
+				$subs = array();
+				foreach ($category['sfSubCategories'] as $sub) {
+					if (is_array($sub) && self::is_storefront_visible($sub)) {
+						$subs[] = $sub;
+					}
+				}
+				$category['sfSubCategories'] = $subs;
+			}
+
+			$visible[] = $category;
+		}
+
+		return $visible;
+	}
+
+	/**
+	 * Whether one category/sub-category payload belongs on a storefront.
+	 *
+	 * @param array $node Category or sub-category payload.
+	 * @return bool
+	 */
+	private static function is_storefront_visible($node) {
+		if (!array_key_exists('visibleOnSf', $node)) {
+			return true; // Field absent: preserve the old behaviour.
+		}
+
+		return (bool) $node['visibleOnSf'];
 	}
 
 	/**
