@@ -358,14 +358,16 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	 * (generous) slice resumes at that cat_item_index and finishes.
 	 */
 	public function test_large_location_checkpoints_within_itself_then_resumes() {
-		// 30 single-upsert categories; default batch (25) drains 25 per batch.
+		// 30 single-upsert categories, each costing a second of the 18-second slice
+		// budget. Both limits apply: the count budget (25) and the clock, whichever
+		// runs out first. Here the clock does, at 18.
 		$big = array();
 		for ( $i = 1; $i <= 30; $i++ ) {
 			$big[] = $this->cat( 6000 + $i );
 		}
 
 		$probe1          = $this->make_probe( $this->make_client() );
-		$probe1->advance = 1; // 25 upserts => 25s, over the 18s budget.
+		$probe1->advance = 1;
 		$probe1->lists   = array( '6001' => $big );
 
 		$state  = $this->fresh_state( array( 6001 ) );
@@ -375,9 +377,9 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 
 		$cursor = Tapgoods_Sync_State::get_instance()->get_cursor();
 		$this->assertSame( 0, (int) $cursor['cat_location_index'], 'Still on the SAME location.' );
-		$this->assertSame( 25, (int) $cursor['cat_item_index'], 'Checkpointed a within-location position.' );
+		$this->assertSame( 18, (int) $cursor['cat_item_index'], 'Checkpointed where the clock ran out, not where the count budget would have.' );
 		$this->assertFalse( $cursor['categories_done'], 'categories_done must NOT be set mid-location.' );
-		$this->assertCount( 25, $probe1->upserts, 'Exactly one batch upserted so far.' );
+		$this->assertCount( 18, $probe1->upserts, 'The batch stops at the deadline.' );
 		$this->assertSame( array(), $probe1->term_removals, 'No reconciliation on a partial pass.' );
 		$this->assertSame( 0, $probe1->client->inv_calls, 'Paging must not start until categories are done.' );
 
@@ -388,8 +390,8 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 		$result2         = $this->run_slice( $probe2, Tapgoods_Sync_State::get_instance() );
 
 		$this->assertArrayNotHasKey( 'in_progress', $result2, 'The resumed slice completes the run.' );
-		// The resume must continue at index 25, upserting only the REMAINING 5.
-		$this->assertSame( 5, count( $probe2->upserts ), 'Resume processes only the 5 leftover categories.' );
+		// The resume must continue at index 18, upserting only the REMAINING 12.
+		$this->assertSame( 12, count( $probe2->upserts ), 'Resume processes only the leftover categories.' );
 		// Token-based reconciliation ran once per taxonomy in finalize, after the full pass.
 		$this->assertSame( array( 'tg_category', 'tg_tags' ), $this->removed_taxonomies( $probe2 ), 'Reconcile once per taxonomy, in finalize.' );
 		$this->assertSame( Tapgoods_Sync_State::STATE_COMPLETED, Tapgoods_Sync_State::get_instance()->get_state() );
@@ -563,6 +565,103 @@ final class ConnectionSyncCategoriesTest extends TestCase {
 	 * whose term already carries the token is skipped (no upsert, still counts a skip),
 	 * and a newly upserted id is stamped into the shared map.
 	 */
+	/**
+	 * A slow host must not be able to stretch one batch past the slice budget.
+	 *
+	 * Measured on a customer site: 25 category upserts took 22 to 48 seconds against
+	 * an 18-second budget, because the clock was only consulted between batches. A
+	 * request that runs to 48s where the host kills at ~30s dies mid-work, and it
+	 * dies every slice, forever.
+	 */
+	public function test_a_slow_host_cannot_stretch_a_batch_past_the_slice_budget() {
+		$big = array();
+		for ( $i = 1; $i <= 25; $i++ ) {
+			$big[] = $this->cat( 7000 + $i );
+		}
+
+		$probe          = $this->make_probe( $this->make_client() );
+		$probe->advance = 5; // Five seconds per upsert: the count budget alone would spend 125s.
+		$probe->lists   = array( '7001' => $big );
+
+		$state = $this->fresh_state( array( 7001 ) );
+		$started = $this->clock->t;
+
+		$this->run_slice( $probe, $state );
+
+		$elapsed = $this->clock->t - $started;
+
+		// Four upserts reach 20s, which is the first check at or past 18. Allowing one
+		// category of overshoot is deliberate: the batch always finishes the category
+		// it started so a parent is never left without its tags.
+		$this->assertLessThanOrEqual(
+			(int) Tapgoods_Connection::sync_time_budget() + 5,
+			$elapsed,
+			'The slice must stop within one category of the budget, not run the whole count budget.'
+		);
+		$this->assertLessThan( 25, count( $probe->upserts ), 'It must not have spent the whole count budget.' );
+		$this->assertGreaterThan( 0, count( $probe->upserts ), 'It must still make progress.' );
+	}
+
+	public function test_upsert_category_batch_stops_on_the_deadline_before_the_count_budget() {
+		$probe = $this->make_probe( $this->make_client() );
+
+		$categories = array(
+			$this->cat( 7101 ),
+			$this->cat( 7102 ),
+			$this->cat( 7103 ),
+			$this->cat( 7104 ),
+		);
+
+		// Generous count budget, but the clock is spent after the second category.
+		$calls       = 0;
+		$out_of_time = static function () use ( &$calls ) {
+			++$calls;
+			return $calls >= 2;
+		};
+
+		$batch = $probe->upsert_category_batch( $categories, 0, 100, null, $out_of_time );
+
+		$this->assertSame( 2, (int) $batch['next_index'], 'Resume point is where the clock stopped it.' );
+		$this->assertFalse( $batch['done'], 'The location is not finished.' );
+		$this->assertCount( 2, $probe->upserts );
+	}
+
+	public function test_the_deadline_never_splits_a_category_from_its_tags() {
+		$probe = $this->make_probe( $this->make_client() );
+
+		// The clock is "spent" immediately, but the first category still has to be
+		// written together with its two tags, or the parent/child link is half-written.
+		$categories  = array( $this->cat( 7201, array( 7301, 7302 ) ), $this->cat( 7202 ) );
+		$out_of_time = static function () {
+			return true;
+		};
+
+		$batch = $probe->upsert_category_batch( $categories, 0, 100, null, $out_of_time );
+
+		$this->assertSame( 1, (int) $batch['next_index'] );
+		$this->assertSame(
+			array(
+				array( 'tax' => 'tg_category', 'id' => 7201 ),
+				array( 'tax' => 'tg_tags', 'id' => 7301 ),
+				array( 'tax' => 'tg_tags', 'id' => 7302 ),
+			),
+			$probe->upserts,
+			'A category and its sub-tags are written as one unit.'
+		);
+	}
+
+	public function test_no_deadline_keeps_the_old_count_only_behaviour() {
+		$probe = $this->make_probe( $this->make_client() );
+
+		$categories = array( $this->cat( 7401 ), $this->cat( 7402 ), $this->cat( 7403 ) );
+
+		// Standalone callers pass no clock; the count budget alone decides.
+		$batch = $probe->upsert_category_batch( $categories, 0, 2 );
+
+		$this->assertSame( 2, (int) $batch['next_index'] );
+		$this->assertCount( 2, $probe->upserts );
+	}
+
 	public function test_upsert_category_batch_skips_already_stamped_ids() {
 		$probe = $this->make_probe( $this->make_client() );
 		$token = 'tok123';

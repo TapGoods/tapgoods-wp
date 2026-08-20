@@ -562,7 +562,7 @@ class Tapgoods_Connection {
 		// the state machine, not from a return value; an in-progress checkpoint is
 		// still a clean end for the request that produced it (the next cron tick
 		// resumes it), so it is reported as ok with in_progress=1.
-		$status = ( ! empty($result['success']) && ! $state->has_error() ) ? 'ok' : 'error';
+		$status = self::run_end_status( ! empty($result['success']), $state);
 		$log->end_run(
 			$status,
 			array(
@@ -675,7 +675,15 @@ class Tapgoods_Connection {
 					// skips a term already carrying it, so a category shared across a
 					// storefront's ~18 locations is written once. No growing collection is
 					// kept in the cursor; only the scalar dupes counter accumulates.
-					$batch                       = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget, $this->run_token);
+						// The clock is handed to the batch, not just checked after it: on a slow
+					// host one batch of $upsert_budget upserts can outlast the whole slice
+					// budget (measured: 25 upserts in 22-48s against an 18s budget), and a
+					// request that overruns what the host allows gets killed mid-work.
+					$out_of_time = function () use ($start_time, $pages_this_run) {
+						return $this->slice_budget_spent($start_time, $pages_this_run);
+					};
+
+					$batch = $this->upsert_category_batch($categories, $cat_item_idx, $upsert_budget, $this->run_token, $out_of_time);
 					$cursor['cat_dupes_skipped'] = (int) $cursor['cat_dupes_skipped'] + (int) $batch['skipped'];
 
 					if ($batch['done']) {
@@ -1322,6 +1330,28 @@ class Tapgoods_Connection {
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * The result label for one slice's sync.run.end line.
+	 *
+	 * Extracted so the rule is testable, because getting it wrong is expensive in a
+	 * way that is hard to notice. It used to consult has_error(), which stays true
+	 * after a failure the run has already recovered from, so 823 consecutive
+	 * successful slices on a customer site were every one of them logged
+	 * result=error. Fourteen hours of steady progress read as a site-wide failure,
+	 * and the real problem in that log (a category phase crawling through hidden
+	 * buckets) was buried under 823 false alarms.
+	 *
+	 * An in-progress checkpoint is a clean end for the request that produced it, so
+	 * only a latched error makes a slice an error.
+	 *
+	 * @param bool                $success Whether the slice returned success.
+	 * @param Tapgoods_Sync_State $state   Current state machine.
+	 * @return string 'ok' or 'error'.
+	 */
+	public static function run_end_status($success, $state) {
+		return ($success && ! $state->has_latched_error()) ? 'ok' : 'error';
 	}
 
 	private function in_progress_message() {
@@ -2219,10 +2249,19 @@ class Tapgoods_Connection {
 	 * sub-tags are not separately processed. Passing $run_token = null (the default)
 	 * disables stamping/dedup, preserving pre-token behaviour for standalone callers.
 	 *
-	 * @param array       $categories    The location's category list.
-	 * @param int         $start_index   Category index to resume from (0-based).
-	 * @param int         $upsert_budget Max term operations (categories + tags) this batch.
-	 * @param string|null $run_token     Token to stamp/dedup against; null disables both.
+	 * TIME, NOT JUST COUNT: the budget is a count of term operations, which assumes
+	 * they are fast. On a slow host they are not. Measured on a customer site, 25
+	 * upserts took 22 to 48 seconds against an 18-second slice budget, because the
+	 * clock was only consulted between batches. A request that runs to 48s on a host
+	 * that kills at ~30s dies mid-batch. So the caller can pass $out_of_time, checked
+	 * on the same whole-category boundary as the count budget, and whichever limit
+	 * comes first ends the batch.
+	 *
+	 * @param array         $categories    The location's category list.
+	 * @param int           $start_index   Category index to resume from (0-based).
+	 * @param int           $upsert_budget Max term operations (categories + tags) this batch.
+	 * @param string|null   $run_token     Token to stamp/dedup against; null disables both.
+	 * @param callable|null $out_of_time   Returns true when the slice's clock is spent.
 	 * @return array {
 	 *     @type bool  $ok           Always true (fetch failures are handled upstream).
 	 *     @type int   $next_index   Category index to resume from next batch.
@@ -2232,7 +2271,7 @@ class Tapgoods_Connection {
 	 *     @type int   $skipped      Category/tag operations skipped as cross-location duplicates.
 	 * }
 	 */
-	public function upsert_category_batch($categories, $start_index, $upsert_budget, $run_token = null) {
+	public function upsert_category_batch($categories, $start_index, $upsert_budget, $run_token = null, $out_of_time = null) {
 		$categories   = array_values((array) $categories);
 		$count        = count($categories);
 		$category_ids = array();
@@ -2273,8 +2312,14 @@ class Tapgoods_Connection {
 			++$i;
 
 			// Stop only after a whole category (with its sub-tags) so the parent/child
-			// linkage is never left half-written across a checkpoint.
+			// linkage is never left half-written across a checkpoint. Both limits are
+			// checked here for that reason: whichever runs out first, the batch ends on
+			// a safe boundary.
 			if ($upserts >= $budget) {
+				break;
+			}
+
+			if (null !== $out_of_time && call_user_func($out_of_time)) {
 				break;
 			}
 		}
@@ -2902,7 +2947,7 @@ class Tapgoods_Connection {
 		$result = $this->sync_inventory_in_batches(false, $trigger);
 
 		$state  = $this->sync_state();
-		$status = ( ! empty($result['success']) && ! $state->has_error() ) ? 'ok' : 'error';
+		$status = self::run_end_status( ! empty($result['success']), $state);
 		$log->end_run($status, array('in_progress' => ! empty($result['in_progress']) ? 1 : 0));
 
 		return $result;

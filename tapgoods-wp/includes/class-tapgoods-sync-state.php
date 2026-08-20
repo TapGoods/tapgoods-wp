@@ -483,8 +483,36 @@ class Tapgoods_Sync_State {
 		return ! $this->is_running();
 	}
 
+	/**
+	 * Whether there is an error worth showing a human.
+	 *
+	 * Includes the message left by a failure the run has since recovered from,
+	 * because the admin screen wants to surface it. Do NOT use this to decide
+	 * whether the current slice failed: see has_latched_error().
+	 *
+	 * @return bool
+	 */
 	public function has_error() {
 		return self::STATE_ERROR === $this->data['state'] || ! empty( $this->data['error_message'] );
+	}
+
+	/**
+	 * Whether the run has actually stopped on an error.
+	 *
+	 * The distinction matters, and got it wrong once at real cost. error_message
+	 * survives a recovered failure (it is only cleared when a run completes), so
+	 * has_error() stays true for every slice of a long run that had one transient
+	 * hiccup hours earlier. The activity log used has_error() to label run-end, so
+	 * 823 consecutive successful slices on a customer site were all logged
+	 * result=error, and a 14-hour log that was in fact making steady progress read
+	 * as a site-wide failure. Nothing was wrong with the sync; the label was wrong.
+	 *
+	 * This reports the latched state only: is the run stopped, right now.
+	 *
+	 * @return bool
+	 */
+	public function has_latched_error() {
+		return self::STATE_ERROR === $this->data['state'];
 	}
 
 	public function get_failure_count() {
