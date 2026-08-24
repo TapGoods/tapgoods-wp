@@ -208,6 +208,17 @@ So tests (and, optionally, local dev) never hit the network, there is an env-var
 - **Mock client:** `tapgoods-wp/tests/mock/class-tapgoods-mock-api-client.php`. It emulates the client surface `Tapgoods_Connection` calls (`validate_key`, `get_location_ids`, `get_location_details_from_graph`, `get_categories_from_graph`, `get_inventories_from_graph`, `item_exists`, …) and calls **no** WordPress functions, so it stays usable in isolated tests.
 - **Fixtures:** static JSON under `tapgoods-wp/tests/fixtures/`, one file per GraphQL response envelope: `bearer-token-validator.json` (`validate_key`), `get-location-details.json`, `get-storefront-categories.json`, `get-inventories.json`. **To add/extend a fixture:** drop a JSON file mirroring the real `{ "data": { ... } }` GraphQL shape in `tests/fixtures/`, then add a method to the mock client that loads it via `$this->fixture('your-file.json')` and returns the same structure the real client returns. In tests, inject the mock through the `tapgoods_api_client` filter (`Filters\expectApplied('tapgoods_api_client')->andReturn($mock)`) or set `tg_mock`.
 
+### The pre-release QA checklist
+
+`QA-CHECKLIST.md` at the repo root is the team's manual checklist for promoting the
+plugin to production, with each line marked **auto** (a named test in this repo),
+**browser** (needs a real browser), or **manual**. It is there so the expectations
+live next to the code: two of its lines were failing on two live sites at once
+before anyone noticed, and both are now integration tests.
+
+When you automate one of its lines, change its status in the same commit. A
+checklist that quietly disagrees with the tests is worse than no checklist.
+
 ### Expectation for new code
 
 New code ships with tests and a verification step. Before saying a change works: add/extend isolated unit tests (Layer 2) for the new behaviour, or an integration test (Layer 3) when it needs real WordPress; then run the relevant gates and confirm they pass. At minimum keep `composer analyze`, `composer test`, and `composer compat` green; run `npm run test:integration` when you touch CPT/taxonomy registration, routing, or the sync-to-WP path. Call out explicitly any test intentionally left failing/skipped to document a known bug, as the encryption test does. Do not grow the PHPStan baseline to hide issues in new code.
