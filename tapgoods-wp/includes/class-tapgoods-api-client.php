@@ -202,14 +202,18 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 		$url = $this->build_url( $endpoint );
 
-		// visibleOnSf separates real storefront categories from the internal buckets
-		// TapGoods keeps alongside them. Without asking for it a client has no way to
-		// tell them apart; see Tapgoods_Connection::filter_storefront_visible().
+		// The response is a FLAT list of NestedSfCategory, so two fields decide what
+		// each entry actually is: visibleOnSf separates real storefront categories from
+		// the internal buckets kept alongside them, and parentId separates roots from
+		// sub-categories that also appear nested under their parent. Without both, a
+		// client cannot tell any of them apart. See
+		// Tapgoods_Connection::storefront_category_list().
 		$fields = array(
 			'id',
 			'name',
 			'slug',
 			'visibleOnSf',
+			'parentId',
 			'sfSubCategories {id,name,visibleOnSf,sfCategories{id}}',
 		);
 

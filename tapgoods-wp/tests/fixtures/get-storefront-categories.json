@@ -31,13 +31,23 @@
               "id": 701
             }
           }
-        ]
+        ],
+        "parentId": null
       },
       {
         "id": 702,
         "name": "Chairs",
         "slug": "chairs",
         "visibleOnSf": true,
+        "sfSubCategories": [],
+        "parentId": null
+      },
+      {
+        "id": 801,
+        "name": "Round Tables",
+        "slug": "round-tables",
+        "visibleOnSf": true,
+        "parentId": 701,
         "sfSubCategories": []
       },
       {
@@ -54,7 +64,8 @@
               "id": 703
             }
           }
-        ]
+        ],
+        "parentId": null
       }
     ]
   }

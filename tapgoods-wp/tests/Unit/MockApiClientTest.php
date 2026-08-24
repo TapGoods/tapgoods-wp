@@ -43,10 +43,11 @@ final class MockApiClientTest extends TestCase {
 	public function test_get_categories_returns_category_tree() {
 		$categories = $this->client()->get_categories_from_graph( 5001 );
 
-		// The mock stands in for the API, so it returns what the API returns:
-		// storefront categories AND the internal buckets alongside them. Filtering
-		// is the consumer's job (Tapgoods_Connection::filter_storefront_visible).
-		$this->assertCount( 3, $categories );
+		// The mock stands in for the API, so it returns what the API returns: a FLAT
+		// list carrying storefront categories, the internal buckets alongside them,
+		// AND sub-categories repeated as their own top-level entries. Filtering is the
+		// consumer's job (Tapgoods_Connection::storefront_category_list).
+		$this->assertCount( 4, $categories );
 		$this->assertSame( 'Tables', $categories[0]['name'] );
 		$this->assertCount( 3, $categories[0]['sfSubCategories'] );
 	}
@@ -63,6 +64,10 @@ final class MockApiClientTest extends TestCase {
 		// on sub-categories, or the filter has nothing to bite on end to end.
 		$this->assertTrue( $by_name['Tables']['visibleOnSf'] );
 		$this->assertFalse( $by_name['Linens (Uncategorized)']['visibleOnSf'] );
+
+		// And the flat duplicate carries its parent, which is what marks it a child.
+		$this->assertNull( $by_name['Tables']['parentId'] );
+		$this->assertSame( 701, $by_name['Round Tables']['parentId'] );
 
 		$subs = array();
 		foreach ( $by_name['Tables']['sfSubCategories'] as $sub ) {

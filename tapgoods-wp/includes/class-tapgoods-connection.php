@@ -2126,7 +2126,7 @@ class Tapgoods_Connection {
 			// still being recreated from an hour-old cache entry. filter_storefront_visible()
 			// is idempotent, so running it at both ends costs nothing and makes the
 			// cached shape independent of which build wrote it.
-			return self::filter_storefront_visible($cached);
+			return self::storefront_category_list($cached);
 		}
 
 		$client     = $this->get_connection();
@@ -2138,7 +2138,7 @@ class Tapgoods_Connection {
 
 		// Filter before caching too, so what is stored is already the list the batch
 		// cursor will index on every slice of the run.
-		$categories = self::filter_storefront_visible($categories);
+		$categories = self::storefront_category_list($categories);
 
 		set_transient($key, $categories, self::CAT_LIST_CACHE_TTL);
 		return $categories;
@@ -2197,6 +2197,82 @@ class Tapgoods_Connection {
 		}
 
 		return $visible;
+	}
+
+
+	/**
+	 * The storefront categories of a location, as this plugin defines a category.
+	 *
+	 * The single funnel for what the category pass is allowed to create, applied on
+	 * both sides of the per-location cache. Two rules, deliberately kept as separate
+	 * predicates because each was learned separately and each is worth its own test:
+	 * only storefront-visible entries, and only roots.
+	 *
+	 * @param mixed $categories Category list as returned by the API client.
+	 * @return array
+	 */
+	public static function storefront_category_list($categories) {
+		return self::filter_storefront_roots(self::filter_storefront_visible($categories));
+	}
+
+	/**
+	 * Keep only root categories, dropping the sub-categories that share the list.
+	 *
+	 * getStorefrontCagetories returns a FLAT list of NestedSfCategory, so every
+	 * sub-category appears TWICE: once nested in its parent's sfSubCategories, and
+	 * once as its own top-level entry. The category pass imported both, so each
+	 * sub-category also became a tg_category, and it stayed at zero items forever
+	 * because items reference it through tg_sfSubCategories, which the item pass
+	 * imports as a tg_tags term instead. Measured on two independent sites: ~195
+	 * empty categories such as "Accent Chairs" (0 items) sitting next to the tag of
+	 * the same name (367 items). It is also two failures on the QA checklist,
+	 * "subcategories should not show up under categories" and "no empty categories".
+	 *
+	 * Roots only, which is how TapGoods' own storefront reads this data: the customer
+	 * portal takes the same flat list and rebuilds the tree from parent_id.
+	 *
+	 * No tags are lost by dropping the duplicates. A sub-category becomes a tg_tags
+	 * term from two places, neither of which is the top-level entry: the parent's
+	 * nested sfSubCategories during the category pass, and the item's own
+	 * tg_sfSubCategories meta during tapgrein_assign_terms().
+	 *
+	 * A missing parentId counts as a root, so an older API that does not return the
+	 * field keeps behaving exactly as before rather than importing nothing at all.
+	 *
+	 * @param mixed $categories Category list (already visibility-filtered).
+	 * @return array Root categories only, in order.
+	 */
+	public static function filter_storefront_roots($categories) {
+		if (!is_array($categories)) {
+			return array();
+		}
+
+		$roots = array();
+
+		foreach ($categories as $category) {
+			if (is_array($category) && self::is_storefront_root($category)) {
+				$roots[] = $category;
+			}
+		}
+
+		return $roots;
+	}
+
+	/**
+	 * Whether one category payload is a root rather than a sub-category.
+	 *
+	 * @param array $node Category payload.
+	 * @return bool
+	 */
+	private static function is_storefront_root($node) {
+		if (!array_key_exists('parentId', $node)) {
+			return true; // Field absent: preserve the old behaviour.
+		}
+
+		$parent = $node['parentId'];
+
+		// null / 0 / '' all mean "no parent". A real id means this entry is a child.
+		return (null === $parent || '' === $parent || 0 === (int) $parent);
 	}
 
 	/**

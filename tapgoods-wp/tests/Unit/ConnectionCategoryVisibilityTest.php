@@ -1,6 +1,8 @@
 <?php
 /**
- * Unit tests for Tapgoods_Connection::filter_storefront_visible().
+ * Unit tests for what the category pass is allowed to import:
+ * filter_storefront_visible(), filter_storefront_roots(), and the
+ * storefront_category_list() funnel that composes them.
  *
  * getStorefrontCagetories returns every NestedSfCategory for a location, including
  * the internal buckets TapGoods keeps alongside the real ones. The bulk of those
@@ -12,6 +14,12 @@
  * The rule is deliberately the flag and not the name: TapGoods' own customer-facing
  * storefront filters the same model on `visible_on_sf: true`, and a merchant is free
  * to have a genuine category with "(Uncategorized)" in its name.
+ *
+ * The list is also FLAT, so every sub-category appears twice, once nested under its
+ * parent and once as its own top-level entry. Importing that second copy is what left
+ * ~195 empty categories on two independent sites, each sitting next to a tag of the
+ * same name holding all the items. Hence roots only, which is also how the customer
+ * portal reads this data.
  *
  * @package Tapgoods\Tests
  */
@@ -226,5 +234,113 @@ final class ConnectionCategoryVisibilityTest extends TestCase {
 		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_visible( null ) );
 		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_visible( 'nope' ) );
 		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_visible( array( 'not-an-array' ) ) );
+	}
+
+	// --- Roots vs the sub-categories that share the same flat list ------------
+
+	public function test_sub_categories_in_the_flat_list_are_not_imported_as_categories() {
+		// The live shape: getStorefrontCagetories returns a FLAT list, so a
+		// sub-category appears both nested under its parent AND as its own top-level
+		// entry. Importing the second copy is what produced ~195 empty categories.
+		$filtered = Tapgoods_Connection::filter_storefront_roots(
+			array(
+				array( 'id' => 701, 'name' => 'Tables', 'parentId' => null ),
+				array( 'id' => 801, 'name' => 'Round Tables', 'parentId' => 701 ),
+				array( 'id' => 802, 'name' => 'Banquet Tables', 'parentId' => 701 ),
+				array( 'id' => 702, 'name' => 'Chairs', 'parentId' => null ),
+			)
+		);
+
+		$this->assertSame( array( 'Tables', 'Chairs' ), $this->names( $filtered ) );
+	}
+
+	public function test_no_parent_is_expressed_in_more_than_one_way() {
+		$filtered = Tapgoods_Connection::filter_storefront_roots(
+			array(
+				array( 'id' => 1, 'name' => 'null',    'parentId' => null ),
+				array( 'id' => 2, 'name' => 'zero',    'parentId' => 0 ),
+				array( 'id' => 3, 'name' => 'empty',   'parentId' => '' ),
+				array( 'id' => 4, 'name' => 'child',   'parentId' => 701 ),
+				array( 'id' => 5, 'name' => 'child s', 'parentId' => '701' ),
+			)
+		);
+
+		$this->assertSame( array( 'null', 'zero', 'empty' ), $this->names( $filtered ) );
+	}
+
+	public function test_a_missing_parent_field_counts_as_a_root() {
+		// An older API that does not return parentId must keep working, not import
+		// nothing at all.
+		$filtered = Tapgoods_Connection::filter_storefront_roots(
+			array(
+				array( 'id' => 1, 'name' => 'Tables' ),
+				array( 'id' => 2, 'name' => 'Chairs' ),
+			)
+		);
+
+		$this->assertSame( array( 'Tables', 'Chairs' ), $this->names( $filtered ) );
+	}
+
+	public function test_a_kept_root_still_carries_its_nested_sub_categories() {
+		// Dropping the duplicates must not touch the nesting, which is where the
+		// sub-category becomes a tg_tags term.
+		$filtered = Tapgoods_Connection::filter_storefront_roots(
+			array(
+				array(
+					'id'              => 701,
+					'name'            => 'Tables',
+					'parentId'        => null,
+					'sfSubCategories' => array( array( 'id' => 801, 'name' => 'Round Tables' ) ),
+				),
+				array( 'id' => 801, 'name' => 'Round Tables', 'parentId' => 701 ),
+			)
+		);
+
+		$this->assertCount( 1, $filtered );
+		$this->assertSame( 'Round Tables', $filtered[0]['sfSubCategories'][0]['name'] );
+	}
+
+	public function test_roots_filter_leaves_no_index_holes() {
+		$filtered = Tapgoods_Connection::filter_storefront_roots(
+			array(
+				array( 'id' => 1, 'name' => 'child', 'parentId' => 9 ),
+				array( 'id' => 2, 'name' => 'root a', 'parentId' => null ),
+				array( 'id' => 3, 'name' => 'child', 'parentId' => 9 ),
+				array( 'id' => 4, 'name' => 'root b', 'parentId' => null ),
+			)
+		);
+
+		$this->assertSame( array( 0, 1 ), array_keys( $filtered ) );
+	}
+
+	public function test_the_funnel_applies_both_rules() {
+		// storefront_category_list() is what get_location_categories_cached() calls,
+		// on both sides of the cache; it has to drop hidden entries AND children.
+		$filtered = Tapgoods_Connection::storefront_category_list(
+			array(
+				array( 'id' => 701, 'name' => 'Tables', 'visibleOnSf' => true, 'parentId' => null ),
+				array( 'id' => 801, 'name' => 'Round Tables', 'visibleOnSf' => true, 'parentId' => 701 ),
+				array( 'id' => 703, 'name' => 'Linens (Uncategorized)', 'visibleOnSf' => false, 'parentId' => null ),
+				array( 'id' => 804, 'name' => 'Linens', 'visibleOnSf' => true, 'parentId' => 703 ),
+			)
+		);
+
+		$this->assertSame( array( 'Tables' ), $this->names( $filtered ) );
+	}
+
+	public function test_the_funnel_is_idempotent() {
+		$input = array(
+			array( 'id' => 701, 'name' => 'Tables', 'visibleOnSf' => true, 'parentId' => null ),
+			array( 'id' => 801, 'name' => 'Round Tables', 'visibleOnSf' => true, 'parentId' => 701 ),
+		);
+
+		$once = Tapgoods_Connection::storefront_category_list( $input );
+		$this->assertSame( $once, Tapgoods_Connection::storefront_category_list( $once ) );
+	}
+
+	public function test_roots_filter_survives_junk() {
+		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_roots( false ) );
+		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_roots( 'nope' ) );
+		$this->assertSame( array(), Tapgoods_Connection::filter_storefront_roots( array( 'flat' ) ) );
 	}
 }
