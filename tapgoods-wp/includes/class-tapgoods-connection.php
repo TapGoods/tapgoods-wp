@@ -3219,35 +3219,33 @@ class Tapgoods_Connection {
 		$new_meta = $this->prepare_meta_input($item); // Get updated meta fields from the API
 	
 		// Define meta keys that should not be removed
-		$protected_meta_keys = [
+		// The sync owns the tg_ namespace and nothing else. Anything outside it belongs
+		// to the site or to another plugin, so it is never ours to delete.
+		//
+		// This used to be an allowlist: delete every meta key the API response did not
+		// carry, except a hand-maintained list of Yoast fields plus
+		// tg_custom_description. That inverts the risk. Every resync wiped any meta
+		// nobody had thought to add to the list, which on a tg_inventory post can mean
+		// a featured image (_thumbnail_id), a page builder's data, or a different SEO
+		// plugin's fields, silently and repeatedly. Scoping deletion to the prefix the
+		// sync writes makes the guarantee structural instead of a list someone has to
+		// remember to extend.
+		//
+		// Two of our own keys still need protecting from it, because they are tg_ but
+		// are not API data: the editor's custom description, and the run-token stamp
+		// (re-stamped by sync_inventory_item right after this, so deleting it here
+		// would just churn).
+		$protected_meta_keys = array(
 			'tg_custom_description',
-			// The run-token stamp (WPB-172): re-stamped by sync_inventory_item after
-			// this update; protecting it avoids a needless delete/re-write each run.
 			self::SYNC_RUN_META,
-			// Yoast SEO meta fields - proteger todos los campos de Yoast
-			'_yoast_wpseo_title',
-			'_yoast_wpseo_metadesc', 
-			'_yoast_wpseo_focuskw',
-			'_yoast_wpseo_meta-robots-noindex',
-			'_yoast_wpseo_meta-robots-nofollow',
-			'_yoast_wpseo_meta-robots-adv',
-			'_yoast_wpseo_canonical',
-			'_yoast_wpseo_bctitle',
-			'_yoast_wpseo_opengraph-title',
-			'_yoast_wpseo_opengraph-description',
-			'_yoast_wpseo_opengraph-image',
-			'_yoast_wpseo_twitter-title',
-			'_yoast_wpseo_twitter-description',
-			'_yoast_wpseo_twitter-image',
-			'_yoast_wpseo_linkdex',
-			'_yoast_wpseo_content_score',
-			'_yoast_wpseo_estimated-reading-time-minutes',
-			'_yoast_wpseo_wordproof_timestamp'
-		];
-	
+		);
+
 		// Detect and remove meta fields that are no longer present in the API response, except protected ones
 		foreach ($existing_meta as $meta_key => $value) {
-			if (!array_key_exists($meta_key, $new_meta) && !in_array($meta_key, $protected_meta_keys)) {
+			if (0 !== strpos((string) $meta_key, 'tg_')) {
+				continue; // Not ours.
+			}
+			if (!array_key_exists($meta_key, $new_meta) && !in_array($meta_key, $protected_meta_keys, true)) {
 				delete_post_meta($post_id, $meta_key); // Delete meta field if it no longer exists in the API
 				$this->console_log('Deleted meta_key: ' . $meta_key . ' from post ID: ' . $post_id);
 			}
