@@ -15,7 +15,63 @@ document.addEventListener('DOMContentLoaded', function() {
     initTagFocus();
     initSyncButton();
     initInventorySync();
+    initClearSyncErrors();
 });
+
+/**
+ * Clear Errors button - resets a latched sync error via AJAX.
+ */
+function initClearSyncErrors() {
+    const clearButton = document.getElementById('tapgrein_clear_sync_errors');
+    if (!clearButton) {
+        return;
+    }
+
+    clearButton.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        clearButton.disabled = true;
+        const originalText = clearButton.textContent;
+        clearButton.textContent = 'Clearing...';
+
+        const formData = new FormData();
+        formData.append('action', 'tapgrein_clear_sync_errors');
+        formData.append('nonce', (typeof tg_admin_vars !== 'undefined' && tg_admin_vars.sync_nonce) ? tg_admin_vars.sync_nonce : '');
+
+        fetch(tg_admin_vars.ajaxurl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            if (response.success) {
+                // Hide the button and reflect the reset state in the panel.
+                clearButton.style.display = 'none';
+                const label = document.getElementById('tapgrein_sync_state_label');
+                if (label && response.data && response.data.state) {
+                    label.textContent = response.data.state.label;
+                }
+                // Keep the "Currently" line in step with the state it describes.
+                const activity = document.getElementById('tapgrein_sync_activity');
+                if (activity && response.data && response.data.state && response.data.state.activity) {
+                    activity.textContent = response.data.state.activity;
+                }
+                showConnectionNotice('Sync errors cleared.', 'success');
+            } else {
+                clearButton.disabled = false;
+                clearButton.textContent = originalText;
+                const message = response.data || 'Unable to clear errors. Please try again.';
+                showConnectionNotice(message, 'error');
+            }
+        })
+        .catch(() => {
+            clearButton.disabled = false;
+            clearButton.textContent = originalText;
+            showConnectionNotice('Unable to clear errors. Please try again.', 'error');
+        });
+    });
+}
 
 /**
  * Admin Permalinks - from admin/class-tapgoods-admin-permalinks.php:129
@@ -161,88 +217,86 @@ function handleConnection(connectButton, connectInput, syncButton) {
 function handleSync(syncButton) {
     const nonce = document.getElementById('_tgnonce_connection').value;
     const statusEl = document.getElementById('tapgrein_connection_test');
-    
+
     // Show sync progress modal
     showSyncProgressModal();
-    
-    // Prevent accidental page close during sync
-    enableSyncProtection();
-    
+
     syncButton.disabled = true;
     syncButton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> WORKING';
-    
-    // Update modal status
-    updateSyncStatus('Connecting to TapGoods API...');
-    
+
+    // The manual sync is non-blocking: this request runs a single bounded slice,
+    // then WP-Cron continues the rest in the background. So we only report what
+    // this one slice did and hand the run off, rather than pretending the whole
+    // sync happens in this request.
+    updateSyncStatus('Starting sync. This runs one batch, then continues in the background...');
+
     const url = `${tg_admin_vars.ajaxurl}?action=tapgrein_api_sync&_tgnonce_connection=${nonce}`;
-    
-    // Start the sync process
-    setTimeout(() => {
-        updateSyncStatus('Fetching categories and tags...');
-    }, 1000);
-    
-    setTimeout(() => {
-        updateSyncStatus('Processing inventory items...');
-    }, 2500);
-    
-    setTimeout(() => {
-        updateSyncStatus('Updating location data...');
-    }, 4000);
-    
-    setTimeout(() => {
-        updateSyncStatus('Finalizing synchronization...');
-    }, 5500);
-    
+
+    // Helper: normalise the wp_send_json_* payload, which may be a structured
+    // object ({ message, in_progress, state }) or, on older/error paths, a string.
+    const readData = (response) => {
+        const data = response && typeof response.data === 'object' && response.data !== null ? response.data : {};
+        const message = (response && typeof response.data === 'string') ? response.data : (data.message || '');
+        return { data, message, inProgress: !!data.in_progress, state: data.state || null };
+    };
+
+    // Reload so the server-rendered "Sync Status" panel reflects the current
+    // state machine (state + planned-vs-completed pages). A simple status read
+    // beats a bespoke polling loop here.
+    const reloadSoon = (markSuccess) => {
+        setTimeout(() => {
+            const next = new URL(window.location.href);
+            if (markSuccess) {
+                next.searchParams.set('sync_success', '1');
+            } else {
+                next.searchParams.delete('sync_success');
+            }
+            window.location.href = next.toString();
+        }, 1800);
+    };
+
     fetch(url)
     .then(response => response.json())
     .then(response => {
         console.log('TapGoods: Sync response:', response);
 
-        if (response.success) {
-            // Get the message from response.data (wp_send_json_success format)
-            const message = response.data || '';
+        const { message, inProgress, state } = readData(response);
 
-            // Check if sync is in progress (when another sync is already running)
-            if (message && message.includes('Sync in progress')) {
-                updateSyncStatus(message);
-                // Keep the modal open and showing the in-progress message
-                // Don't close it, don't disable protection, don't reset button
+        if (response.success) {
+            const pages = state ? `${state.pages_completed} of ${state.total_pages}` : null;
+
+            // Still running: this slice checkpointed and cron will carry on. Do NOT
+            // claim the sync finished.
+            if (inProgress || (state && (state.state === 'active' || state.state === 'prep'))) {
+                const note = pages
+                    ? `Sync is running in the background (${pages} pages done). You can safely leave this page; it will keep syncing.`
+                    : 'Sync is running in the background. You can safely leave this page; it will keep syncing.';
+                updateSyncStatus(note);
                 if (statusEl) {
-                    showConnectionNotice(message, 'info');
+                    showConnectionNotice(note, 'info');
                 }
-                return; // Don't close modal, keep it open
+                reloadSoon(false);
+                return;
             }
 
-            // Check if there's a message indicating nothing to sync
+            // Nothing to sync (already up to date).
             if (message && message.includes('Nothing to sync')) {
                 updateSyncStatus(message);
-                setTimeout(() => {
-                    hideSyncProgressModal();
-                    disableSyncProtection();
-                    syncButton.disabled = false;
-                    syncButton.textContent = 'SYNC';
-
-                    if (statusEl) {
-                        showConnectionNotice(message, 'success');
-                    }
-                }, 1500);
-            } else {
-                updateSyncStatus('Synchronization completed successfully!');
-                setTimeout(() => {
-                    disableSyncProtection(); // Remove page close protection
-
-                    // Reload page with success parameter to show all updated data
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('sync_success', '1');
-                    window.location.href = url.toString();
-                }, 1500);
+                if (statusEl) {
+                    showConnectionNotice(message, 'success');
+                }
+                reloadSoon(false);
+                return;
             }
+
+            // Completed fully within this one slice.
+            updateSyncStatus('Synchronization completed successfully!');
+            reloadSoon(true);
         } else {
-            const errorMessage = response.data || 'Synchronization failed. Please try again.';
+            const errorMessage = message || 'Synchronization failed. Please try again.';
             updateSyncStatus('Synchronization failed: ' + errorMessage);
             setTimeout(() => {
                 hideSyncProgressModal();
-                disableSyncProtection(); // Remove page close protection
                 syncButton.disabled = false;
                 syncButton.textContent = 'SYNC';
 
@@ -256,13 +310,12 @@ function handleSync(syncButton) {
         console.error('TapGoods: Sync error:', error);
         const errorMessage = error.message || 'Connection error occurred. Please check your internet connection and try again.';
         updateSyncStatus(errorMessage);
-        
+
         setTimeout(() => {
             hideSyncProgressModal();
-            disableSyncProtection(); // Remove page close protection
             syncButton.disabled = false;
             syncButton.textContent = 'SYNC';
-            
+
             if (statusEl) {
                 showConnectionNotice('Synchronization failed. Please try again.', 'error');
             }

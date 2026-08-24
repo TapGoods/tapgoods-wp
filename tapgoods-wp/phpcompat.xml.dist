@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ruleset name="TapGoods PHP Compatibility">
+	<description>Ensure shipped (production) code stays compatible with the declared minimum PHP version (see "Requires PHP" in tapgoods.php). Dev-only test code is excluded.</description>
+
+	<file>.</file>
+
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<!-- Bundled third-party Action Scheduler: ships in the zip, but it is not our
+	     code so we do not run the PHP-compatibility scan over it. -->
+	<exclude-pattern>*/lib/action-scheduler/*</exclude-pattern>
+
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- Match the "Requires PHP: 7.2" header in tapgoods.php. -->
+	<config name="testVersion" value="7.2-"/>
+</ruleset>

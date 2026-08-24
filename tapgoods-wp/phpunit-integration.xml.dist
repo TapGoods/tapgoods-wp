@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Integration test configuration. Runs against a REAL WordPress install via
+  wp-phpunit, inside @wordpress/env, using the isolated PHPUnit 9.6 toolchain in
+  tools/phpunit9/ (the WordPress test framework is incompatible with PHPUnit
+  10+). Because of that this file uses the PHPUnit 9.x config schema, not the
+  PHPUnit 10 schema used by phpunit.xml.dist.
+
+  Run it with:
+      npm run test:integration          # from the repo root (wraps wp-env)
+  or, already inside the wp-env tests container, from the plugin dir:
+      composer test:integration
+
+  The TapGoods API is mocked (TG_MOCK) by tests/Integration/bootstrap.php, so no
+  network is hit.
+-->
+<phpunit
+    bootstrap="tests/Integration/bootstrap.php"
+    colors="true"
+    cacheResultFile=".phpunit.cache/integration.result"
+    failOnRisky="true"
+    failOnWarning="false"
+    convertDeprecationsToExceptions="false"
+    convertErrorsToExceptions="true"
+    convertNoticesToExceptions="true"
+    convertWarningsToExceptions="true">
+    <testsuites>
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    <!-- Coverage scope (production code only). A driver is only needed when a
+         CLI coverage flag is passed; none is passed by default. -->
+    <coverage>
+        <include>
+            <directory suffix=".php">includes</directory>
+            <directory suffix=".php">admin</directory>
+            <directory suffix=".php">public</directory>
+        </include>
+    </coverage>
+</phpunit>

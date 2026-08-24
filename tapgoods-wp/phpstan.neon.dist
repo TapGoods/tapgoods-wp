@@ -1,0 +1,60 @@
+includes:
+	# Pre-existing legacy debt is captured here so the suite is GREEN today and
+	# only NEW issues fail the build. Regenerate with:
+	#   composer analyze -- --generate-baseline
+	- phpstan-baseline.neon
+	# WordPress core function/class/constant stubs + WP-aware rules.
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+	# Pragmatic starting level for a legacy codebase. Raise over time.
+	level: 5
+
+	# composer.lock is intentionally not committed, so CI resolves PHPStan fresh
+	# and a patch release can analyze a baselined line slightly differently,
+	# leaving a baseline entry unmatched. Don't fail the build on that (it would
+	# make the baseline brittle across PHPStan versions); new real issues still
+	# fail. Prune stale baseline entries when regenerating the baseline.
+	reportUnmatchedIgnoredErrors: false
+
+	# Production (shipped) code only. Dev/test code is intentionally excluded.
+	paths:
+		- includes
+		- admin
+		- public
+		- tapgoods.php
+		- uninstall.php
+
+	excludePaths:
+		- tests/*
+		- vendor/*
+		- node_modules/*
+		- dist/*
+		- src/*
+		# Action Scheduler is bundled third-party code (lib/action-scheduler). It
+		# ships in the zip but we do not analyze it. It is NOT listed here as a
+		# plain excludePath because that defaults to analyseAndScan, which would
+		# also drop the as_*() symbols we add via scanDirectories below and make
+		# the plugin's own calls read as unknown functions. It is simply absent
+		# from `paths`, so it is never analysed; it is scan-only (symbols) below.
+
+	# The plugin has no autoloader; symbols are pulled in via require_once at
+	# runtime. Tell PHPStan where to find the plugin's own classes so it can
+	# resolve cross-file references without executing the bootstrap.
+	scanDirectories:
+		- includes
+		- admin
+		- public
+		# Symbol discovery only (not analyzed, thanks to excludePaths above): lets
+		# PHPStan resolve the bundled Action Scheduler as_*() functions the sync
+		# driver calls, so their use does not read as an unknown-function error.
+		- lib/action-scheduler
+
+	# Third-party integrations the plugin talks to but does not bundle.
+	# These are optional at runtime (guarded by function_exists/class_exists),
+	# so their symbols are legitimately unknown to static analysis.
+	dynamicConstantNames:
+		- TAPGOODS_DEV
+		- TG_ENV
+		- TG_MOCK
+		- TAPGOODS_KEY

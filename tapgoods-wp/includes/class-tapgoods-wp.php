@@ -43,6 +43,9 @@ class Tapgoods {
 			'includes/class-tapgoods-post-types.php',     // Regusters Taxonomies and Post Types
 			'public/class-tapgoods-public.php',           // Class for frontend features
 			'includes/class-tapgoods-encryption.php',     // Class for encryption/decryption methods
+			'includes/class-tapgoods-sync-log.php',       // Sync activity log (file + error_log mirror)
+			'includes/class-tapgoods-sync-state.php',     // Sync flow state machine
+			'includes/class-tapgoods-sync-scheduler.php', // Action Scheduler driver for the sync
 			'includes/class-tapgoods-connection.php',     // API Connection Controller
 			'includes/class-tapgoods-api-exception.php',  // API Exception Classes
 			'includes/class-tapgoods-api-request.php',    // API Request Class
@@ -85,6 +88,7 @@ class Tapgoods {
 		$this->loader->add_action( 'wp_ajax_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_nopriv_tapgrein_api_sync', $this->plugin_admin, 'tapgrein_api_sync', 10, 1 );
 		$this->loader->add_action( 'wp_ajax_load_location_details', $this->plugin_admin, 'load_location_details', 10, 1 );
+		$this->loader->add_action( 'wp_ajax_tapgrein_download_sync_log', $this->plugin_admin, 'tapgrein_download_sync_log', 10, 0 );
 
 		$this->loader->add_action( 'tg_save_custom_css', $this->plugin_admin, 'tapgrein_save_styles', 10, 1 );
 		$this->loader->add_action( 'tg_save_advanced', $this->plugin_admin, 'tg_save_advanced', 10, 0 );
@@ -127,6 +131,11 @@ class Tapgoods {
 		$this->loader->add_action( 'tapgoods_cron_hook', $this, 'tapgrein_cron_exec' );
 		$this->loader->add_action( 'init', $this, 'tapgrein_cron_setup', 10, 0 );
 
+		// One Action Scheduler action == one bounded sync slice. The handler runs a
+		// single slice and chains the next while work remains (see
+		// Tapgoods_Sync_Scheduler). Registered even when Action Scheduler is not
+		// loaded (the action simply never fires in that case).
+		$this->loader->add_action( Tapgoods_Sync_Scheduler::HOOK, 'Tapgoods_Sync_Scheduler', 'run_slice' );
 	}
 
 	public function tapgrein_add_cron_interval( $schedules ) {
@@ -143,13 +152,66 @@ class Tapgoods {
 		}
 	}
 
+	/**
+	 * Five-minute WP-Cron tick: WATCHDOG, not the driver.
+	 *
+	 * Action Scheduler is the primary driver now (slices chain themselves, see
+	 * Tapgoods_Sync_Scheduler). This tick therefore no longer runs sync work or
+	 * fires the non-blocking self-ping; it only ensures a slice is enqueued so the
+	 * chain gets (re-)armed if it ever stalls or a fresh sync is due:
+	 *
+	 *   - not connected           => nothing to do.
+	 *   - latched ERROR           => do NOT re-arm; an admin must clear it first
+	 *                                (this is what keeps cron from storming on top
+	 *                                of the state machine's ERROR latch).
+	 *   - in progress             => ALWAYS enqueue_slice() to keep the chain
+	 *                                alive. enqueue_slice() is guarded by
+	 *                                as_has_scheduled_action so an already
+	 *                                pending/running chain is never duplicated;
+	 *                                the fresh-sync throttle must NOT stall a run
+	 *                                that is already flowing.
+	 *   - idle, throttled         => a run finished less than the minimum interval
+	 *                                ago (Tapgoods_Sync_Scheduler::min_interval,
+	 *                                default 15 min): skip so a completed full sync
+	 *                                does not immediately restart every tick.
+	 *   - idle, due               => enqueue_slice() to start a fresh run (its
+	 *                                own PREP).
+	 *
+	 * The whole decision lives in Tapgoods_Sync_Scheduler::cron_plan() so it is
+	 * unit-testable without booting WordPress; this method just executes the plan.
+	 * The throttle is applied ONLY here (the cron watchdog); the manual "Sync Now"
+	 * button and the direct auto-triggers enqueue slices directly and are
+	 * deliberately not throttled.
+	 *
+	 * When Action Scheduler is unavailable the tick falls back to the legacy
+	 * self-ping driver so the sync still runs.
+	 *
+	 * @return void
+	 */
 	public function tapgrein_cron_exec() {
-		tapgrein_write_log( 'tapgrein_cron_exec running at: ' . current_time( 'mysql' ) );
+		$api_connected = get_option( 'tg_api_connected', 0 );
 
-		if ( '1' === get_option( 'tg_api_connected', 0 ) ) {
-			$connection = Tapgoods_Connection::get_instance();
-			$sync       = $connection->tapgrein_async_sync_from_api();
+		if ( '1' !== $api_connected ) {
+			return;
 		}
+
+		$log = Tapgoods_Sync_Log::get_instance();
+
+		// Graceful fallback: no Action Scheduler => keep the old self-ping driver.
+		if ( ! Tapgoods_Sync_Scheduler::is_available() ) {
+			$log->debug( 'sync.cron.tick', array( 'driver' => 'selfping_fallback', 'will_ping' => 1 ) );
+			Tapgoods_Connection::get_instance()->tapgrein_async_sync_from_api();
+			return;
+		}
+
+		$state = Tapgoods_Connection::get_instance()->sync_state();
+		$plan  = Tapgoods_Sync_Scheduler::cron_plan( $state );
+
+		$context = array_merge( array( 'driver' => 'action_scheduler' ), $plan['context'] );
+		if ( $plan['enqueue'] ) {
+			$context['enqueued'] = Tapgoods_Sync_Scheduler::enqueue_slice() ? 1 : 0;
+		}
+		$log->debug( 'sync.cron.tick', $context );
 	}
 
 	public function tapgrein_disable_autop_blocks( $block_content, $block ) {

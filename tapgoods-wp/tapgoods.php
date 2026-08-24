@@ -12,6 +12,15 @@
  * License:           MIT
  * Text Domain:       tapgoods
  * Domain Path:       /languages
+ * Update URI:        false
+ *
+ * "Update URI: false" tells WordPress 5.8+ that this plugin has no update
+ * source, so core stops asking wordpress.org about it. Without it, every site
+ * running this plugin sends the folder name "tapgoods-wp" to the .org update
+ * API, and an unrelated .org plugin claiming that same slug would be offered
+ * to our users as an "update" and overwrite this one. Remove this line only if
+ * the plugin is actually published to wordpress.org, or replace it with the
+ * URL of a self-hosted update server.
  *
  *
  * MIT License
@@ -43,6 +52,28 @@ define( 'TAPGREIN_PLUGIN_DIR',  plugin_dir_path( TAPGOODS_PLUGIN_FILE ) );
  * Path to the plugin root directory.
  */
 define( 'TAPGOODS_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
+
+/*
+ * Action Scheduler (bundled, pinned 3.9.3).
+ *
+ * Action Scheduler is the background driver for the inventory sync: each sync
+ * "slice" runs as one `tapgoods_sync_slice` async action, and each slice chains
+ * the next while work remains, so a large catalog syncs back-to-back instead of
+ * one slice per five-minute cron tick.
+ *
+ * It MUST be loaded as early as possible (its own docs require it to be required
+ * on every request, before `plugins_loaded`) so the `as_*()` functions exist by
+ * the time any hook fires. This runs at plugin-include time, which is before
+ * `plugins_loaded`. It is a TRACKED, shipped directory under lib/ (NOT a Composer
+ * runtime dependency), because the release zip excludes vendor/. The file_exists
+ * guard keeps the plugin from fataling if the library is ever missing; the sync
+ * then falls back to the legacy cron self-ping driver (see Tapgoods::tapgrein_cron_exec).
+ */
+$tapgoods_action_scheduler = TAPGOODS_PLUGIN_PATH . 'lib/action-scheduler/action-scheduler.php';
+if ( file_exists( $tapgoods_action_scheduler ) ) {
+	require_once $tapgoods_action_scheduler;
+}
+unset( $tapgoods_action_scheduler );
 /**
  * Url to the plugin root directory.
  */

@@ -4,12 +4,17 @@
     "@wordpress/scripts": "^27.1.0",
     "archiver": "^7.0.1",
     "bootstrap": "^5.3.2",
-    "sass": "^1.70.0"
+    "sass": "^1.70.0",
+    "@playwright/test": "^1.49.0"
   },
   "scripts": {
-    "clean": "rimraf releases && mkdir releases", 
+    "clean": "rimraf releases && mkdir releases",
     "build-sass": "sass ./tapgoods-wp/assets/scss/custom.scss ./tapgoods-wp/assets/css/custom.css",
     "build": "npm run clean && npm run build-sass",
-    "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*'"
+    "zip-plugin": "mkdir -p releases && zip -r ./releases/tapgoods-wp.zip ./tapgoods-wp -x '*.git*' '*.DS_Store' 'node_modules/*' 'tapgoods-wp/vendor/*' 'tapgoods-wp/tests/*' 'tapgoods-wp/phpunit.xml.dist' 'tapgoods-wp/phpunit-integration.xml.dist' 'tapgoods-wp/phpcompat.xml.dist' 'tapgoods-wp/phpstan.neon.dist' 'tapgoods-wp/phpstan-baseline.neon' 'tapgoods-wp/tools/*' 'tapgoods-wp/coverage/*' 'tapgoods-wp/.phpunit.cache/*'",
+    "test:integration": "wp-env run tests-cli --env-cwd=wp-content/plugins/tapgoods-wp php tools/phpunit9/vendor/bin/phpunit -c phpunit-integration.xml.dist",
+    "e2e:seed": "wp-env run cli wp eval-file wp-content/tg-e2e/seed.php",
+    "e2e": "playwright test --config=e2e/playwright.config.js",
+    "e2e:ui": "playwright test --config=e2e/playwright.config.js --ui"
   }
 }
