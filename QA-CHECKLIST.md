@@ -9,7 +9,7 @@ Status key:
 | | Meaning |
 |---|---|
 | **auto** | Covered by a test in this repo. The test file is named; if it breaks, CI fails. |
-| **browser** | Needs a real browser. Covered by, or a candidate for, the Playwright suite (`e2e/`). |
+| **browser** | Needs a real browser. The Playwright suite lives in `e2e/` and runs in CI; lines still marked browser without a named spec are candidates, not coverage. |
 | **manual** | A person has to do it. Kept short on purpose. |
 
 When you automate a line, change its status here in the same commit. A checklist
@@ -63,13 +63,13 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 
 | Item | Status | Where |
 |---|---|---|
-| Mobile-responsive | browser | |
-| Searching | browser | Includes "no price when searching", which renders through the AJAX search path |
-| Pagination | browser | |
-| Category filter keeps you on the inventory grid | auto | `ParseRequestRoutingTest` |
+| Mobile-responsive | **browser, auto** | `e2e/tests/category-accordion.spec.js` covers the one responsive contract we have; wider visual checks are still by eye |
+| Searching | **browser, auto** | `e2e/tests/shop-grid.spec.js`. "No price when searching" still by eye: it renders through the AJAX path |
+| Pagination | browser | Needs a fixture catalog bigger than one page |
+| Category filter keeps you on the inventory grid | **auto** | `ParseRequestRoutingTest`, and clicked for real in `e2e/tests/shop-grid.spec.js` |
 | Only categories are shown, not subcategories | **auto** | `CategoryTaxonomyContractTest` |
 | Only categories in the selected location show | **auto** | `ShopCategoryMenuTest` |
-| Categories accordion starts closed on mobile, open on desktop | **auto** | `CategoryFilterMarkupTest`, and it asserts the markup is identical for both so a page cache cannot serve it to the wrong device |
+| Categories accordion starts closed on mobile, open on desktop | **auto** | `e2e/tests/category-accordion.spec.js` for what the visitor gets, `CategoryFilterMarkupTest` for the markup being identical for both so a page cache cannot serve the wrong one |
 
 ### Multilocation
 
@@ -83,7 +83,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 
 | Item | Status | Where |
 |---|---|---|
-| Hide item pricing: no price in the grid, and the item link inherits it | **auto** | `ShortcodeContractsTest`, including the curly quotes a page builder inserts |
+| Hide item pricing: no price in the grid, and the item link inherits it | **auto** | `ShortcodeContractsTest` (including the curly quotes a page builder inserts) and `e2e/tests/shop-grid.spec.js` |
 | Category modifier | **auto** | `ShortcodeContractsTest::test_the_category_modifier_filters_the_grid` |
 | Tag modifier | **auto** | `ShortcodeContractsTest::test_the_tag_modifier_filters_the_grid` |
 

@@ -64,3 +64,8 @@ dev.php
 
 #ignore
 /releases/*
+# Playwright (browser suite) output
+/playwright-report/
+/test-results/
+/e2e/test-results/
+/e2e/playwright-report/
