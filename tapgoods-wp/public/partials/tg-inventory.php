@@ -6,7 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 $category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : ( ! empty( $atts['category'] ) ? sanitize_text_field( $atts['category'] ) : '' );
 $category_attribute = $category ? "category=\"{$category}\"" : '';
 
-$tags                   = ! empty( $atts['tags'] ) ? "tags=\"{$atts['tags']}\"" : '';
+// Prioritize the value from the URL over $atts['tags'] (mirrors category handling above).
+$tags_value             = isset( $_GET['tags'] ) ? sanitize_text_field( wp_unslash( $_GET['tags'] ) ) : ( ! empty( $atts['tags'] ) ? sanitize_text_field( $atts['tags'] ) : '' );
+$tags                   = $tags_value ? "tags=\"{$tags_value}\"" : '';
 $per_page_default       = isset( $atts['per_page_default'] ) ? "per_page_default=\"{$atts['per_page_default']}\"" : '';
 $show_search            = filter_var( $atts['show_search'], FILTER_VALIDATE_BOOLEAN );
 $show_filters           = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );

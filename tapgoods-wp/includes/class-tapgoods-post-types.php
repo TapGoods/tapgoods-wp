@@ -408,7 +408,7 @@ class Tapgoods_Post_Types {
 		do_action( 'tg_register_tags' );
 		$tg_tags = register_taxonomy(
 			'tg_tags',
-			apply_filters( 'tapgoods_taxonomy_objects_tg_tags', array( 'tg_inventory', ' tg_bundle' ) ),
+			apply_filters( 'tapgoods_taxonomy_objects_tg_tags', array( 'tg_inventory', 'tg_bundle' ) ),
 			apply_filters(
 				'tapgoods_taxonomy_args_tg_tags',
 				array(
