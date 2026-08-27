@@ -216,7 +216,7 @@ $tg_pages = $query->max_num_pages;
                 </a>
                 <?php if (!empty($add_cart_url)) : ?>
                 <div class="add-to-cart item-<?php the_ID(); ?>">
-                    <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-<?php echo esc_attr($tg_id); ?>">
+                    <input class="qty-input form-control round" type="text" placeholder="Qty" value="1" id="qty-<?php echo esc_attr($tg_id); ?>">
                     <button type="button" data-target="<?php echo esc_url($add_cart_url); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" class="add-cart btn btn-primary">Add</button>
                 </div>
                 <?php endif; ?>
