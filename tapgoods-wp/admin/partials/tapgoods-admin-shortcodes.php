@@ -25,7 +25,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-inventory-input" class="form-control" disabled value="[tapgoods-inventory]">
+						<span id="tapgoods-inventory-input" class="form-control" data-shortcode="[tapgoods-inventory]">[tapgoods-inventory]</span>
 						<button type="button" onClick="copyText('tapgoods-inventory-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
@@ -73,7 +73,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-location-select-input" class="form-control" disabled value="[tapgoods-location-select]">
+						<span id="tapgoods-location-select-input" class="form-control" data-shortcode="[tapgoods-location-select]">[tapgoods-location-select]</span>
 						<button type="button" onClick="copyText('tapgoods-location-select-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
@@ -113,7 +113,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-cart-input" class="form-control" disabled value="[tapgoods-cart]">
+						<span id="tapgoods-cart-input" class="form-control" data-shortcode="[tapgoods-cart]">[tapgoods-cart]</span>
 						<button type="button" onClick="copyText('tapgoods-cart-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
@@ -155,7 +155,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-sign-in-input" class="form-control" disabled value="[tapgoods-sign-in]">
+						<span id="tapgoods-sign-in-input" class="form-control" data-shortcode="[tapgoods-sign-in]">[tapgoods-sign-in]</span>
 						<button type="button" onClick="copyText('tapgoods-sign-in-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
@@ -195,7 +195,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-sign-up-input" class="form-control" disabled value="[tapgoods-sign-up]">
+						<span id="tapgoods-sign-up-input" class="form-control" data-shortcode="[tapgoods-sign-up]">[tapgoods-sign-up]</span>
 						<button type="button" onClick="copyText('tapgoods-sign-up-input')" 
 								data-bs-toggle="tooltip" data-bs-placement="bottom" 
 								data-bs-title="Copy to clipboard" 
