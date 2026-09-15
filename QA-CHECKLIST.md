@@ -86,6 +86,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Hide item pricing: no price in the grid, and the item link inherits it | **auto** | `ShortcodeContractsTest` (including the curly quotes a page builder inserts) and `e2e/tests/shop-grid.spec.js` |
 | Category modifier | **auto** | `ShortcodeContractsTest::test_the_category_modifier_filters_the_grid` |
 | Tag modifier | **auto** | `ShortcodeContractsTest::test_the_tag_modifier_filters_the_grid` |
+| Several inventory shortcodes on one page: add to cart and search work in every grid, not only the first | **browser, auto** | `e2e/tests/multi-grid.spec.js` (WPB-180) |
 
 ### Item page
 
