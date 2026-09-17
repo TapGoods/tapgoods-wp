@@ -26,6 +26,7 @@ if (isset($_POST['confirm_reset'])) {
     delete_option('tg_last_api_key');
     delete_option('tg_last_sync_progress');
     delete_option('tg_last_sync_info');
+    delete_option('tg_sync_state');
 
     // Delete all categories and tags
     $taxonomies = ['tg_category', 'tg_tags', 'tg_location'];
@@ -82,13 +83,85 @@ if (isset($_POST['confirm_reset'])) {
 
 <!-- Sync Status Message -->
 <div id="tapgrein_connection_test">
-    <?php 
+    <?php
     $sync_message = $tg_api->last_sync_message();
     if ($sync_message && get_option('tg_api_connected')) :
         echo wp_kses(wpautop($sync_message), 'post');
     endif;
     ?>
 </div>
+
+<?php
+// Sync state machine status panel.
+if ( $connected ) :
+    $tg_state   = $tg_api->sync_state();
+    $tg_summary = $tg_state->get_summary();
+    $tg_fmt     = static function ( $ts ) {
+        return $ts ? esc_html( date_i18n( 'M j, Y g:i a', (int) $ts ) ) : 'Never';
+    };
+    ?>
+    <div id="tapgrein_sync_status" class="tapgrein-sync-status" data-state="<?php echo esc_attr( $tg_summary['state'] ); ?>">
+        <h3>Sync Status</h3>
+        <table class="widefat striped" style="max-width:640px;">
+            <tbody>
+                <tr>
+                    <th scope="row">Current state</th>
+                    <td><span id="tapgrein_sync_state_label"><?php echo esc_html( $tg_summary['label'] ); ?></span></td>
+                </tr>
+                <tr>
+                    <th scope="row">Currently</th>
+                    <td>
+                        <span id="tapgrein_sync_activity">
+                            <?php
+                            // Fall back to the state label rather than rendering an empty
+                            // row. A plugin distributed as a zip gets unpacked over a
+                            // running site, and a host with a persistent opcache can serve
+                            // a stale compiled copy of one file while another is already
+                            // new, which is exactly how this row showed up blank once.
+                            echo esc_html(
+                                isset( $tg_summary['activity'] ) && '' !== $tg_summary['activity']
+                                    ? $tg_summary['activity']
+                                    : $tg_summary['label']
+                            );
+                            ?>
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <?php
+                    // Deliberately not called "progress": this counts item pages only, and a
+                    // run spends whole phases (categories, then finalize) at 0/N and N/N. The
+                    // "Currently" row above is what says where the run actually is.
+                    ?>
+                    <th scope="row">Item pages fetched</th>
+                    <td><?php echo esc_html( $tg_summary['pages_completed'] . ' / ' . $tg_summary['total_pages'] ); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row">Last successful sync</th>
+                    <td><?php echo $tg_fmt( $tg_summary['last_success'] ); ?></td>
+                </tr>
+                <tr>
+                    <th scope="row">Last error</th>
+                    <td>
+                        <?php echo $tg_fmt( $tg_summary['last_error'] ); ?>
+                        <?php if ( ! empty( $tg_summary['error_message'] ) ) : ?>
+                            <br><em><?php echo esc_html( $tg_summary['error_message'] ); ?></em>
+                        <?php endif; ?>
+                        <?php if ( $tg_summary['failure_count'] > 0 ) : ?>
+                            <br><small>Attempts failed: <?php echo esc_html( $tg_summary['failure_count'] . ' (retries before error: ' . $tg_summary['max_retries'] . ')' ); ?></small>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p>
+            <button type="button" id="tapgrein_clear_sync_errors" class="btn btn-secondary round"
+                <?php echo $tg_summary['has_error'] ? '' : 'style="display:none;"'; ?>>
+                Clear Errors
+            </button>
+        </p>
+    </div>
+<?php endif; ?>
 
 <!-- Sync progress modal -->
 <div id="syncProgressModal" class="overlay" style="display: none;">
@@ -97,7 +170,7 @@ if (isset($_POST['confirm_reset'])) {
             <span class="spinner-border spinner-border-lg text-primary" role="status" aria-hidden="true"></span>
         </div>
         <h2>Synchronization in Progress</h2>
-        <p>Please wait while we sync your inventory and locations from TapGoods. This process may take several minutes depending on the amount of data.</p>
+        <p>We're syncing your inventory and locations from TapGoods. This runs one batch now and then continues automatically in the background, so large catalogs keep syncing after this window closes.</p>
         <div class="sync-details">
             <p><strong>What we're doing:</strong></p>
             <ul>
@@ -107,7 +180,7 @@ if (isset($_POST['confirm_reset'])) {
                 <li>✓ Processing images and metadata</li>
             </ul>
         </div>
-        <p class="sync-warning"><strong>Important:</strong> Please do not close this window or navigate away until synchronization is complete.</p>
+        <p class="sync-warning"><strong>Good to know:</strong> You can safely leave this page. The sync continues in the background and its progress is shown under "Sync Status" below.</p>
         <div id="syncProgressStatus" class="sync-status">
             <p>Initializing synchronization...</p>
         </div>

@@ -1,0 +1,52 @@
+{
+    "data": {
+        "getLocationDetails": {
+            "id": 5001,
+            "token": "loc_tok_5001",
+            "name": "Downtown Warehouse",
+            "locationCode": "DTW",
+            "locationColor": "#0055ff",
+            "website": "https://example.com",
+            "subdomain": "downtown",
+            "locale": "en",
+            "sfSubscriptionTier": "pro",
+            "businessId": 1042,
+            "email": "ops@example.com",
+            "createdAt": "2024-01-15T10:00:00Z",
+            "active": true,
+            "physicalAddress": {
+                "streetAddress1": "100 Main St",
+                "streetAddress2": "",
+                "city": "Austin",
+                "locale": "TX",
+                "postalCode": "78701",
+                "country": "US",
+                "latitude": 30.2672,
+                "longitude": -97.7431,
+                "fullAddress": "100 Main St, Austin, TX 78701"
+            },
+            "storefrontSetting": {
+                "id": 9001,
+                "darkFontColor": "#ffffff",
+                "darkSecondaryColor": "#222222",
+                "lightFontColor": "#111111",
+                "lightSecondaryColor": "#eeeeee",
+                "primaryColor": "#0055ff",
+                "shopShowItemPricing": true,
+                "theme": "light",
+                "shopAllowAutobook": false,
+                "buttonStyle": "rounded",
+                "domains": [
+                    { "id": 1, "name": "shop.example.com", "domainableType": "Location" }
+                ]
+            },
+            "storefrontShopSettings": {
+                "id": 9101,
+                "allowedFilters": ["category", "price"],
+                "seoTitle": "Rentals",
+                "shopShowItemPricing": true,
+                "sortBy": "name"
+            }
+        }
+    }
+}

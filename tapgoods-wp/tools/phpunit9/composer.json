@@ -1,0 +1,7 @@
+{
+    "//": "Isolated PHPUnit 9.6 toolchain for the INTEGRATION layer only. The WordPress core test framework (wp-phpunit) is not compatible with PHPUnit 10+ (it calls PHPUnit\\Util\\Test::parseTestMethodAnnotations(), removed in 10). The main composer.json keeps PHPUnit 10+ for the fast isolated unit suite; this separate vendor tree provides the 9.6 runner + Yoast polyfills the WP test bootstrap requires, with no conflict.",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "yoast/phpunit-polyfills": "^2.0"
+    }
+}

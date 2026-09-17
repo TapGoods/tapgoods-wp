@@ -1,0 +1,553 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 3
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_URL not found\.$#'
+			identifier: constant.notFound
+			count: 3
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Property Tapgoods_Admin\:\:\$filesystem is unused\.$#'
+			identifier: property.unused
+			count: 1
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''edit\-tg_tags'' and ''edit\-tg_category'' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 7
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Variable \$response might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Variable \$submitted_api_key might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: admin/class-tapgoods-admin.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 7
+			path: admin/partials/tapgoods-admin-page.php
+
+		-
+			message: '#^File ends with a trailing whitespace\. This may cause problems when running the code in the web browser\. Remove the closing \?\> mark or remove the whitespace\.$#'
+			identifier: whitespace.fileEnd
+			count: 1
+			path: admin/partials/tapgoods-admin-shortcodes.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 3
+			path: admin/partials/tapgoods-admin-styling.php
+
+		-
+			message: '#^Property Tapgoods_API_Client\:\:\$bid is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: includes/class-tapgoods-api-client.php
+
+		-
+			message: '#^Property Tapgoods_API_Client\:\:\$cookies is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: includes/class-tapgoods-api-client.php
+
+		-
+			message: '#^Undefined variable\: \$query$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/class-tapgoods-api-client.php
+
+		-
+			message: '#^Variable \$location_ids might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/class-tapgoods-api-client.php
+
+		-
+			message: '#^Constructor of class TG_Bad_Request_Exception has an unused parameter \$response\.$#'
+			identifier: constructor.unusedParameter
+			count: 1
+			path: includes/class-tapgoods-api-exception.php
+
+		-
+			message: '#^Undefined variable\: \$reponse$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/class-tapgoods-api-exception.php
+
+		-
+			message: '#^Undefined variable\: \$repsonse$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/class-tapgoods-api-exception.php
+
+		-
+			message: '#^Call to function array_key_exists\(\) with ''method'' and non\-empty\-array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Class TG_HTTP_Request_Failed_Exception referenced with incorrect case\: TG_Http_Request_Failed_Exception\.$#'
+			identifier: class.nameCase
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Instantiated class InvalidArgumeException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Instantiated class InvalidParametersException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Instantiated class TG_Unknown_Error_Exception not found\.$#'
+			identifier: class.notFound
+			count: 2
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Parameter \#1 \$text of function esc_html expects string, WP_Error given\.$#'
+			identifier: argument.type
+			count: 2
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Throwing object of an unknown class InvalidArgumeException\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Throwing object of an unknown class InvalidParametersException\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Throwing object of an unknown class TG_Unknown_Error_Exception\.$#'
+			identifier: class.notFound
+			count: 2
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 2
+			path: includes/class-tapgoods-api-request.php
+
+		-
+			message: '#^Call to function is_wp_error\(\) with int\<0, max\> will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Instantiated class Tapgoods_Mock_API_Client not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Offset ''term_id'' on array\{term_id\: int, term_taxonomy_id\: int\|string\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Property Tapgoods_Connection\:\:\$last_sync_time is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Property Tapgoods_Connection\:\:\$sync_duration is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: includes/class-tapgoods-connection.php
+
+		-
+			message: '#^Constant LOGGED_IN_KEY not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/class-tapgoods-encryption.php
+
+		-
+			message: '#^Undefined variable\: \$value$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/class-tapgoods-encryption.php
+
+		-
+			message: '#^Method Tapgoods_Enqueue\:\:get_admin_connection_styles\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: includes/class-tapgoods-enqueue.php
+
+		-
+			message: '#^Constant TAPGOODS_UPLOADS not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: includes/class-tapgoods-filesystem.php
+
+		-
+			message: '#^Parameter \#4 \$context of function request_filesystem_credentials expects string, false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: includes/class-tapgoods-filesystem.php
+
+		-
+			message: '#^Parameter \#1 \$args of function get_pages expects array\{child_of\?\: int, sort_order\?\: string, sort_column\?\: string, hierarchical\?\: bool, exclude\?\: array\<int\>, include\?\: array\<int\>, meta_key\?\: string, meta_value\?\: string, \.\.\.\}, ''post_type\=tg…'' given\.$#'
+			identifier: argument.type
+			count: 1
+			path: includes/class-tapgoods-helpers.php
+
+		-
+			message: '#^Method Tapgoods_Post_Types\:\:updated_term_messages\(\) should return bool but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: includes/class-tapgoods-post-types.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/class-tapgoods-shortcodes.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/class-tapgoods-wp.php
+
+		-
+			message: '#^Property Tapgoods\:\:\$tapgoods_taxonomy is unused\.$#'
+			identifier: property.unused
+			count: 1
+			path: includes/class-tapgoods-wp.php
+
+		-
+			message: '#^Call to function is_wp_error\(\) with WP_Post\|WP_Post_Type\|WP_Term\|WP_User will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Constant TAPGREIN_PLUGIN_DIR not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Found usage of constant DOING_AJAX\. Use wp_doing_ajax\(\) instead\.$#'
+			identifier: phpstanWP.wpConstant.fetch
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Offset ''QUERY_STRING'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Offset ''category'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Offset ''item_id'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Offset ''local_storage…'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Offset ''tapgreino_default…'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Parameter \#1 \$term of function term_exists expects int\|string, WP_Error\|WP_Term\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Parameter \#1 \$term_id of function get_term_meta expects int, WP_Error\|WP_Term\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Parameter \#1 \$text of function esc_js expects string, int\<0, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Parameter \#3 \$callback of function add_meta_box expects callable\(\)\: mixed, ''wpseo_meta_box'' given\.$#'
+			identifier: argument.type
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Undefined variable\: \$wp$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 4
+			path: includes/tapgoods-core-functions.php
+
+		-
+			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: includes/tapgoods-formatting-functions.php
+
+		-
+			message: '#^Call to function is_float\(\) with float will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: includes/tapgoods-formatting-functions.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between 1 and string will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: includes/tapgoods-formatting-functions.php
+
+		-
+			message: '#^Variable \$str on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 2
+			path: includes/tapgoods-formatting-functions.php
+
+		-
+			message: '#^Variable \$value on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: includes/tapgoods-formatting-functions.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Offset ''delete_tags'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''category'' and ''tg_tags'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Variable \$current_screen might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Variable \$message might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Variable \$ret might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Variable \$taxonomy in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.variable
+			count: 1
+			path: includes/tg_edit-tags.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_PATH not found\.$#'
+			identifier: constant.notFound
+			count: 3
+			path: public/class-tapgoods-public.php
+
+		-
+			message: '#^Constant TAPGOODS_PLUGIN_URL not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: public/class-tapgoods-public.php
+
+		-
+			message: '#^Undefined variable\: \$content$#'
+			identifier: variable.undefined
+			count: 1
+			path: public/class-tapgoods-public.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: public/class-tapgoods-public.php
+
+		-
+			message: '#^Variable \$query might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: public/class-tapgoods-public.php
+
+		-
+			message: '#^Variable \$subcategory might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: public/partials/tg-filter.php
+
+		-
+			message: '#^Parameter \#1 \$text of function esc_attr expects string, int\<0, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/partials/tg-image-carousel.php
+
+		-
+			message: '#^Offset ''QUERY_STRING'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: public/partials/tg-inventory-grid.php
+
+		-
+			message: '#^Parameter \#1 \$str of function sanitize_text_field expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/partials/tg-inventory-grid.php
+
+		-
+			message: '#^Parameter \#1 \$text of function esc_html expects string, int\<2, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/partials/tg-inventory-grid.php
+
+		-
+			message: '#^Variable \$atts might not be defined\.$#'
+			identifier: variable.undefined
+			count: 4
+			path: public/partials/tg-inventory.php
+
+		-
+			message: '#^Found usage of constant DOING_AJAX\. Use wp_doing_ajax\(\) instead\.$#'
+			identifier: phpstanWP.wpConstant.fetch
+			count: 1
+			path: public/partials/tg-location-select.php
+
+		-
+			message: '#^Offset ''location_id'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: public/partials/tg-location-select.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: public/partials/tg-location-select.php
+
+		-
+			message: '#^Offset ''QUERY_STRING'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: public/partials/tg-product-single.php
+
+		-
+			message: '#^Offset ''QUERY_STRING'' on non\-empty\-array\<mixed\> in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: public/partials/tg-search.php
+
+		-
+			message: '#^Parameter \#1 \$text of function esc_attr expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/partials/tg-search.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between false and true will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: public/partials/tg-tag-results.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: public/partials/tg-tag-results.php

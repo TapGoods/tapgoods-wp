@@ -1,0 +1,69 @@
+name: E2E (Playwright)
+
+# The browser half of the pre-release QA checklist: what a visitor actually sees
+# and clicks. Kept in its own workflow rather than folded into ci.yml because it is
+# an order of magnitude slower (boot WordPress, seed it, drive a browser) and
+# because a browser failure wants its own report artifact to look at.
+#
+# It runs against a throwaway wp-env site with the plugin pinned to the offline
+# mock API (TG_MOCK in .wp-env.json), so nothing here touches a real storefront or
+# the TapGoods API. Deterministic on purpose: a browser suite pointed at a live
+# site fails for reasons unrelated to the change and people stop believing it.
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Browser suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # Only Chromium. The mobile project uses a Chromium phone profile, so the
+      # whole suite runs on one engine and CI does not pull WebKit for a breakpoint.
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Start WordPress
+        run: npx wp-env start
+
+      - name: Seed fixtures
+        run: npm run e2e:seed
+
+      - name: Run the browser suite
+        run: npm run e2e
+
+      # The report is what makes a red run actionable: it carries the failing
+      # assertion, a screenshot, and a trace you can step through.
+      - name: Upload the Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # A failed sync during seeding is the most likely cause of a confusing red
+      # run, and it leaves its reasoning in the plugin's own log.
+      - name: Dump WordPress debug log on failure
+        if: failure()
+        run: npx wp-env run cli sh -c 'cat /var/www/html/wp-content/debug.log || true'

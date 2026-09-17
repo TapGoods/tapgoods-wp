@@ -1,0 +1,44 @@
+{
+    "data": {
+        "getInventories": {
+            "metadata": {
+                "currentPage": 1,
+                "limitValue": 10,
+                "totalCount": 2,
+                "totalPages": 1
+            },
+            "collection": [
+                {
+                    "id": 11001,
+                    "token": "itm_11001",
+                    "name": "6ft Round Table",
+                    "slug": "6ft_round_table",
+                    "productType": "Product",
+                    "active": true,
+                    "quantity": 50,
+                    "dailyPrice": "12.00",
+                    "locationId": 5001,
+                    "sfCategories": [{ "id": 701, "name": "Tables", "slug": "tables" }],
+                    "sfSubCategories": [{ "id": 801, "name": "Round Tables" }],
+                    "pictures": [
+                        { "url": "https://img.example.com/table.jpg", "imgixUrl": "https://img.example.com/table.jpg?w=400" }
+                    ]
+                },
+                {
+                    "id": 11002,
+                    "token": "itm_11002",
+                    "name": "Folding Chair",
+                    "slug": "folding_chair",
+                    "productType": "Product",
+                    "active": true,
+                    "quantity": 500,
+                    "dailyPrice": "1.50",
+                    "locationId": 5001,
+                    "sfCategories": [{ "id": 702, "name": "Chairs", "slug": "chairs" }],
+                    "sfSubCategories": [],
+                    "pictures": []
+                }
+            ]
+        }
+    }
+}

@@ -203,8 +203,18 @@ class Tapgoods_Admin {
 	public static function tapgrein_api_sync() {
 		// check_ajax_referer( 'save', '_tgnonce_connection' );
 
-		$client   = Tapgoods_Connection::get_instance();
-		$response = $client->sync_from_api();
+		$client = Tapgoods_Connection::get_instance();
+
+		// This handler is registered on both wp_ajax_ and wp_ajax_nopriv_ for
+		// tapgrein_api_sync, and that action has no nonce (WPB-176), so the
+		// unauthenticated branch is reachable by anyone and not only by our own
+		// cron self-ping. The label therefore states just what is known, the
+		// endpoint and the auth state, instead of claiming the caller was cron.
+		// The five-minute self-ping is the expected source; an unexpected volume
+		// of ajax_sync_unauth runs is itself a finding.
+		$trigger = ( is_user_logged_in() ) ? 'admin_ajax_sync' : 'ajax_sync_unauth';
+
+		$response = $client->sync_from_api( $trigger );
 
 		// tapgrein_write_log( $response );
 		if ( true === $response['success'] ) {
@@ -213,6 +223,41 @@ class Tapgoods_Admin {
 			wp_send_json_error( $response['message'] );
 		}
 		die();
+	}
+
+	/**
+	 * Stream the sync activity log file as a download.
+	 *
+	 * Administrators only, and nonce-protected: the log is not reachable over HTTP
+	 * by design, so this handler is the supported way to get it off the site (see
+	 * admin/partials/tapgoods-sync-log.php for the link).
+	 *
+	 * @return void
+	 */
+	public static function tapgrein_download_sync_log() {
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to download this file.', 'tapgoods' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'tapgrein_sync_log' );
+
+		$log      = Tapgoods_Sync_Log::get_instance();
+		$contents = $log->read_all();
+
+		if ( false === $contents ) {
+			wp_die( esc_html__( 'No sync log has been written yet.', 'tapgoods' ), '', array( 'response' => 404 ) );
+		}
+
+		$filename = 'tapgoods-sync-' . gmdate( 'Ymd-His' ) . '.log';
+
+		nocache_headers();
+		header( 'Content-Type: text/plain; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Length: ' . strlen( $contents ) );
+
+		echo $contents; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- plain-text file download, not HTML.
+		exit;
 	}
 
 	/**

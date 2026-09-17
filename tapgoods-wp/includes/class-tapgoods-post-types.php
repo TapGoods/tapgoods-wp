@@ -667,9 +667,9 @@ class Tapgoods_Post_Types {
 			__CLASS__ . '::tapgrein_tags_metaboxes',
 			'edit-tg_location',
 			'normal',
-			'low',
+			'low'
 		);
-	}	
+	}
 
 	public static function tapgrein_get_inventory_meta() {
 		global $post;
