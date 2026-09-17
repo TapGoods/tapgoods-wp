@@ -586,7 +586,11 @@ function handleInventoryAddToCart(event, locationId) {
     
     const button = event.currentTarget;
     const itemId = button.getAttribute("data-item-id");
-    const container = document.getElementById('tg-inventory-grid') || button.closest(".tapgoods-inventory");
+    // Resolve the grid from the button, never from a page-wide id. Every
+    // [tapgoods-inventory] renders the same id="tg-inventory-grid", so a
+    // getElementById() lookup always answers with the FIRST grid on the page and
+    // a button in any other grid cannot find its own quantity input (WPB-180).
+    const container = button.closest('.tapgoods-inventory') || button.closest('#tg-inventory-grid') || document;
     const qtyInput = container.querySelector(`#qty-${itemId}`);
     
     if (!qtyInput) {
@@ -1076,24 +1080,37 @@ function reinitializeProductEventListeners() {
  * Search Handlers - from public/partials/tg-search.php:92
  */
 function initSearchHandlers() {
-    const searchInput = document.getElementById('tg-search');
-    const resultsContainer = document.querySelector('#tg-results-container');
+    // A page may hold several [tapgoods-inventory] shortcodes, each with its own
+    // search box and grid (WPB-180). Bind every search box to the grid it sits
+    // in; a document-wide lookup would only ever find the first one.
+    document.querySelectorAll('[id="tg-search"]').forEach(initSearchInstance);
+}
+
+function initSearchInstance(searchInput) {
+    // initSearchHandlers() runs more than once on some pages (tag results call it
+    // again); binding twice would fire two requests per keystroke.
+    if (searchInput.dataset.tgSearchBound) return;
+    searchInput.dataset.tgSearchBound = '1';
+
+    // Everything below is scoped to this shortcode instance, never to document.
+    const root = searchInput.closest('.tapgoods-inventory') || document;
+    const form = searchInput.form || root;
+    const resultsContainer = root.querySelector('#tg-results-container');
+    const getGridSection = () => root.querySelector('#tg-inventory-grid-container');
     // Helper to always fetch the current grid element (avoid stale references after replace)
     const getInventoryGrid = () => {
-        const gridContainer = document.getElementById('tg-inventory-grid-container');
-        return gridContainer ? gridContainer.querySelector('#tg-inventory-grid') : document.querySelector('.tapgoods.tapgoods-inventory');
+        const gridContainer = getGridSection();
+        return gridContainer ? gridContainer.querySelector('#tg-inventory-grid') : root.querySelector('#tg-inventory-grid');
     };
     
-    if (!searchInput) return;
-    
     // Location ID value from hidden field if present
-    const locationField = document.querySelector('input[name="tg_location_id"]');
+    const locationField = form.querySelector('input[name="tg_location_id"]');
     const locationId = locationField ? locationField.value : (getCookie('tg_user_location') || localStorage.getItem('tg_user_location'));
-    const tagsField = document.querySelector('input[name="tags"]');
-    const categoriesField = document.querySelector('input[name="category"]');
-    const perPageField = document.querySelector('input[name="per_page_default"]');
+    const tagsField = form.querySelector('input[name="tags"]');
+    const categoriesField = form.querySelector('input[name="category"]');
+    const perPageField = form.querySelector('input[name="per_page_default"]');
     const perPage = perPageField ? perPageField.value : 12;
-    const showPricingField = document.querySelector('input[name="show_pricing"]');
+    const showPricingField = form.querySelector('input[name="show_pricing"]');
     const showPricing = showPricingField ? showPricingField.value === 'true' : true;
     
     // Prevent Enter submit
@@ -1109,7 +1126,7 @@ function initSearchHandlers() {
         const query = searchInput.value.trim();
         if (query.length === 0) {
             // Clear grid first then load default results
-            const container = document.getElementById('tg-inventory-grid');
+            const container = getInventoryGrid();
             if (container) container.innerHTML = '';
             fetchResults(null, 1, true);
         } else {
@@ -1151,8 +1168,7 @@ function initSearchHandlers() {
                     newGrid.innerHTML = data.data.html;
                     inventoryGrid.replaceWith(newGrid);
                     // Update reference after replace
-                    const container = document.getElementById('tg-inventory-grid-container');
-                    const updatedGrid = container ? container.querySelector('#tg-inventory-grid') : newGrid;
+                    const updatedGrid = getInventoryGrid() || newGrid;
                     setupInventoryCartButtons(updatedGrid, locationId);
                     // keep processing so pagination renders
                     inventoryGrid = updatedGrid;
@@ -1162,7 +1178,7 @@ function initSearchHandlers() {
                 setupInventoryCartButtons(inventoryGrid, locationId);
             }
             // Render/update pagination below the grid (abajo del todo)
-            let gridSection = document.getElementById('tg-inventory-grid-container');
+            let gridSection = getGridSection();
             if (!gridSection) {
                 // fallback: take the parent of the grid
                 const currentGrid = getInventoryGrid();
@@ -1244,7 +1260,7 @@ function initSearchHandlers() {
                 e.preventDefault();
                 const page = parseInt(link.getAttribute('data-page'), 10);
                 if (!isNaN(page)) {
-                    const query = (document.getElementById('tg-search')?.value || '').trim();
+                    const query = (searchInput.value || '').trim();
                     fetchResults(query || null, page, query.length === 0);
                 }
             });

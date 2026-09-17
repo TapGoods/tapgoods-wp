@@ -70,6 +70,10 @@ if ( 0 === $items ) {
 $pages = array(
 	'shop'                => '[tapgoods-inventory]',
 	'shop-hide-pricing'   => '[tapgoods-inventory show_pricing="false"]',
+	// Two grids on one page, each filtered to a category, the way a client builds
+	// a "browse everything" page. Every grid renders the same element ids, which
+	// is what WPB-180 tripped over.
+	'shop-multi'          => '[tapgoods-inventory category="tables"][tapgoods-inventory category="chairs"]',
 	'tg-cart'             => '[tapgoods-cart]',
 );
 
