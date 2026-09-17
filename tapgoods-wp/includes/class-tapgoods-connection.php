@@ -737,8 +737,9 @@ class Tapgoods_Connection {
 					$page_started = microtime(true);
 					$response     = $client->get_inventories_from_graph($lid, $page, $batch_size);
 
-					if (false === $response) {
-						// A false response is an API ERROR, not "no more items".
+					if (! is_array($response)) {
+						// Anything that is not a page (false from the client, or a
+						// null that slipped through) is an API ERROR, not "no more items".
 						// Treating it as end-of-location would let finalize delete
 						// items that still exist (a partial/aborted pass). Abort the
 						// run instead so it is retried fresh, with no deletions.
