@@ -92,17 +92,30 @@ $collapse_classes = 'accordion-collapse collapse';
 						<?php echo esc_html( $category->name ); ?>
 					</a>
 					<?php
-					// COMMENTED: Subcategory display temporarily disabled
-					// if ( $has_subcategories ) :
+					/*
+					 * COMMENTED: Subcategory display temporarily disabled.
+					 *
+					 * It was previously commented out in HTML only, with the PHP
+					 * tags inside left live, so each pass of this loop still
+					 * evaluated $subcategory->slug and $subcategory->name on a
+					 * variable that no longer exists. That is one "Undefined
+					 * variable" warning per category on every shop page that has
+					 * any, and it is why rendering [tapgoods-inventory] could not
+					 * be asserted under strict error settings.
+					 *
+					 * Restoring it means restoring the $subcategories lookup above
+					 * and this markup:
+					 *
+					 *   if ( $has_subcategories ) :
+					 *     div.subcategory-list  data-parent-category = $category->term_id
+					 *       foreach ( $subcategories as $subcategory ) :
+					 *         a.subcategory-link  data-tag-id = $subcategory->slug
+					 *           $subcategory->name
+					 *       endforeach;
+					 *     /div
+					 *   endif;
+					 */
 					?>
-						<!-- <div class="subcategory-list" data-parent-category="<?php echo esc_attr( (string) $category->term_id ); ?>"> -->
-							<?php // foreach ( $subcategories as $subcategory ) : ?>
-								<!-- <a class="subcategory-link" href="#" data-tag-id="<?php echo esc_attr( $subcategory->slug ); ?>"> -->
-									<?php // echo esc_html( $subcategory->name ); ?>
-								<!-- </a> -->
-							<?php // endforeach; ?>
-						<!-- </div> -->
-					<?php // endif; ?>
 				<?php endforeach; ?>
 			</div>
 		</div>
