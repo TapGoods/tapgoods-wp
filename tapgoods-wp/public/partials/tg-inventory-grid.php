@@ -129,6 +129,22 @@ $query = new WP_Query($args);
 
 $tg_pages = $query->max_num_pages;
 
+/*
+ * Each card's quantity field ships with value="1" (WPB-168).
+ *
+ * The default is rendered here rather than set by script, because the page is
+ * cached per URL: every visitor must get the same markup, and only that
+ * visitor's own cart quantity overwrites it, client side.
+ *
+ * Still type="text". type="number" would add browser spinners of differing
+ * widths inside the two-column card, and it would remove no validation, since a
+ * number field still hands over "" and "1.5". inputmode="numeric" gets the phone
+ * keypad without touching how the card renders.
+ *
+ * A PHP comment, and outside the loop: an HTML comment here would ship its own
+ * length to the browser once per card, on every shop page.
+ */
+
 ?>
 
 
@@ -205,7 +221,7 @@ $tg_pages = $query->max_num_pages;
                 </a>
                 <?php if (!empty($add_cart_url)) : ?>
                 <div class="add-to-cart item-<?php the_ID(); ?>">
-                    <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-<?php echo esc_attr($tg_id); ?>">
+                    <input class="qty-input form-control round" type="text" inputmode="numeric" placeholder="Qty" value="1" id="qty-<?php echo esc_attr($tg_id); ?>">
                     <button type="button" data-target="<?php echo esc_url($add_cart_url); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" class="add-cart btn btn-primary">Add</button>
                 </div>
                 <?php endif; ?>

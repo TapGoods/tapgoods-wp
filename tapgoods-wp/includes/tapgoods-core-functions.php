@@ -1569,7 +1569,7 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'tapgrein_handle_tg_search');
                 . ($show_pricing && ! empty( $price ) ? '<div class="price mb-2">' . esc_html( $price ) . '</div>' : '')
                 . '<a class="d-block item-name mb-2" href="' . esc_url( $item_url ) . '"><strong>' . esc_html( get_the_title() ) . '</strong></a>'
                 . '<div class="add-to-cart">'
-                . '<input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-' . esc_attr( $tg_id ) . '">'
+                . '<input class="qty-input form-control round" type="text" inputmode="numeric" placeholder="Qty" value="1" id="qty-' . esc_attr( $tg_id ) . '">'
                 . '<button type="button" data-target="' . esc_url( $add_url ) . '" data-item-id="' . esc_attr( $tg_id ) . '" class="add-cart btn btn-primary">' . esc_html__( 'Add', 'tapgoods' ) . '</button>'
                 . '</div>'
                 . '</div>'
