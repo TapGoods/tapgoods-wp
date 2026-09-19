@@ -21,12 +21,13 @@ $tg_ttl = get_option( 'tg_ttl', -1 );
 ?>
 <h2>Advanced</h2>
 <?php echo esc_html( $notice ); ?>
-<form name="tapgoods_advanced" method="post", action="">
+<form name="tapgoods_advanced" method="post", action="" autocomplete="off">
 	<?php wp_nonce_field( 'save', '_tgnonce_advanced' ); ?>
 	<div class="mb-3">
 		<!-- Advanced Settings -->
 		<label for="tg_ttl">Data Cache Lifetime</label>
-		<input type="text" name="tg_ttl" id="tg_ttl">
+		<?php // autocomplete="off" (see WPB-167): this is a saved settings field, not a login form, and it is the only text input on this tab when Advanced is enabled. ?>
+		<input type="text" name="tg_ttl" id="tg_ttl" autocomplete="off">
 		<p class="help-text"></p>
 	</div>
 	<input type="submit" name="Connect" value="<?php echo esc_attr( $submit_text ); ?>" class="btn btn-primary bg-blue px-5 py-2 round">

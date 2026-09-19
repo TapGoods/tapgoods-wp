@@ -1,5 +1,8 @@
 // @ts-check
+const path = require('path');
 const { defineConfig, devices } = require('@playwright/test');
+
+const ADMIN_AUTH_FILE = path.join(__dirname, '.auth', 'admin.json');
 
 /**
  * Browser suite for the parts of the pre-release QA checklist that only a browser
@@ -35,6 +38,9 @@ module.exports = defineConfig({
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'] },
+      // wp-admin has its own "admin" project below (storageState from a one-time
+      // login, not the anonymous storefront context every other spec here wants).
+      testIgnore: /admin-shortcodes\.spec\.js/,
     },
     {
       // The categories accordion is the reason this project exists: its whole
@@ -45,6 +51,22 @@ module.exports = defineConfig({
       // single browser download instead of pulling WebKit for one breakpoint.
       name: 'mobile',
       use: { ...devices['Pixel 7'] },
+      testIgnore: /admin-shortcodes\.spec\.js/,
+    },
+    {
+      // Logs into wp-admin once and saves the session to ADMIN_AUTH_FILE (see
+      // admin.setup.js). wp-admin is not part of the mobile-viewport contract
+      // (that is what the "mobile" project above owns), so this runs once, not
+      // once per project, and admin-shortcodes.spec.js does not need its own
+      // per-test/per-project skip logic for that any more.
+      name: 'admin-setup',
+      testMatch: /admin\.setup\.js/,
+    },
+    {
+      name: 'admin',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH_FILE },
+      testMatch: /admin-shortcodes\.spec\.js/,
+      dependencies: ['admin-setup'],
     },
   ],
 });

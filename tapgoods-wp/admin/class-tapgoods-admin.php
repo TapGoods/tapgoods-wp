@@ -56,6 +56,40 @@ class Tapgoods_Admin {
 				$bootstrap_version 
 			);
 
+			/*
+			 * WPB-167: the Shortcodes tab boxes moved from <input disabled> (which a
+			 * browser password manager could autofill) to
+			 * <span class="tapgoods-shortcode-display" role="textbox">, so they lost
+			 * Bootstrap's .form-control:disabled look for free (a <span> has no
+			 * :disabled state) and the browser's own default dimming of disabled input
+			 * text. Restored here, scoped to that one class rather than bare
+			 * .form-control. Values match what a real .form-control:disabled input
+			 * computes in this theme: background var(--bs-secondary-bg), #949494 text,
+			 * #cccccc border (the latter two are the browser's UA default for a
+			 * disabled control, not something Bootstrap's CSS sets). min-height: 40px
+			 * (with display:flex/align-items:center to keep the text centered) matches
+			 * wp-admin/css/forms.css's own `input[type=text] { min-height: 40px }`,
+			 * which a <span> never matches on its own, so the box stays the same size
+			 * as before this change.
+			 */
+			wp_add_inline_style(
+				$this->plugin_name . '-bootstrap',
+				'.tapgoods-shortcode-display {
+					background-color: var(--bs-secondary-bg);
+					color: #949494;
+					border-color: #cccccc;
+					display: flex;
+					align-items: center;
+					min-height: 40px;
+					-webkit-user-select: all;
+					user-select: all;
+				}
+				.tapgoods-shortcode-display:focus-visible {
+					outline: 2px solid var(--bs-primary, #0d6efd);
+					outline-offset: 1px;
+				}'
+			);
+
 			wp_enqueue_style( 
 				$this->plugin_name . '-font-heebo', 
 				'https://fonts.googleapis.com/css2?family=Heebo:wght@400;700&display=swap', 

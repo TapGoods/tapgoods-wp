@@ -53,12 +53,25 @@ if (isset($_POST['confirm_reset'])) {
 ?>
 
 <h2>Connect to your TapGoods account</h2>
-<form name="tapgoods_connection" id="tapgrein_connection_form" method="post" action="">
+<form name="tapgoods_connection" id="tapgrein_connection_form" method="post" action="" autocomplete="off">
     <input type="hidden" name="tapgoods_hidden" value="1">
     <?php wp_nonce_field( 'save', '_tgnonce_connection' ); ?>
     <div class="row">
         <div class="col col-sm-6">
-            <input type="password" id="tapgoods_api_key" name="tapgoods_api_key" value="<?php echo esc_attr( $api_key ); ?>" size="60" class="form-control round api-key" <?php echo esc_attr( $key_disabled ); ?>>
+            <?php
+            /**
+             * autocomplete="new-password" (not "off") on the field itself: password
+             * managers ignore autocomplete="off" on password inputs, but "new-password"
+             * is the documented signal that tells them not to offer to fill or save
+             * this field. This matters more since WPB-167 -- with the shortcode boxes
+             * no longer real <input>s, this is the only text-like field left on the
+             * page, so a manager that was filling the shortcode box could instead
+             * offer the admin's own WordPress login here, and a "save password" prompt
+             * would post the admin's WP credentials to whatever the manager considers
+             * the form target.
+             */
+            ?>
+            <input type="password" id="tapgoods_api_key" name="tapgoods_api_key" value="<?php echo esc_attr( $api_key ); ?>" size="60" class="form-control round api-key" autocomplete="new-password" <?php echo esc_attr( $key_disabled ); ?>>
         </div>
         <div class="col col-sm-3">
             <button type="submit" name="submit" id="tapgrein_update_connection" value="tapgrein_update_connection" class="btn btn-primary bg-blue w-100 round" <?php echo esc_attr( $button_disabled ); ?>>

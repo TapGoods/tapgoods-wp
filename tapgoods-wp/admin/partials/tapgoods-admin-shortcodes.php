@@ -25,10 +25,11 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-inventory-input" class="form-control" disabled value="[tapgoods-inventory]">
-						<button type="button" onClick="copyText('tapgoods-inventory-input')" 
-								data-bs-toggle="tooltip" data-bs-placement="bottom" 
-								data-bs-title="Copy to clipboard" 
+						<span id="tapgoods-inventory-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Show Inventory shortcode" tabindex="0" data-shortcode="[tapgoods-inventory]">[tapgoods-inventory]</span>
+						<button type="button" onClick="copyText('tapgoods-inventory-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Show Inventory shortcode to clipboard"
 								class="btn btn-outline-secondary">
 							<span class="dashicons dashicons-admin-page"></span>
 						</button>
@@ -73,10 +74,11 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-location-select-input" class="form-control" disabled value="[tapgoods-location-select]">
-						<button type="button" onClick="copyText('tapgoods-location-select-input')" 
-								data-bs-toggle="tooltip" data-bs-placement="bottom" 
-								data-bs-title="Copy to clipboard" 
+						<span id="tapgoods-location-select-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Select Location shortcode" tabindex="0" data-shortcode="[tapgoods-location-select]">[tapgoods-location-select]</span>
+						<button type="button" onClick="copyText('tapgoods-location-select-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Select Location shortcode to clipboard"
 								class="btn btn-outline-secondary">
 							<span class="dashicons dashicons-admin-page"></span>
 						</button>
@@ -113,10 +115,11 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-cart-input" class="form-control" disabled value="[tapgoods-cart]">
-						<button type="button" onClick="copyText('tapgoods-cart-input')" 
-								data-bs-toggle="tooltip" data-bs-placement="bottom" 
-								data-bs-title="Copy to clipboard" 
+						<span id="tapgoods-cart-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Cart Button shortcode" tabindex="0" data-shortcode="[tapgoods-cart]">[tapgoods-cart]</span>
+						<button type="button" onClick="copyText('tapgoods-cart-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Cart Button shortcode to clipboard"
 								class="btn btn-outline-secondary">
 							<span class="dashicons dashicons-admin-page"></span>
 						</button>
@@ -155,10 +158,11 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-sign-in-input" class="form-control" disabled value="[tapgoods-sign-in]">
-						<button type="button" onClick="copyText('tapgoods-sign-in-input')" 
-								data-bs-toggle="tooltip" data-bs-placement="bottom" 
-								data-bs-title="Copy to clipboard" 
+						<span id="tapgoods-sign-in-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Sign In Link shortcode" tabindex="0" data-shortcode="[tapgoods-sign-in]">[tapgoods-sign-in]</span>
+						<button type="button" onClick="copyText('tapgoods-sign-in-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Sign In Link shortcode to clipboard"
 								class="btn btn-outline-secondary">
 							<span class="dashicons dashicons-admin-page"></span>
 						</button>
@@ -195,10 +199,11 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 			<div class="col-md-8">
 				<form>
 					<div class="input-group mb-3">
-						<input type="text" id="tapgoods-sign-up-input" class="form-control" disabled value="[tapgoods-sign-up]">
-						<button type="button" onClick="copyText('tapgoods-sign-up-input')" 
-								data-bs-toggle="tooltip" data-bs-placement="bottom" 
-								data-bs-title="Copy to clipboard" 
+						<span id="tapgoods-sign-up-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Sign Up Link shortcode" tabindex="0" data-shortcode="[tapgoods-sign-up]">[tapgoods-sign-up]</span>
+						<button type="button" onClick="copyText('tapgoods-sign-up-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Sign Up Link shortcode to clipboard"
 								class="btn btn-outline-secondary">
 							<span class="dashicons dashicons-admin-page"></span>
 						</button>
