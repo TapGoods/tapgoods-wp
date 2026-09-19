@@ -17,22 +17,38 @@ CI runs exactly this, in `.github/workflows/e2e.yml`.
 
 The plugin here is pinned to the offline mock API (`TG_MOCK` in `.wp-env.json`), so
 the catalog is the same fixture set the PHP suites use: two known items, two
-categories, one sub-category. That is what lets a spec assert "one result" instead
-of "something rendered". A browser suite pointed at a live storefront fails for
-reasons unrelated to the change, and then people stop believing it.
+categories, one sub-category (which becomes the `tag-round-tables` tag). That is
+what lets a spec assert "one result" instead of "something rendered". A browser
+suite pointed at a live storefront fails for reasons unrelated to the change, and
+then people stop believing it.
 
 `seed.php` is idempotent, so re-run it whenever you want a clean catalog.
 
 ## Two things that will surprise you
 
-**Permalinks are plain.** The wp-env web container is nginx with no `try_files`
-rule, so every pretty permalink returns a bare 404 before WordPress sees the
-request. `/sample-page/` 404s too, so it is the environment and not the plugin.
-Specs therefore address pages as `/?page_id=N`, resolved by slug through
-`?rest_route=` in `tests/helpers.js`, and the pretty REST route is unavailable for
-the same reason. Anything that genuinely needs pretty URLs
-(`tapgrein_parse_request()` routing) stays in the PHP integration suite, which runs
-inside WordPress and does not care about the web server.
+**Permalinks are pretty, and `.htaccess` is mounted, not generated.** This file
+used to say the opposite: that the web container was nginx with no `try_files`
+rule, so every pretty permalink 404'd and specs had to address pages as
+`/?page_id=N`. wp-env serves WordPress through Apache, so that is no longer true —
+but it does need a `.htaccess`. `e2e/htaccess` is mapped onto the WordPress root
+by `.wp-env.json`, and `seed.php` sets `/%postname%/` and then fails loudly if that
+file has no `RewriteRule` in it, because otherwise every spec fails on a 404 far
+from the cause.
+
+Mounted rather than written by the seed, and that distinction cost a CI run:
+`save_mod_rewrite_rules()` succeeds on macOS, where the bind mount ignores
+ownership, and fails on Linux CI, where `/var/www/html` is root-owned and the
+wp-cli container runs as the host user. A mounted file needs no write permission
+anywhere. **If you have an environment from before this mapping existed, run
+`npx wp-env destroy && npx wp-env start`** — a running container will not pick up
+a new mapping.
+
+This is not cosmetic. WPB-166 could not be reproduced on plain permalinks at all:
+the old code parsed the tag slug out of the URL path, found nothing there, and the
+grid's own query var quietly filtered the page correctly. A suite pinned to plain
+permalinks passed the entire time the bug was open. `tests/helpers.js` therefore
+resolves each page's real `link` through `?rest_route=`, and specs address tags as
+`/tags/<slug>/`, the shape a customer site serves.
 
 **Two projects, one engine.** `desktop` and `mobile` both run Chromium; the mobile
 project is a Chromium phone profile. The only viewport-dependent contract we have

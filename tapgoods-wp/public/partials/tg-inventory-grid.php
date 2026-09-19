@@ -80,18 +80,12 @@ if (is_string($categories) && !empty($categories)) {
     $categories = explode(',', $categories);
 }
 
-// Get tags from query var 'tags' or shortcode attribute
-$tg_tags = get_query_var('tags', false);
-if (false === $tg_tags) {
-    $tg_tags = get_query_var('tg_tags', false);
-}
-if (!empty($atts['tags'])) {
-    $tg_tags = explode(',', $atts['tags']);
-}
-// Convert to array if it's a string
-if (is_string($tg_tags) && !empty($tg_tags)) {
-    $tg_tags = explode(',', $tg_tags);
-}
+// Tags come from the one resolver the search box and tg-inventory.php also use,
+// with the same precedence (attribute first, then the URL), so the three cannot
+// disagree about what is filtered. It reads the tg_tags query var too, which is
+// what filters the term-archive fallback where there is no ?tags= at all.
+$tg_tags = tapgrein_resolve_tag_filter(isset($atts) ? $atts : array());
+$tg_tags = ('' === $tg_tags) ? false : explode(',', $tg_tags);
 
 $tax_args = array();
 if (false !== $categories) {
@@ -105,19 +99,14 @@ if (false !== $categories) {
 }
 
 if (false !== $tg_tags) {
-    // Add 'tag-' prefix to tag slugs if not already present
-    $prefixed_tags = array();
-    foreach ($tg_tags as $tag_slug) {
-        if (strpos($tag_slug, 'tag-') !== 0) {
-            $prefixed_tags[] = 'tag-' . $tag_slug;
-        } else {
-            $prefixed_tags[] = $tag_slug;
-        }
-    }
-
+    // Match either slug form. Synced tags carry a 'tag-' prefix and storefront
+    // links have historically carried the stripped form, but a tag created any
+    // other way has no prefix at all; adding one unconditionally, as this used
+    // to, made such a tag unmatchable. Slugs are unique within tg_tags, so the
+    // extra candidate can only resolve to the term the visitor asked for.
     $tax_args[] = array(
         'taxonomy' => 'tg_tags',
-        'terms'    => $prefixed_tags,
+        'terms'    => tapgrein_tag_slug_variants($tg_tags),
         'field'    => 'slug',
         'operator' => 'IN',
     );

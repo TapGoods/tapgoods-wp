@@ -14,6 +14,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Include core functions (available in both admin and frontend).
 
+/**
+ * Most slugs any one storefront filter may carry.
+ *
+ * Enforced in tapgrein_sanitize_slug_list(), which every path feeding a
+ * tax_query goes through: the shortcode attribute, ?tags= / ?category=, and the
+ * logged-out AJAX search. Without it, ?tags=a,b,c... or a POST to the nopriv
+ * tg_search_grid action became an unbounded IN() list.
+ */
+if ( ! defined( 'TAPGOODS_MAX_SLUG_FILTER' ) ) {
+	define( 'TAPGOODS_MAX_SLUG_FILTER', 20 );
+}
 
 /**
  * Define a constant if it is not already defined.
@@ -812,6 +823,438 @@ function tapgrein_get_page_id( $page ) {
 	return $page_id;
 }
 
+/**
+ * Does this content hold an [tapgoods-inventory] that shows the whole catalog?
+ *
+ * "Whole catalog" means no category and no tags attribute. A page built as
+ * [tapgoods-inventory category="tables"] is a curated landing page, not the
+ * shop: sending a tag there gives the visitor category AND tag, which for most
+ * pairs is an empty grid -- the exact symptom WPB-166 is about. So such a page
+ * must never be chosen as the redirect target.
+ *
+ * Parsed with the shortcode regex rather than by string matching, so attribute
+ * order, quoting style and whitespace do not matter. The regex's trailing
+ * (?![\w-]) is what keeps [tapgoods-inventory-grid] out.
+ *
+ * @param string $content Post content.
+ * @return bool
+ */
+function tapgrein_content_has_unscoped_inventory( $content ) {
+	$content = (string) $content;
+
+	if ( false === strpos( $content, '[tapgoods-inventory' ) ) {
+		return false;
+	}
+
+	$pattern = get_shortcode_regex( array( 'tapgoods-inventory' ) );
+
+	if ( ! preg_match_all( '/' . $pattern . '/', $content, $matches, PREG_SET_ORDER ) ) {
+		return false;
+	}
+
+	foreach ( $matches as $shortcode ) {
+		// Escaped as [[tapgoods-inventory]], which renders as literal text in a
+		// documentation page and must not count. The escape is the doubled
+		// bracket pair, groups 1 and 6 -- NOT group 5, which is the ENCLOSED
+		// CONTENT of [tapgoods-inventory]...[/tapgoods-inventory]. Testing
+		// group 5 got both cases backwards: it counted escaped text as a shop
+		// page and skipped a real enclosing one.
+		if ( '[' === $shortcode[1] && ']' === $shortcode[6] ) {
+			continue;
+		}
+
+		// shortcode_parse_atts() answers the empty STRING, not an array, for a
+		// shortcode with no attributes at all -- which is the unscoped case.
+		$atts = (array) shortcode_parse_atts( isset( $shortcode[3] ) ? $shortcode[3] : '' );
+
+		if ( empty( $atts['category'] ) && empty( $atts['tags'] ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * The page that hosts the storefront grid ("the shop page").
+ *
+ * There is no setting for this: tapgrein_get_page_id( 'shop' ) reads an option
+ * that nothing ever writes, so it answers false on every site. What actually
+ * defines the shop page is the page a site builder put [tapgoods-inventory] on,
+ * whatever they named it, so that is what is looked for here. Resolution order:
+ *
+ *  1. the tg_shop_page_id filter, for a site that wants to say so explicitly;
+ *  2. the tg_shop_page_id option, same thing without code;
+ *  3. the oldest published page carrying an UNSCOPED [tapgoods-inventory].
+ *
+ * Oldest rather than newest on purpose: a site that later adds a second grid
+ * page must not silently move the shop out from under existing links.
+ * Deterministic either way.
+ *
+ * Returns 0 when the site has no such page, including when the only pages with
+ * a grid on them are scoped to a category or a tag. Callers must handle that: a
+ * site can legitimately have none, and guessing /shop/ would send visitors to a
+ * 404 while guessing a curated page would send them to an empty grid.
+ *
+ * Bounded by BOTH a batch size and a batch count, because post_content LIKE
+ * cannot express "unscoped": the SQL narrows to pages that mention the
+ * shortcode at all, and the attribute parsing happens in PHP over one batch at
+ * a time. A single LIMIT could not do this -- a site with ten category landing
+ * pages older than its shop page would run out of rows and answer "no shop
+ * page" while one sat just past the cut. So it pages, and stops after
+ * SHOP_PAGE_BATCHES * SHOP_PAGE_BATCH rows whatever happens: a hundred pages
+ * carrying a grid shortcode is not a shape worth guessing at, and such a site
+ * should set the option.
+ *
+ * Memoised in the object cache for five minutes, including the "none" answer,
+ * so neither a site with a shop page nor one without runs this per request.
+ * The cached id is re-checked against post status on read, because with a
+ * persistent object cache the entry outlives the page being trashed and a stale
+ * id would produce a 302 to a 404.
+ *
+ * @return int Page id, or 0 when no shop page can be found.
+ */
+function tapgrein_get_shop_page_id() {
+	// Rows per query, and the most queries this will ever run. 100 candidate
+	// pages is the hard ceiling; see the note above.
+	$batch_size  = 20;
+	$batch_limit = 5;
+
+	// The filter and the option are the documented way for a site to say which
+	// page it means. Both are checked against post status, so a workaround
+	// pointing at a trashed page falls through to discovery instead of
+	// redirecting visitors to a 404.
+	$filtered = (int) apply_filters( 'tg_shop_page_id', 0 );
+
+	if ( $filtered > 0 && 'publish' === get_post_status( $filtered ) ) {
+		return $filtered;
+	}
+
+	$configured = (int) get_option( 'tg_shop_page_id', 0 );
+
+	if ( $configured > 0 && 'publish' === get_post_status( $configured ) ) {
+		return $configured;
+	}
+
+	$cached = wp_cache_get( 'tg_shop_page_id', 'tapgoods' );
+
+	if ( false !== $cached ) {
+		$cached = (int) $cached;
+
+		// 0 is a real answer (no shop page) and is cached on purpose.
+		if ( 0 === $cached ) {
+			return 0;
+		}
+
+		if ( 'publish' === get_post_status( $cached ) ) {
+			return $cached;
+		}
+		// Stale: the page was trashed or unpublished since. Fall through.
+	}
+
+	global $wpdb;
+
+	// Match [tapgoods-inventory] and [tapgoods-inventory att="..."], but not
+	// [tapgoods-inventory-grid] / -pagination, which render a bare grid with no
+	// filters or search and are not a shop page on their own. This is only a
+	// prefilter; whether a candidate is scoped is decided in PHP below.
+	$closed    = '%' . $wpdb->esc_like( '[tapgoods-inventory]' ) . '%';
+	$with_atts = '%' . $wpdb->esc_like( '[tapgoods-inventory ' ) . '%';
+
+	$page_id = 0;
+
+	for ( $batch = 0; $batch < $batch_limit; $batch++ ) {
+		$candidates = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT ID, post_content FROM {$wpdb->posts}
+				WHERE post_type = 'page'
+				  AND post_status = 'publish'
+				  AND ( post_content LIKE %s OR post_content LIKE %s )
+				ORDER BY ID ASC
+				LIMIT %d OFFSET %d",
+				$closed,
+				$with_atts,
+				$batch_size,
+				$batch * $batch_size
+			)
+		);
+
+		$candidates = (array) $candidates;
+
+		foreach ( $candidates as $candidate ) {
+			if ( tapgrein_content_has_unscoped_inventory( $candidate->post_content ) ) {
+				$page_id = (int) $candidate->ID;
+				break 2;
+			}
+		}
+
+		// Short batch: there is nothing after it to page into.
+		if ( count( $candidates ) < $batch_size ) {
+			break;
+		}
+	}
+
+	wp_cache_set( 'tg_shop_page_id', $page_id, 'tapgoods', 300 );
+
+	return $page_id;
+}
+
+/**
+ * Forget the memoised shop page id.
+ *
+ * Takes no arguments on purpose: the option hooks it is attached to pass
+ * different things in the first position ( add_option_* passes the option NAME,
+ * update_option_* the OLD VALUE ), and anything read from there would be read
+ * wrongly for one of them.
+ */
+function tapgrein_flush_shop_page_cache() {
+	wp_cache_delete( 'tg_shop_page_id', 'tapgoods' );
+}
+add_action( 'add_option_tg_shop_page_id', 'tapgrein_flush_shop_page_cache' );
+add_action( 'update_option_tg_shop_page_id', 'tapgrein_flush_shop_page_cache' );
+
+/**
+ * Forget the memoised shop page id when a PAGE changes.
+ *
+ * The post-type gate is load-bearing rather than tidiness: deleted_post,
+ * trashed_post and untrashed_post fire for every post type, and a sync
+ * reconcile force-deletes thousands of tg_inventory posts in a single run. An
+ * ungated hook would turn that into thousands of cache deletes for an entry no
+ * inventory item can affect.
+ *
+ * The type is read from the id rather than taken from a second hook argument,
+ * because deleted_post only started passing the post object in WordPress 5.5
+ * and this plugin supports older.
+ *
+ * @param int $post_id Post the lifecycle event is about.
+ */
+function tapgrein_maybe_flush_shop_page_cache( $post_id ) {
+	if ( 'page' !== get_post_type( $post_id ) ) {
+		return;
+	}
+
+	tapgrein_flush_shop_page_cache();
+}
+add_action( 'save_post_page', 'tapgrein_maybe_flush_shop_page_cache' );
+add_action( 'deleted_post', 'tapgrein_maybe_flush_shop_page_cache' );
+add_action( 'trashed_post', 'tapgrein_maybe_flush_shop_page_cache' );
+add_action( 'untrashed_post', 'tapgrein_maybe_flush_shop_page_cache' );
+
+/**
+ * Permalink of the shop page, or '' when the site has no shop page.
+ *
+ * @return string
+ */
+function tapgrein_get_shop_url() {
+	$page_id = tapgrein_get_shop_page_id();
+
+	if ( $page_id < 1 ) {
+		return '';
+	}
+
+	$permalink = get_permalink( $page_id );
+
+	return is_string( $permalink ) ? $permalink : '';
+}
+
+/**
+ * Every slug form a tg_tags term may be addressed by.
+ *
+ * Synced tags are stored with a 'tag-' prefix so WordPress cannot share a
+ * term_id between tg_category and tg_tags (see
+ * Tapgoods_Connection::tg_insert_or_update_term), and the storefront links have
+ * historically carried the stripped form ( ?tags=champagne ). A term created
+ * any other way has no prefix at all.
+ *
+ * Rather than guess which convention a given slug follows -- the old code added
+ * the prefix unconditionally, so a tag whose slug genuinely lacked it could
+ * never be matched -- ask the tax query for both forms.
+ *
+ * The extra candidate could only widen the result if a site held BOTH "x" and
+ * "tag-x" as separate tg_tags terms. The sync cannot produce that pair: it
+ * always prefixes and dedups on the tg_id term meta. Resolving the term first
+ * would rule it out completely, at the cost of a term query on every grid
+ * render, which is not worth paying for a case that cannot arise from a sync.
+ *
+ * @param string[]|string $slugs One slug or a list of them.
+ * @return string[] Unique candidate slugs; empty when nothing usable was given.
+ */
+function tapgrein_tag_slug_variants( $slugs ) {
+	$slugs    = is_array( $slugs ) ? $slugs : array( $slugs );
+	$variants = array();
+
+	foreach ( $slugs as $slug ) {
+		$slug = trim( (string) $slug );
+
+		if ( '' === $slug ) {
+			continue;
+		}
+
+		$variants[] = $slug;
+
+		if ( 0 === strpos( $slug, 'tag-' ) ) {
+			$stripped = substr( $slug, 4 );
+
+			// A slug of exactly "tag-" strips to nothing, and an empty candidate
+			// in a tax query would stop the query narrowing anything.
+			if ( '' !== $stripped ) {
+				$variants[] = $stripped;
+			}
+		} else {
+			$variants[] = 'tag-' . $slug;
+		}
+	}
+
+	return array_values( array_unique( $variants ) );
+}
+
+/**
+ * Strip the characters that would break out of a shortcode attribute.
+ *
+ * Templates build shortcode strings by concatenation ( tags="{$value}" ). The
+ * values are term slugs, so anything outside a slug list is noise; removing it
+ * is what keeps the concatenation safe. esc_attr() is the wrong tool there and
+ * was the actual cause of WPB-166: it turns the quotes into &quot;, the
+ * shortcode parser then reads the entity as part of the value, and the grid
+ * looks up a term named tag-&quot;tag-champagne&quot; and renders nothing.
+ *
+ * Whitespace goes too, not only the quotes: inside a shortcode attribute a
+ * space starts the next attribute, so a value carrying one could append
+ * arbitrary attributes to the tag. Term slugs never contain spaces, and the
+ * grid matches on 'field' => 'slug', so nothing legitimate is lost.
+ *
+ * An ALLOWLIST of what a slug list is made of, not a denylist of what is known
+ * to hurt today. A denylist is only ever as good as the last sink someone
+ * added; this way a new caller cannot be surprised by a byte nobody thought to
+ * ban. The class is:
+ *
+ *   A-Z a-z 0-9 _ - , %  and every high byte \x80-\xFF
+ *
+ * The last two matter and are why this is not the obvious [A-Za-z0-9-]. A
+ * WordPress slug for a non-latin name is percent-encoded
+ * ( sanitize_title() of a Japanese name gives %e6%97%a5... ), and a visitor may
+ * also arrive with the same slug as raw UTF-8. An allowlist without % and the
+ * high bytes ate both, so the filter silently resolved to nothing on any
+ * non-latin catalog. No /u modifier, so this works bytewise: UTF-8 sequences
+ * pass through whole and invalid UTF-8 cannot make preg_replace return null.
+ *
+ * The list is also CAPPED. Every caller of this -- the shortcode attribute, the
+ * ?tags= URL parameter and the nopriv AJAX search -- feeds a tax_query, and
+ * ?tags=a,b,c...x5000 turned into an IN() list of ten thousand slugs after the
+ * variants helper doubled it. Capping here rather than at each caller means a
+ * new caller inherits the bound instead of having to remember it. Twenty is far
+ * more tags than a storefront filter ever combines.
+ *
+ * Note this is NOT escaping for HTML. Callers rendering the value into markup
+ * still run it through esc_attr(); what this guarantees is only that the value
+ * cannot break out of the shortcode attribute it is concatenated into.
+ *
+ * @param string $value Raw attribute value.
+ * @return string Value safe to embed in a double-quoted shortcode attribute.
+ */
+function tapgrein_sanitize_slug_list( $value ) {
+	// Curly quotes first. They are high bytes, so the allowlist below keeps
+	// them, and they are harmless there -- but a page builder that smartens
+	// tags="x" into tags=“x” would otherwise leave the quotes inside the value
+	// and match no slug. The rest of this file strips them for the same reason.
+	$value = str_replace( array( "\xe2\x80\x9c", "\xe2\x80\x9d", "\xe2\x80\x98", "\xe2\x80\x99" ), '', (string) $value );
+
+	$clean = preg_replace( '/[^A-Za-z0-9_%,\-\x80-\xFF]/', '', $value );
+
+	if ( null === $clean || '' === $clean ) {
+		return '';
+	}
+
+	$slugs = array();
+
+	foreach ( explode( ',', $clean ) as $slug ) {
+		if ( '' === $slug ) {
+			continue;
+		}
+
+		$slugs[] = $slug;
+
+		if ( count( $slugs ) >= TAPGOODS_MAX_SLUG_FILTER ) {
+			break;
+		}
+	}
+
+	return implode( ',', $slugs );
+}
+
+/**
+ * The tag filter that applies to a storefront render, from one place.
+ *
+ * Three templates used to read ?tags= with three different rules, which is how
+ * the search box and the grid ended up disagreeing about what was filtered.
+ * They all call this now.
+ *
+ * Precedence: an explicit tags="..." attribute WINS over the URL. A page built
+ * as [tapgoods-inventory tags="linens"] is curated, and a visitor appending
+ * ?tags=anything must not be able to re-point it; the URL only applies where
+ * the page did not say. This also matches what the grid has always done with
+ * its own attribute.
+ *
+ * Reads the registered query var first so a tg_tags term archive (the fallback
+ * path, where there is no ?tags= at all) filters itself, and falls back to
+ * $_GET for a request that never reached WP_Query. ?tg_tags= is honoured only
+ * as a legacy alias for links made before ?tags= existed.
+ *
+ * @param mixed $atts Shortcode attributes, if any.
+ * @return string Comma-separated slug list, sanitised; '' when unfiltered.
+ */
+function tapgrein_resolve_tag_filter( $atts = array() ) {
+	if ( is_array( $atts ) && ! empty( $atts['tags'] ) ) {
+		return tapgrein_sanitize_slug_list( $atts['tags'] );
+	}
+
+	$sources = array(
+		get_query_var( 'tags', '' ),
+		get_query_var( 'tg_tags', '' ),
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		isset( $_GET['tags'] ) ? wp_unslash( $_GET['tags'] ) : '',
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		isset( $_GET['tg_tags'] ) ? wp_unslash( $_GET['tg_tags'] ) : '',
+	);
+
+	foreach ( $sources as $source ) {
+		if ( ! is_scalar( $source ) ) {
+			continue;
+		}
+
+		$clean = tapgrein_sanitize_slug_list( $source );
+
+		if ( '' !== $clean ) {
+			return $clean;
+		}
+	}
+
+	return '';
+}
+
+/**
+ * Put a stored term slug into a query string without double-encoding it.
+ *
+ * WordPress stores a non-latin slug already percent-encoded, and add_query_arg()
+ * does not encode at all, so rawurlencode() on the way out produced
+ * ?tags=%25e6%2597%25a5 and nothing matched. An ASCII slug, on the other hand,
+ * is stored raw and does need encoding if it somehow holds a reserved
+ * character.
+ *
+ * @param string $slug Term slug as stored.
+ * @return string Value safe to place after "tags=".
+ */
+function tapgrein_query_arg_slug( $slug ) {
+	$slug = (string) $slug;
+
+	// Already percent-encoded: decoding it changes it, so pass it through.
+	if ( rawurldecode( $slug ) !== $slug ) {
+		return $slug;
+	}
+
+	return rawurlencode( $slug );
+}
+
 function tapgrein_get_start_date() {
     // Get the start date of the cookie, if it exists
     $start_date = isset($_COOKIE['tg-eventStart']) ? sanitize_text_field( wp_unslash( $_COOKIE['tg-eventStart'] ) ) : '';
@@ -988,7 +1431,11 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'tapgrein_handle_tg_search');
 
     $search_term = isset($_POST['s']) && $_POST['s'] !== '' ? sanitize_text_field( wp_unslash( $_POST['s'] ) ) : null;
     $location_id = isset($_POST['tg_location_id']) ? sanitize_text_field( wp_unslash( $_POST['tg_location_id'] ) ) : '';
-    $tags = isset($_POST['tg_tags']) && !empty($_POST['tg_tags']) ? explode(',', sanitize_text_field( wp_unslash( $_POST['tg_tags'] ) ) ) : [];
+    // Slug sanitizer, not sanitize_text_field(): that strips percent octets, so
+    // a non-latin tag slug arrived empty here and the search quietly answered
+    // with the whole catalog instead of the filtered set.
+    $posted_tags = isset($_POST['tg_tags']) ? tapgrein_sanitize_slug_list( wp_unslash( $_POST['tg_tags'] ) ) : '';
+    $tags = ('' === $posted_tags) ? [] : explode(',', $posted_tags);
     $categories = isset($_POST['tg_categories']) && !empty($_POST['tg_categories']) ? explode(',', sanitize_text_field( wp_unslash( $_POST['tg_categories'] ) ) ) : [];
     $per_page = isset($_POST['per_page_default']) ? (int) sanitize_text_field( wp_unslash( $_POST['per_page_default'] ) ) : 12;
     $paged = isset($_POST['paged']) ? (int) sanitize_text_field( wp_unslash( $_POST['paged'] ) ) : 1;
@@ -1001,15 +1448,11 @@ add_action('wp_ajax_nopriv_tg_search_grid', 'tapgrein_handle_tg_search');
         return htmlspecialchars_decode($category);
     }, $categories);
 
-    // Add 'tag-' prefix to tag slugs if not already present
-    // Categories don't need prefix
+    // Match a tag by either slug form. Adding the 'tag-' prefix unconditionally,
+    // as this used to, cannot find a tag whose slug never had one. Categories
+    // need no prefix at all.
     if (!empty($tags)) {
-        $tags = array_map(function($tag_slug) {
-            if (strpos($tag_slug, 'tag-') !== 0) {
-                return 'tag-' . $tag_slug;
-            }
-            return $tag_slug;
-        }, $tags);
+        $tags = tapgrein_tag_slug_variants($tags);
     }
 
     $args = [
@@ -1365,45 +1808,112 @@ function tapgrein_update_inventory_grid() {
 add_action( 'wp_ajax_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 add_action( 'wp_ajax_nopriv_update_inventory_grid', 'tapgrein_update_inventory_grid' );
 
-// Redirect category and tag archive pages to shop page with filters
-// removed because of redemption tents jira ticket wp-132 add_action('template_redirect', 'tapgrein_redirect_taxonomy_archives');
-function tapgrein_redirect_taxonomy_archives() {
-    $term = get_queried_object();
+/**
+ * Send a tg_tags term archive to the shop grid, filtered by that tag (WPB-166).
+ *
+ * A tag is reached from the "Tags" list on an item page and from
+ * TapGoods > Tags > View in wp-admin. Both land on the term archive, which is
+ * not a storefront: the visitor expects the shop they came from, narrowed to
+ * that tag, exactly as a category click narrows it. So resolve the shop page and
+ * redirect there with ?tags=<slug>.
+ *
+ * Three things this deliberately does:
+ *
+ * - It carries the term's REAL slug, not a stripped one. The consumers accept
+ *   both forms (tapgrein_tag_slug_variants), so a tag whose slug never had the
+ *   'tag-' prefix routes as well as a synced one.
+ * - It puts the filter in the URL and nowhere else. Customer pages are cached
+ *   per URL with no device or cookie variance, so a filter held in a cookie or
+ *   a session would be baked into whatever the first visitor warmed.
+ * - It only runs when a shop page actually exists. Guessing home_url('/shop/')
+ *   -- what the old dead code here did -- sends visitors to a 404 on any site
+ *   that named the page something else, which is most of them.
+ *
+ * 302, not 301: the target depends on which page holds [tapgoods-inventory],
+ * which a site owner can change. A permanent redirect would be cached in
+ * visitors' browsers and would keep pointing at a page that had moved.
+ *
+ * Only tg_tags is routed. Category archives are intentionally left alone; that
+ * behaviour was removed for the redemption-tents issue (WP-132).
+ */
+function tapgrein_redirect_tag_archives() {
+	if ( is_admin() || wp_doing_ajax() || is_feed() || is_robots() || is_embed() ) {
+		return;
+	}
 
-    if (!$term || is_wp_error($term)) {
-        return;
-    }
+	if ( ! is_tax( 'tg_tags' ) ) {
+		return;
+	}
 
-    $shop_url = home_url('/shop/');
-    $redirect_url = null;
+	$term = get_queried_object();
 
-    // Check if this is a tg_category taxonomy archive page
-    if (is_tax('tg_category')) {
-        // Use category slug as-is (no prefix to remove)
-        $category_slug = $term->slug;
+	if ( ! $term instanceof WP_Term || empty( $term->slug ) ) {
+		return;
+	}
 
-        // Build redirect URL with category parameter
-        $redirect_url = add_query_arg('category', $category_slug, $shop_url);
-    }
-    // Check if this is a tg_tags taxonomy archive page
-    elseif (is_tax('tg_tags')) {
-        // Remove 'tag-' prefix from slug if present for cleaner URL
-        $tag_slug = $term->slug;
-        if (strpos($tag_slug, 'tag-') === 0) {
-            $tag_slug = substr($tag_slug, 4); // Remove 'tag-' prefix
-        }
+	$shop_url = tapgrein_get_shop_url();
 
-        // Build redirect URL with tags parameter
-        $redirect_url = add_query_arg('tags', $tag_slug, $shop_url);
-    }
+	if ( '' === $shop_url ) {
+		// No shop page on this site, or the only grid pages are scoped to a
+		// category: fall through to tg-tag-results.php, which renders the same
+		// filtered grid in place. A redirect to nothing, or to a curated page
+		// that would AND its own category with this tag, is worse than the
+		// archive we are on.
+		return;
+	}
 
-    // Perform redirect if URL was set
-    if ($redirect_url) {
-        wp_safe_redirect($redirect_url, 301);
-        exit;
-    }
+	// Carry the rest of the query string. A tag link can arrive with campaign
+	// parameters on it, and dropping them loses the attribution for every visit
+	// that starts at a tag. Read $_GET rather than $_SERVER['QUERY_STRING']:
+	// the latter is set by the web server, so it is absent under some SAPIs and
+	// under the test runner.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$carried = wp_unslash( (array) $_GET );
+
+	// Everything WordPress itself routes on is dropped, not just the taxonomy
+	// vars. These described the archive being left, and on the page being
+	// entered they mean something else entirely: /tags/x/?embed=true carried
+	// through would land the visitor on the shop page's oEmbed document rather
+	// than the shop. Campaign parameters and anything else unknown to WordPress
+	// are not in this list and do carry through.
+	$public_vars = isset( $GLOBALS['wp']->public_query_vars ) ? (array) $GLOBALS['wp']->public_query_vars : array();
+	$carried     = array_diff_key( $carried, array_flip( $public_vars ) );
+
+	// Belt and braces for the handful that matter most, in case the global is
+	// not available this early on some install.
+	unset( $carried['tg_tags'], $carried['taxonomy'], $carried['term'], $carried['tags'], $carried['paged'], $carried['page'], $carried['embed'], $carried['s'] );
+
+	$query = '';
+
+	if ( ! empty( $carried ) ) {
+		$query = http_build_query( $carried, '', '&', PHP_QUERY_RFC3986 );
+	}
+
+	// The slug goes on last and unencoded by http_build_query, because a stored
+	// non-latin slug is already percent-encoded.
+	$query .= ( '' === $query ? '' : '&' ) . 'tags=' . tapgrein_query_arg_slug( $term->slug );
+
+	// /tags/x/page/2/ is a real URL WordPress will serve. The grid paginates on
+	// ?paged=, so map it rather than silently dropping the visitor on page one.
+	$paged = (int) get_query_var( 'paged' );
+
+	if ( $paged > 1 ) {
+		$query .= '&paged=' . $paged;
+	}
+
+	$redirect_url = $shop_url . ( false === strpos( $shop_url, '?' ) ? '?' : '&' ) . $query;
+
+	wp_safe_redirect( $redirect_url, 302 );
+	exit;
 }
+add_action( 'template_redirect', 'tapgrein_redirect_tag_archives' );
 
+/**
+ * Fallback for a site with no shop page: render the tag's grid on the archive.
+ *
+ * tapgrein_redirect_tag_archives() has already run by the time template_include
+ * fires, so this only ever renders when there was nowhere to redirect to.
+ */
 add_filter('template_include', 'tapgrein_custom_tax_template');
 function tapgrein_custom_tax_template($template) {
     // Check if this is a taxonomy archive page for a custom taxonomy
@@ -1420,51 +1930,12 @@ function tapgrein_custom_tax_template($template) {
     return $template; // Return the default template if conditions are not met
 }
 
-// Force enqueue scripts for tag pages - using wp_head to ensure proper timing
-add_action('wp_head', 'tapgrein_enqueue_tag_page_scripts', 1);
-function tapgrein_enqueue_tag_page_scripts() {
-    global $wp_query;
-    
-    // Debug: Check what WordPress thinks we are
-    error_log('TapGoods: tapgrein_enqueue_tag_page_scripts called');
-    error_log('TapGoods: is_tax(): ' . (is_tax() ? 'true' : 'false'));
-    error_log('TapGoods: is_tax(tg_tags): ' . (is_tax('tg_tags') ? 'true' : 'false'));
-    error_log('TapGoods: get_queried_object: ' . print_r(get_queried_object(), true));
-    
-    // Debug URL check
-    $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-    $is_tag_url = strpos($request_uri, '/tags/') !== false;
-    error_log('TapGoods: REQUEST_URI: ' . $request_uri);
-    error_log('TapGoods: is_tag_url: ' . ($is_tag_url ? 'true' : 'false'));
-    
-    // Check multiple conditions to catch tag pages
-    if (is_tax('tg_tags') || 
-        (is_tax() && isset($wp_query->queried_object->taxonomy) && $wp_query->queried_object->taxonomy === 'tg_tags') ||
-        $is_tag_url) {
-        
-        error_log('TapGoods: Tag page detected, enqueuing scripts');
-        
-        // Enqueue main JavaScript file
-        wp_enqueue_script(
-            'tapgoods-public-complete',
-            plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-complete.js',
-            array('jquery'),
-            '0.1.124-tag-fix',
-            true
-        );
-        
-        // Localize script with necessary data
-        wp_localize_script('tapgoods-public-complete', 'tg_public_vars', array(
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'default_location' => get_option('tapgreino_default_location'),
-            'plugin_url' => plugin_dir_url(dirname(__FILE__))
-        ));
-        
-        error_log('TapGoods: Scripts enqueued for tag page');
-    } else {
-        error_log('TapGoods: Not a tag page, skipping script enqueue');
-    }
-}
+// A wp_head hook that enqueued the public script "for tag pages" used to live
+// here. It could never do that: tg-tag-results.php never calls get_header(), so
+// wp_head() does not run on a tag archive at all. What it did run on was every
+// other page of the site, where it wrote five error_log lines per request and
+// enqueued nothing. The template enqueues and prints its own script (see
+// tg-tag-results.php), so removing it changes no behaviour and stops the noise.
 
 
 // Ensure Yoast SEO metabox is added to tg_inventory
