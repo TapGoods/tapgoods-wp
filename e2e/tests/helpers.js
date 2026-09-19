@@ -36,4 +36,44 @@ function categoryLinks(page) {
   return page.locator('a.category-link[data-category-id]:not([data-category-id=""])');
 }
 
-module.exports = { pageUrl, itemCards, categoryLinks };
+/**
+ * Log into wp-admin as the wp-env default administrator (admin/password).
+ *
+ * Called once, by the "admin-setup" Playwright project (e2e/tests/admin.setup.js),
+ * not per test -- see admin-shortcodes.spec.js for why. That still means it can run
+ * on a machine under real load (several agents' wp-env instances competing for CPU
+ * here), and one run of this did land with "password" typed into the *username*
+ * field and the password field empty, which reads like the page reset between the
+ * two fills rather than a slow selector. Each fill is verified to have actually
+ * stuck (`toHaveValue`, which polls) before moving on, and the whole thing is
+ * retried once on failure, rather than trusting two independent `.fill()` calls to
+ * both land on a page that did not change out from under them.
+ */
+async function loginAsAdmin(page) {
+  const { expect } = require('@playwright/test');
+
+  const attempt = async () => {
+    await page.goto('/wp-login.php', { waitUntil: 'domcontentloaded' });
+
+    const username = page.locator('#user_login');
+    const password = page.locator('#user_pass');
+
+    await expect(username).toBeVisible();
+    await username.fill('admin');
+    await expect(username).toHaveValue('admin');
+
+    await password.fill('password');
+    await expect(password).toHaveValue('password');
+
+    await page.locator('#wp-submit').click();
+    await page.waitForURL('**/wp-admin/**', { timeout: 15000 });
+  };
+
+  try {
+    await attempt();
+  } catch (err) {
+    await attempt();
+  }
+}
+
+module.exports = { pageUrl, itemCards, categoryLinks, loginAsAdmin };
