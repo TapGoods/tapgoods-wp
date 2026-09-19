@@ -73,7 +73,7 @@ $cart_url = $base_cart_url . '&redirectUrl=' . urlencode($current_page);
                     </div>
                 <?php endif; ?>
                 <div class="quantity-select mb-4">
-                    <input type="text" placeholder="Qty" name="quantity" class="form-control qty-input">
+                    <input type="text" inputmode="numeric" placeholder="Qty" name="quantity" class="form-control qty-input" value="1">
                     <button data-location-id="<?php echo esc_attr($location_id); ?>" data-item-id="<?php echo esc_attr($tg_id); ?>" data-target="<?php echo esc_url($cart_url); ?>" class="add-cart btn btn-primary">Add Item</button>
                 </div>
             </section>

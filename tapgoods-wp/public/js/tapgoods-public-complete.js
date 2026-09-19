@@ -567,13 +567,209 @@ function updateCartItemsOnLoad(container, locationId) {
 }
 
 /**
+ * The quantity a card starts with, and returns to after a successful add.
+ *
+ * The same value is rendered server side (value="1" in the templates), because a
+ * storefront page is cached per URL with no device or visitor variance: the
+ * default has to be in the cached HTML, and only a visitor's own cart quantity
+ * may overwrite it, client side.
+ */
+const TG_DEFAULT_QTY = '1';
+
+/**
+ * The largest quantity the field will accept.
+ *
+ * Four digits covers any real rental line -- the biggest in the fixture
+ * catalogues and on the live sites are in the hundreds -- and it is the cheapest
+ * way to keep JavaScript's number formatting out of the storefront URL: without
+ * a ceiling, "999999999999999999999" parses to a finite number whose String() is
+ * "1e+21", and that is what would be sent as &quantity=. The storefront remains
+ * the authority on what it will actually accept.
+ */
+const TG_MAX_QTY = 9999;
+
+/**
+ * Read a quantity field and say whether it can be added.
+ *
+ * Returns { valid: true, quantity: <int> } or { valid: false, message: <string> }.
+ * Whole numbers only: parseInt() used to accept "1.5" and quietly add 1, and
+ * isNaN() accepted "-1" only to have the caller's <= 0 check reject it with a
+ * message that did not say what was wrong.
+ */
+function tgReadQuantity(qtyInput) {
+    const raw = (qtyInput && typeof qtyInput.value === 'string') ? qtyInput.value.trim() : '';
+
+    if (raw === '') {
+        return { valid: false, message: 'Enter a quantity of 1 or more.' };
+    }
+
+    if (!/^\d+$/.test(raw)) {
+        return { valid: false, message: 'Enter a whole number, 1 or more.' };
+    }
+
+    const quantity = parseInt(raw, 10);
+
+    if (quantity < 1) {
+        return { valid: false, message: 'Enter a quantity of 1 or more.' };
+    }
+
+    if (quantity > TG_MAX_QTY) {
+        return { valid: false, message: 'Enter a quantity of ' + TG_MAX_QTY + ' or less.' };
+    }
+
+    return { valid: true, quantity: quantity };
+}
+
+/**
+ * Each field's message element, held by reference rather than looked up by id.
+ *
+ * Two [tapgoods-inventory] grids on one page render the same item twice, so
+ * "qty-11001" is not unique and document.getElementById() answers with whichever
+ * grid comes first: dismissing the second grid's message used to remove the
+ * first grid's instead, and leave its own on screen. A WeakMap cannot be fooled
+ * by a duplicate id, and lets a removed card's entry be collected.
+ */
+const tgQuantityErrorBoxes = new WeakMap();
+
+let tgQuantityErrorSeq = 0;
+
+/**
+ * The id of this field's message, stable across repeated errors so the field's
+ * aria-describedby keeps pointing at the message that is actually on screen.
+ * Numbered, never derived from the input's id, which is not unique on a page
+ * holding the same item in two grids.
+ */
+function tgQuantityErrorId(qtyInput) {
+    if (!qtyInput.dataset.tgErrorId) {
+        tgQuantityErrorSeq += 1;
+        qtyInput.dataset.tgErrorId = 'tg-qty-error-' + tgQuantityErrorSeq;
+    }
+
+    return qtyInput.dataset.tgErrorId;
+}
+
+/**
+ * Show a dismissible validation message beside a quantity field.
+ *
+ * Replaces alert() (WPB-168). A native alert blocks the page, cannot be styled,
+ * and -- because the same button used to carry several click handlers -- arrived
+ * once per handler, which is what made it feel impossible to close.
+ */
+function tgShowQuantityError(qtyInput, message) {
+    if (!qtyInput) return;
+
+    const wrapper = qtyInput.closest('.add-to-cart') || qtyInput.closest('.quantity-select') || qtyInput.parentElement;
+    if (!wrapper) return;
+
+    // Never stack two messages on one field, however often Add is pressed.
+    tgClearQuantityError(qtyInput);
+
+    const box = document.createElement('div');
+    box.id = tgQuantityErrorId(qtyInput);
+    box.className = 'tg-qty-error';
+    box.setAttribute('role', 'alert');
+    // Styled here rather than in the stylesheets, so a validation message needs
+    // no say in the card layout rules. gridColumn is for the product page, where
+    // the message lands in .summary.col, a two-column grid, and has to claim the
+    // full row; on a grid card the parent is .item-wrap, which is display:block,
+    // and the property is simply inert.
+    box.style.gridColumn = '1 / -1';
+    box.style.display = 'flex';
+    box.style.alignItems = 'center';
+    box.style.gap = '6px';
+    box.style.margin = '4px 0 0';
+    box.style.color = '#b32d2e';
+    box.style.fontSize = '12px';
+    box.style.lineHeight = '1.4';
+
+    const text = document.createElement('span');
+    text.className = 'tg-qty-error-text';
+    text.textContent = message;
+    box.appendChild(text);
+
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'tg-qty-error-dismiss';
+    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.textContent = '×';
+    // setProperty(..., 'important') because the theme stylesheet paints every
+    // button inside .add-to-cart with the primary colour, !important included.
+    dismiss.style.setProperty('background-color', 'transparent', 'important');
+    dismiss.style.setProperty('color', 'inherit', 'important');
+    dismiss.style.setProperty('border', '0', 'important');
+    dismiss.style.setProperty('padding', '0', 'important');
+    dismiss.style.setProperty('line-height', '1', 'important');
+    // 24x24 is the WCAG 2.5.8 target minimum. It only ever applies while a
+    // message is showing, so the card itself is not resized by it.
+    dismiss.style.setProperty('min-width', '24px', 'important');
+    dismiss.style.setProperty('min-height', '24px', 'important');
+    dismiss.style.setProperty('display', 'inline-flex', 'important');
+    dismiss.style.setProperty('align-items', 'center', 'important');
+    dismiss.style.setProperty('justify-content', 'center', 'important');
+    dismiss.style.setProperty('flex', '0 0 auto', 'important');
+    dismiss.style.cursor = 'pointer';
+    dismiss.addEventListener('click', function() {
+        tgClearQuantityError(qtyInput);
+        qtyInput.focus();
+    });
+    box.appendChild(dismiss);
+
+    wrapper.insertAdjacentElement('afterend', box);
+    tgQuantityErrorBoxes.set(qtyInput, box);
+
+    qtyInput.setAttribute('aria-invalid', 'true');
+    qtyInput.setAttribute('aria-describedby', box.id);
+    qtyInput.focus();
+
+    // Clear the message as soon as the field holds something addable again.
+    if (!qtyInput.dataset.tgQtyWatch) {
+        qtyInput.dataset.tgQtyWatch = '1';
+        qtyInput.addEventListener('input', function() {
+            if (tgReadQuantity(qtyInput).valid) {
+                tgClearQuantityError(qtyInput);
+            }
+        });
+    }
+}
+
+/**
+ * Remove a field's validation message, if it has one.
+ */
+function tgClearQuantityError(qtyInput) {
+    if (!qtyInput) return;
+
+    const box = tgQuantityErrorBoxes.get(qtyInput);
+    if (box && box.parentNode) {
+        box.parentNode.removeChild(box);
+    }
+    tgQuantityErrorBoxes.delete(qtyInput);
+
+    qtyInput.removeAttribute('aria-invalid');
+    qtyInput.removeAttribute('aria-describedby');
+}
+
+/**
  * Setup cart buttons for inventory grid
  */
 function setupInventoryCartButtons(container, locationId) {
     const addButtons = container.querySelectorAll('.add-cart');
     addButtons.forEach(button => {
+        // The location a later setup call resolved still wins, but the handler
+        // itself is bound once and only once.
+        if (locationId) {
+            button.dataset.tgLocationId = locationId;
+        }
+
+        // Every level of the grid carries .tapgoods-inventory -- #tg-shop, the row
+        // wrapper and each card -- and initInventoryGrid() loops over all of them,
+        // so a button used to collect one handler per ancestor, times the number of
+        // times init ran (six on a plain shop page). Six handlers meant six
+        // alert()s per click: the "error you cannot close" of WPB-168.
+        if (button.dataset.tgCartBound) return;
+        button.dataset.tgCartBound = '1';
+
         button.addEventListener('click', function(event) {
-            handleInventoryAddToCart(event, locationId);
+            handleInventoryAddToCart(event, button.dataset.tgLocationId || locationId);
         });
     });
 }
@@ -594,18 +790,21 @@ function handleInventoryAddToCart(event, locationId) {
     const qtyInput = container.querySelector(`#qty-${itemId}`);
     
     if (!qtyInput) {
-        alert("Quantity input field is missing.");
+        // Nothing a visitor can do about this one, so it goes to the console
+        // rather than into a blocking dialog. WPB-180 is what stops it happening.
+        console.error('TapGoods: quantity input missing for item', itemId);
         return;
     }
-    
-    const quantityValue = qtyInput.value.trim();
-    if (!quantityValue || isNaN(quantityValue) || parseInt(quantityValue, 10) <= 0) {
-        alert("Please enter a valid quantity.");
+
+    const parsedQty = tgReadQuantity(qtyInput);
+    if (!parsedQty.valid) {
+        tgShowQuantityError(qtyInput, parsedQty.message);
         return;
     }
-    
-    const quantity = parseInt(quantityValue, 10);
-    
+
+    tgClearQuantityError(qtyInput);
+    const quantity = parsedQty.quantity;
+
     // Update localStorage with cart data
     const cartData = JSON.parse(localStorage.getItem("cartData")) || {};
     if (!cartData[locationId]) {
@@ -659,9 +858,10 @@ function resetCartButton(button, qtyInput, itemId, locationId) {
     button.textContent = "Add";
     button.style.removeProperty("background-color");
     button.disabled = false;
-    
+
     if (qtyInput) {
-        qtyInput.value = "";
+        // Back to the default, not to an empty field (WPB-168).
+        qtyInput.value = TG_DEFAULT_QTY;
     }
 }
 
@@ -907,18 +1107,28 @@ function initProductCartData(itemId, locationId, addButton, quantityInput) {
  * Setup add to cart button functionality
  */
 function setupAddToCartButton(addButton, quantityInput, itemId, locationId) {
+    // initProductSingle() runs twice on a product page -- once from the module's
+    // own DOMContentLoaded and once from the inline script Tapgoods_Enqueue adds --
+    // so without this the button carried two handlers and an invalid quantity
+    // produced two alerts (WPB-168).
+    if (addButton.dataset.tgCartBound) return;
+    addButton.dataset.tgCartBound = '1';
+
     addButton.addEventListener("click", function (event) {
         event.preventDefault();
-        
+
         const url = this.getAttribute("data-target");
-        const quantity = quantityInput.value || 1;
-        
+
         // Validate quantity
-        if (!quantity || isNaN(quantity) || quantity <= 0) {
-            alert("Please enter a valid quantity.");
+        const parsedQty = tgReadQuantity(quantityInput);
+        if (!parsedQty.valid) {
+            tgShowQuantityError(quantityInput, parsedQty.message);
             return;
         }
-        
+
+        tgClearQuantityError(quantityInput);
+        const quantity = parsedQty.quantity;
+
         if (!locationId || !itemId) {
             console.error("TapGoods: Invalid locationId or itemId:", { locationId, itemId });
             return;
@@ -986,9 +1196,10 @@ function updateCartButton(button, isAdded) {
             
             const quantityInput = document.querySelector(".qty-input");
             if (quantityInput) {
-                quantityInput.value = "";
+                // Back to the default, not to an empty field (WPB-168).
+                quantityInput.value = TG_DEFAULT_QTY;
             }
-            
+
             // Remove from cart data
             removeFromCartData(button);
         }, 10000);
@@ -1178,12 +1389,19 @@ function initSearchInstance(searchInput) {
                     inventoryGrid.replaceWith(newGrid);
                     // Update reference after replace
                     const updatedGrid = getInventoryGrid() || newGrid;
-                    setupInventoryCartButtons(updatedGrid, locationId);
                     // keep processing so pagination renders
                     inventoryGrid = updatedGrid;
                 } else if (Array.isArray(data.data.results)) {
                     inventoryGrid.innerHTML = buildInventoryGridHtml(data.data.results, showPricing);
                 }
+                // One pass over the refreshed grid, in the order a first page load
+                // uses: restore what this visitor already has in the cart, then
+                // bind. The restore used to be missing here, so after a search or a
+                // page change an item already in the cart at 5 came back showing the
+                // freshly defaulted 1 with an enabled "Add" -- and one click on that
+                // sends quantity=1 (WPB-168). Once per refresh, not once per
+                // container that happens to match .tapgoods-inventory.
+                updateCartItemsOnLoad(inventoryGrid, locationId);
                 setupInventoryCartButtons(inventoryGrid, locationId);
             }
             // Render/update pagination below the grid (abajo del todo)
@@ -1316,7 +1534,7 @@ function buildInventoryGridHtml(items, showPricing = true) {
                 ${priceHtml}
                 <a class="d-block item-name mb-2" href="${itemUrl}"><strong>${item.title || ''}</strong></a>
                 <div class="add-to-cart">
-                    <input class="qty-input form-control round" type="text" placeholder="Qty" id="qty-${item.tg_id}">
+                    <input class="qty-input form-control round" type="text" inputmode="numeric" placeholder="Qty" value="1" id="qty-${item.tg_id}">
                     <button type="button" data-item-id="${item.tg_id}" class="btn btn-primary add-cart">Add</button>
                 </div>
             </div>
