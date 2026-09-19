@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const { pageUrl, itemCards, categoryLinks } = require('./helpers');
+const { pageUrl, withQuery, itemCards, categoryLinks } = require('./helpers');
 
 /**
  * Shop page with inventory grid, from the pre-release QA checklist.
@@ -55,7 +55,7 @@ test.describe('shop grid', () => {
   });
 
   test('All Categories clears the filter', async ({ page, request }) => {
-    await page.goto((await pageUrl(request, 'shop')) + '&category=tables');
+    await page.goto(withQuery(await pageUrl(request, 'shop'), 'category=tables'));
     await expect(itemCards(page)).toHaveCount(1);
 
     await page.locator('a.category-link[data-category-id=""]').click();
