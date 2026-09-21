@@ -54,7 +54,7 @@ class Tapgoods_Enqueue {
                 'tapgoods-admin-complete',
                 plugin_dir_url(dirname(__FILE__)) . 'admin/js/tapgoods-admin-complete.js',
                 array('jquery', 'wp-color-picker'),
-                TAPGOODSWP_VERSION,
+                tapgrein_asset_version('admin/js/tapgoods-admin-complete.js'),
                 true
             );
 
@@ -84,15 +84,15 @@ class Tapgoods_Enqueue {
                 'tapgoods-admin',
                 plugin_dir_url(dirname(__FILE__)) . 'admin/css/tapgoods-admin.css',
                 array(),
-                TAPGOODSWP_VERSION
+                tapgrein_asset_version('admin/css/tapgoods-admin.css')
             );
-            
+
             // Enqueue complete styles (includes all inline styles refactored)
             wp_enqueue_style(
                 'tapgoods-complete-styles',
                 plugin_dir_url(dirname(__FILE__)) . 'assets/css/tapgoods-complete-styles.css',
                 array('tapgoods-admin'),
-                TAPGOODSWP_VERSION
+                tapgrein_asset_version('assets/css/tapgoods-complete-styles.css')
             );
             
             // Add dynamic admin styles
@@ -118,16 +118,16 @@ class Tapgoods_Enqueue {
                 'tapgoods-global-styles',
                 plugin_dir_url(dirname(__FILE__)) . 'public/css/global-styles.css',
                 array(),
-                TAPGOODSWP_VERSION,
+                tapgrein_asset_version('public/css/global-styles.css'),
                 'all'
             );
-            
+
             // Enqueue complete public script
             wp_enqueue_script(
                 'tapgoods-public-complete',
                 plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-complete.js',
                 array('jquery'),
-                TAPGOODSWP_VERSION . '-search-fix',
+                tapgrein_asset_version('public/js/tapgoods-public-complete.js'),
                 true
             );
 
@@ -155,7 +155,7 @@ class Tapgoods_Enqueue {
                 'tapgoods-complete-styles',
                 plugin_dir_url(dirname(__FILE__)) . 'assets/css/tapgoods-complete-styles.css',
                 array(),
-                TAPGOODSWP_VERSION
+                tapgrein_asset_version('assets/css/tapgoods-complete-styles.css')
             );
         }
     }

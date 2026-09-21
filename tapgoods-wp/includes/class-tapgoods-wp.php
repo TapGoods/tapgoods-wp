@@ -39,6 +39,7 @@ class Tapgoods {
 			'includes/class-tapgoods-i18n.php',           // Loads text domain for localization
 			'includes/tapgoods-core-functions.php',       // Core functions for admin and public
 			'includes/tapgoods-formatting-functions.php', // Core functions for admin and public
+			'includes/tapgoods-asset-functions.php',      // Cache-busting asset version helper
 			'includes/class-tapgoods-shortcodes.php',     // Registers Shortcodes
 			'includes/class-tapgoods-post-types.php',     // Regusters Taxonomies and Post Types
 			'public/class-tapgoods-public.php',           // Class for frontend features
@@ -69,7 +70,7 @@ class Tapgoods {
 	}
 
 	private function define_admin_hooks() {
-		$this->plugin_admin = new Tapgoods_Admin( $this->get_plugin_name(), $this->get_version() );
+		$this->plugin_admin = new Tapgoods_Admin( $this->get_plugin_name() );
 
 		$this->loader->add_action( 'current_screen', $this->plugin_admin, 'conditional_includes', 10, 0 );
 		// Re-enabled temporarily to ensure functionality works
@@ -97,7 +98,7 @@ class Tapgoods {
 
 	private function define_public_hooks() {
 
-		$plugin_public = new Tapgoods_Public( $this->get_plugin_name(), $this->get_version() );
+		$plugin_public = new Tapgoods_Public( $this->get_plugin_name() );
 
 		// Re-enabled temporarily to ensure functionality works
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
