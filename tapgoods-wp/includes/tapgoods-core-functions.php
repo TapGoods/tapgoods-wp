@@ -1449,7 +1449,7 @@ function tapgrein_enqueue_tag_page_scripts() {
             'tapgoods-public-complete',
             plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-complete.js',
             array('jquery'),
-            tapgrein_asset_version('public/js/tapgoods-public-complete.js'),
+            '0.1.124-tag-fix',
             true
         );
         

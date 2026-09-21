@@ -46,7 +46,7 @@ class Tapgoods_Admin {
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-				wp_enqueue_style(
+			wp_enqueue_style(
 				$this->plugin_name . '-bootstrap',
 				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css',
 				array(),
