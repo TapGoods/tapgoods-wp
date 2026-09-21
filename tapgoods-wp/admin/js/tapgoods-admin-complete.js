@@ -465,7 +465,16 @@ function initAdminShortcodes() {
             console.error("TapGoods Admin: Input element not found with ID: " + elementId);
             return;
         }
-        
+
+        // Read from the authoritative data-shortcode attribute first (see WPB-167:
+        // a form input here could be silently overwritten by a browser password
+        // manager / autofill, which copied the wrong value). Fall back to .value /
+        // .textContent so this stays backward-compatible with any other element
+        // copyText() might be pointed at.
+        const textToCopy = (input.dataset && typeof input.dataset.shortcode === 'string')
+            ? input.dataset.shortcode
+            : (typeof input.value === 'string' && input.value !== '' ? input.value : (input.textContent || '').trim());
+
         const button = document.querySelector(`button[onclick*="${elementId}"]`);
         const originalButtonContent = button ? button.innerHTML : null;
         
@@ -485,8 +494,8 @@ function initAdminShortcodes() {
         
         // Try modern clipboard API first
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(input.value).then(() => {
-                console.log("TapGoods Admin: Copied to clipboard: " + input.value);
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                console.log("TapGoods Admin: Copied to clipboard: " + textToCopy);
                 showCopyFeedback(true);
             }).catch(err => {
                 console.error("TapGoods Admin: Modern clipboard failed: ", err);
@@ -502,7 +511,7 @@ function initAdminShortcodes() {
             try {
                 // Create a temporary textarea element
                 const tempTextarea = document.createElement('textarea');
-                tempTextarea.value = input.value;
+                tempTextarea.value = textToCopy;
                 tempTextarea.style.position = 'fixed';
                 tempTextarea.style.left = '-999999px';
                 tempTextarea.style.top = '-999999px';
@@ -517,7 +526,7 @@ function initAdminShortcodes() {
                 document.body.removeChild(tempTextarea);
                 
                 if (successful) {
-                    console.log("TapGoods Admin: Copied using fallback method: " + input.value);
+                    console.log("TapGoods Admin: Copied using fallback method: " + textToCopy);
                     showCopyFeedback(true);
                 } else {
                     console.error("TapGoods Admin: Fallback copy command failed");
@@ -529,6 +538,25 @@ function initAdminShortcodes() {
             }
         }
     };
+
+    // A real <input> selects its text as soon as you tab to it; a <span> (used here
+    // instead so nothing on this tab is a form control autofill can target -- see
+    // WPB-167) has no such built-in behaviour. Do it by hand so a keyboard-only user
+    // who tabs to one of these boxes can select-all + Ctrl/Cmd+C without touching the
+    // mouse or the copy button. `user-select: all` (tg-admin-shortcode-display.css)
+    // covers the mouse-drag case; this covers focus.
+    document.querySelectorAll('[data-shortcode]').forEach(function (el) {
+        el.addEventListener('focus', function () {
+            const selection = window.getSelection();
+            if (!selection) {
+                return;
+            }
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        });
+    });
 }
 
 /**

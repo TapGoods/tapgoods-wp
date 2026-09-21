@@ -26,7 +26,7 @@ that quietly disagrees with the tests is worse than no checklist.
 | Connection tab: email link | manual | mailto, nothing to assert |
 | Connection tab: Reset to Default, TapGoods link opens in new tab | browser | |
 | Connection tab: Reset to Default, does it reconnect | **manual, destructive** | See the warning below |
-| Shortcodes tab: copy to clipboard | browser | Clipboard permission needed |
+| Shortcodes tab: copy to clipboard | **auto** | `e2e/tests/admin-shortcodes.spec.js` (WPB-167: also proves the boxes can't be overwritten by autofill) |
 | Shortcodes tab: click menu link | browser | |
 | Multilocation: change default location updates the front end | **auto** | `LocationAndCartUrlTest` (precedence); browser for the click-through |
 | Multilocation: change default location updates the cart link | **auto** | `LocationAndCartUrlTest` |
