@@ -2,36 +2,33 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
-// Debug log to verify this template is being used
-error_log('TapGoods: Tag results template loaded - tg-tag-results.php');
+/**
+ * Tag archive fallback, used only on a site with no [tapgoods-inventory] page.
+ *
+ * Where a shop page exists, tapgrein_redirect_tag_archives() has already sent
+ * the visitor there with ?tags=<slug> and this file never runs.
+ */
 
-global $wp;
-
-// Get the tag from url
-$request_uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field(wp_unslash($_SERVER['REQUEST_URI'])) : '';
-$segments = explode('/', trim($request_uri, '/'));
-$tag = '';
-
-// Find 'tags' in segments and get the next segment
-$tags_index = array_search('tags', $segments);
-if ($tags_index !== false && isset($segments[$tags_index + 1])) {
-    $tag = sanitize_text_field($segments[$tags_index + 1]);
-}
+// The queried term, not the URL. Parsing REQUEST_URI for the literal segment
+// 'tags' broke on any site that changed the tag permalink base on
+// Settings > Permalinks (tg_tag_base), which is a supported setting.
+$queried = get_queried_object();
+$tag     = ( $queried instanceof WP_Term && 'tg_tags' === $queried->taxonomy ) ? $queried->slug : '';
 
 // Set up inventory display similar to tg-inventory.php
 $show_search = true;
 $show_filters = true;
 $show_pricing = 'show_pricing="true"';
 $per_page_default = 'per_page_default="14"';
-$tags_attribute = !empty($tag) ? 'tags="' . esc_attr($tag) . '"' : '';
+// NOT esc_attr(): this is shortcode source, not an HTML attribute. esc_attr()
+// turns the quotes into &quot;, which the shortcode parser then reads as part of
+// the value, so the grid looked for a term slug of tag-&quot;tag-x&quot; and
+// rendered an empty grid -- the WPB-166 symptom.
+$tags_attribute = !empty($tag) ? 'tags="' . tapgrein_sanitize_slug_list($tag) . '"' : '';
 
-$tg_inventory_grid_class = $show_filters 
-    ? 'col-sm-8 col-xs-12' 
+$tg_inventory_grid_class = $show_filters
+    ? 'col-sm-8 col-xs-12'
     : 'col-sm-12 col-xs-12';
-
-// Debug log
-error_log('TapGoods: Tag results - Found tag: ' . $tag . ', Grid class: ' . $tg_inventory_grid_class);
-error_log('TapGoods: Tag results - Tags attribute: ' . $tags_attribute);
 
 // Force load TapGoods styles directly for tag pages
 // Build correct plugin URLs
@@ -130,11 +127,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
     <?php if ( false !== $show_search ) : ?>
         <?php
-        echo do_shortcode( 
-            '[tapgoods-search nos="true" ' . esc_attr($show_pricing) . ' ' . 
-            esc_attr($tags_attribute) . ' ' . 
-            esc_attr($per_page_default) . ']' 
-        ); 
+        echo do_shortcode(
+            '[tapgoods-search nos="true" ' . $show_pricing . ' ' .
+            $tags_attribute . ' ' .
+            $per_page_default . ']'
+        );
         ?>
     <?php endif; ?>
     <div class="container shop">
@@ -145,11 +142,11 @@ document.addEventListener('DOMContentLoaded', function() {
             <section class="<?php echo esc_attr( $tg_inventory_grid_class ); ?>" id="tg-inventory-grid-container">
                 <div id="tg-inventory-grid">
                     <?php 
-                    echo do_shortcode( 
-                        '[tapgoods-inventory-grid ' . esc_attr($per_page_default) . ' ' . 
-                        esc_attr($show_pricing) . ' ' . 
-                        esc_attr($tags_attribute) . ']' 
-                    ); 
+                    echo do_shortcode(
+                        '[tapgoods-inventory-grid ' . $per_page_default . ' ' .
+                        $show_pricing . ' ' .
+                        $tags_attribute . ']'
+                    );
                     ?>
                 </div>
             </section>

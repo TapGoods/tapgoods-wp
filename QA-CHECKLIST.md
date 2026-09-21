@@ -55,7 +55,10 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Item | Status | Where |
 |---|---|---|
 | Can't edit (only delete) | browser | |
-| View takes you to the filtered inventory grid | auto | `ParseRequestRoutingTest` for the routing; browser for the click |
+| View takes you to the filtered inventory grid | **auto** | `TagArchiveRoutingTest` for the routing and the filtered destination, `e2e/tests/tag-routing.spec.js` for the click (WPB-166) |
+
+Both tag lines claimed `ParseRequestRoutingTest`, which only ever covered
+`tg_category`: nothing routed a tag at all, and a tag URL rendered an empty grid.
 
 ## Front end
 
@@ -93,7 +96,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Item | Status | Where |
 |---|---|---|
 | Mobile-responsive | browser | |
-| Tags return you to the inventory grid | auto | `ParseRequestRoutingTest` |
+| Tags return you to the inventory grid | **auto** | `TagArchiveRoutingTest`, and clicked for real in `e2e/tests/tag-routing.spec.js` (WPB-166) |
 | Multiple images: clickable thumbnails, arrows work | browser | |
 | Accordion shortcode renders | browser | Third-party plugin |
 
