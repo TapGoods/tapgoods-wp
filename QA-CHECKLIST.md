@@ -73,6 +73,9 @@ Both tag lines claimed `ParseRequestRoutingTest`, which only ever covered
 | Only categories are shown, not subcategories | **auto** | `CategoryTaxonomyContractTest` |
 | Only categories in the selected location show | **auto** | `ShopCategoryMenuTest` |
 | Categories accordion starts closed on mobile, open on desktop | **auto** | `e2e/tests/category-accordion.spec.js` for what the visitor gets, `CategoryFilterMarkupTest` for the markup being identical for both so a page cache cannot serve the wrong one |
+| Quantity starts at 1, and Add with the default adds one | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js` (WPB-168); server-rendered, so it is the same for every visitor of a cached page |
+| An unusable quantity gets one dismissible inline message, never a native alert | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js` (WPB-168) |
+| Add runs once per click, on a refreshed grid and on a page of several grids | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js`, "the Add handler runs once per click": it counts each run's cart write, since one message is shown however many handlers fired. Its last test removes the bind-once guards from the served script and checks the count goes up, so the measurement cannot stop measuring |
 
 ### Multilocation
 
@@ -136,7 +139,7 @@ Both tag lines claimed `ParseRequestRoutingTest`, which only ever covered
 |---|---|---|
 | Sign in / sign up / cart links redirect to the right location | **auto** | `LocationAndCartUrlTest` |
 | Empty cart redirect and "Add More Items to Order" | browser | |
-| Add to cart UI: quantity and green button clear after 10s | browser | Timing, browser only |
+| Add to cart UI: green button clears after 10s and the quantity returns to 1 | browser | Timing, browser only. The value it returns to is pinned by `e2e/tests/add-to-cart-qty.spec.js` (WPB-168) |
 | Returns you to the same page | browser | |
 | Cart icon turns to a plus and stays | browser | |
 | Place an order, shows in TapGoods | **manual** | Real order in a real account |

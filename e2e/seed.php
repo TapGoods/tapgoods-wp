@@ -74,6 +74,13 @@ $pages = array(
 	// a "browse everything" page. Every grid renders the same element ids, which
 	// is what WPB-180 tripped over.
 	'shop-multi'          => '[tapgoods-inventory category="tables"][tapgoods-inventory category="chairs"]',
+	// The harder multi-grid shape: two grids holding the SAME items, so every
+	// per-item id in the page exists twice. shop-multi cannot catch an id
+	// collision because its two grids have disjoint catalogues.
+	'shop-duplicate'      => '[tapgoods-inventory][tapgoods-inventory]',
+	// One item per page, so pagination actually renders against a two-item
+	// fixture catalogue and the AJAX paging path can be clicked.
+	'shop-paged'          => '[tapgoods-inventory per_page_default="1"]',
 	// A page the site curated to one tag. A visitor appending ?tags= must not be
 	// able to re-point it (the WPB-166 precedence rule: attribute beats URL).
 	'shop-tag-curated'    => '[tapgoods-inventory tags="tag-round-tables"]',
