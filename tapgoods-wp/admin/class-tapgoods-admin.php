@@ -12,13 +12,14 @@
 class Tapgoods_Admin {
 
 	private $plugin_name;
-	private $version;
 	private $filesystem;
 
-	public function __construct( $plugin_name, $version ) {
+	// No longer takes a $version param: every asset enqueue that used to read a stored
+	// TAPGOODSWP_VERSION now versions itself via tapgrein_asset_version() instead (see
+	// includes/tapgoods-asset-functions.php).
+	public function __construct( $plugin_name ) {
 
 		$this->plugin_name = $plugin_name;
-		$this->version     = $version;
 	}
 
 	public function conditional_includes() {
@@ -41,19 +42,15 @@ class Tapgoods_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles( $hook ) {
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), $this->version, 'all' );
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), tapgrein_asset_version( 'admin/css/tapgoods-admin.css' ), 'all' );
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-			$bootstrap_version = file_exists( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				? filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				: '1.0';
-
-				wp_enqueue_style( 
-				$this->plugin_name . '-bootstrap', 
-				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', 
-				array(), 
-				$bootstrap_version 
+			wp_enqueue_style(
+				$this->plugin_name . '-bootstrap',
+				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css',
+				array(),
+				tapgrein_asset_version( 'assets/css/tg-bootstrap.css' )
 			);
 
 			wp_enqueue_style( 
@@ -75,7 +72,7 @@ class Tapgoods_Admin {
 	public function enqueue_scripts( $hook ) {
 		if ( 'toplevel_page_tapgoods' === $hook ) {
 
-			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), $this->version, false );
+			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), tapgrein_asset_version( 'admin/js/tapgoods-admin.js' ), false );
 			wp_localize_script(
 				$this->plugin_name . '-admin',
 				'tg_ajax',

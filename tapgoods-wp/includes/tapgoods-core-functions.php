@@ -873,7 +873,7 @@ function tapgrein_disable_gutenberg_editing() {
             'disable-gutenberg-editing',
             plugins_url( 'public/js/disable-gutenberg-editing.js', dirname( __FILE__ ) ), // Mejor manejo de la URL
             array( 'wp-blocks', 'wp-dom' ),
-            filemtime( plugin_dir_path( __FILE__ ) . '../public/js/disable-gutenberg-editing.js' ), // Usa el timestamp del archivo como versión
+            tapgrein_asset_version( 'public/js/disable-gutenberg-editing.js' ), // Cache-busts on file change; falls back safely if the file is ever missing
             true
         );
         

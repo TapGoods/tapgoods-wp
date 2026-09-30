@@ -42,11 +42,11 @@ $inline_styles_url = '/wp-content/plugins/tapgoods-wp/assets/css/tapgoods-inline
 $custom_css_url = '/wp-content/plugins/tapgoods-wp/public/css/tapgoods-custom.css';
 
 // Load styles that work well for tag pages (excluding tg-bootstrap.css that conflicts)
-echo '<link rel="stylesheet" href="' . esc_url($global_styles_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
-echo '<link rel="stylesheet" href="' . esc_url($public_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
-echo '<link rel="stylesheet" href="' . esc_url($complete_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
-echo '<link rel="stylesheet" href="' . esc_url($inline_styles_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
-echo '<link rel="stylesheet" href="' . esc_url($custom_css_url) . '?v=0.1.124-tag-direct" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($global_styles_url . '?v=' . tapgrein_asset_version('public/css/global-styles.css')) . '" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($public_css_url . '?v=' . tapgrein_asset_version('public/css/tapgoods-public.css')) . '" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($complete_css_url . '?v=' . tapgrein_asset_version('assets/css/tapgoods-complete-styles.css')) . '" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($inline_styles_url . '?v=' . tapgrein_asset_version('assets/css/tapgoods-inline-styles.css')) . '" type="text/css" media="all">';
+echo '<link rel="stylesheet" href="' . esc_url($custom_css_url . '?v=' . tapgrein_asset_version('public/css/tapgoods-custom.css')) . '" type="text/css" media="all">';
 
 // Add location-specific dynamic styles (colors, themes, etc.)
 $location_styles = tapgrein_location_styles();
@@ -64,7 +64,7 @@ wp_enqueue_script(
     'tapgoods-public-complete',
     plugin_dir_url(dirname(dirname(__FILE__))) . 'public/js/tapgoods-public-complete.js',
     array('jquery'),
-    '0.1.124-tag-inline',
+    tapgrein_asset_version('public/js/tapgoods-public-complete.js'),
     true
 );
 

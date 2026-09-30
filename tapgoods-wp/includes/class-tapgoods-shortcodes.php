@@ -84,7 +84,7 @@ class Tapgoods_Shortcodes {
 				'tapgoods-public',
 				plugin_dir_url(dirname(__FILE__)) . 'public/css/tapgoods-public.css',
 				array(),
-				TAPGOODSWP_VERSION
+				tapgrein_asset_version('public/css/tapgoods-public.css')
 			);
 		}
 
@@ -94,7 +94,7 @@ class Tapgoods_Shortcodes {
 				'tapgoods-custom',
 				plugin_dir_url(dirname(__FILE__)) . 'public/css/tapgoods-custom.css',
 				array(),
-				TAPGOODSWP_VERSION
+				tapgrein_asset_version('public/css/tapgoods-custom.css')
 			);
 		}
 
@@ -104,7 +104,7 @@ class Tapgoods_Shortcodes {
 				'tapgoods-inline-styles',
 				plugin_dir_url(dirname(__FILE__)) . 'assets/css/tapgoods-inline-styles.css',
 				array(),
-				TAPGOODSWP_VERSION
+				tapgrein_asset_version('assets/css/tapgoods-inline-styles.css')
 			);
 		}
 
@@ -125,7 +125,7 @@ class Tapgoods_Shortcodes {
 				'tapgoods-public-inline',
 				plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-public-inline.js',
 				array('jquery'),
-				TAPGOODSWP_VERSION,
+				tapgrein_asset_version('public/js/tapgoods-public-inline.js'),
 				true
 			);
 
@@ -151,7 +151,7 @@ class Tapgoods_Shortcodes {
 					'tapgoods-cart-init',
 					plugin_dir_url(dirname(__FILE__)) . 'public/js/tapgoods-cart-init.js',
 					array(),
-					TAPGOODSWP_VERSION,
+					tapgrein_asset_version('public/js/tapgoods-cart-init.js'),
 					true
 				);
 				error_log('TapGoods: Successfully enqueued tapgoods-cart-init.js');
