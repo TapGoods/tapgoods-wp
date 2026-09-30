@@ -22,6 +22,12 @@ WP_CLI::log( 'Seeding TapGoods e2e fixtures...' );
 update_option( 'tg_api_connected', '1' );
 update_option( 'tg_last_api_key', 'e2e-mock-key' );
 
+// Turn on the Advanced tab so e2e/tests/admin-shortcodes.spec.js can assert the
+// tg_ttl field carries autocomplete="off" (WPB-167 follow-up: it is a saved field,
+// not a login field, and it becomes the only text-like input on the page besides the
+// API key once that tab is visible). The tab is hidden by default in production.
+update_option( 'tg_enable_advanced', '1' );
+
 // 2. Location settings the storefront templates read (cart links, location select).
 $locations = array( 5001, 5002 );
 update_option( 'tg_locationIds', $locations );
