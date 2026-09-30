@@ -42,11 +42,11 @@ $base_url = tapgrein_get_add_to_cart_url( $location_id );
 // Sanitize category to remove any unwanted characters
 $category = isset($atts['category']) ? preg_replace('/^(category=)?["“”]?|["“”]?$/', '', $atts['category']) : ''; 
 
-$tags_from_url = isset($_GET['tg_tags']) ? sanitize_text_field(wp_unslash($_GET['tg_tags'])) : '';
-$tags_from_atts = isset($atts['tags']) ? sanitize_text_field($atts['tags']) : '';
-
-
-$tags = !empty($tags_from_url) ? $tags_from_url : $tags_from_atts;
+// One resolver, shared with tg-inventory.php and the grid: attribute first,
+// then the URL. Deliberately NOT sanitize_text_field(), which strips percent
+// octets and so erased the whole slug of any non-latin tag, leaving the hidden
+// field empty and the AJAX search returning the entire catalog.
+$tags = tapgrein_resolve_tag_filter(isset($atts) ? $atts : array());
 
 
 // Get the current URL
@@ -83,7 +83,7 @@ do_action('tg_before_search_form');
 
         <input type="hidden" name="tg_location_id" value="<?php echo esc_attr($location_id); ?>">
         <input type="hidden" name="category" value="<?php echo esc_attr($category); ?>">
-        <input type="hidden" name="tags" value="<?php echo esc_attr($atts['tags'] ?? ''); ?>">
+        <input type="hidden" name="tags" value="<?php echo esc_attr($tags); ?>">
         <input type="hidden" name="per_page_default" value="<?php echo esc_attr($tg_per_page); ?>">
         <input type="hidden" name="show_pricing" value="<?php echo esc_attr($show_pricing ? 'true' : 'false'); ?>">
     </form>

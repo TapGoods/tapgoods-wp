@@ -791,6 +791,13 @@ function setupInventoryPagination() {
     // This function now only handles pagination
 
     // Handle category clicks (keeping for backward compatibility)
+    //
+    // Three separate handlers end up bound to the same .category-link: this one,
+    // initCategoryMenu()'s, and tg-filter.php's inline one. They all navigate, so
+    // whichever runs last decides the URL -- and this one was the only one that
+    // left ?tags= in place. Now that a tag filter is actually reachable
+    // (WPB-166), that meant clicking a category from a tag-filtered grid gave you
+    // category AND tag, which is not what either of the other two do.
     categoryLinks.forEach(link => {
         link.addEventListener("click", function(event) {
             event.preventDefault();
@@ -800,6 +807,7 @@ function setupInventoryPagination() {
             if (selectedCategory === null || selectedCategory === "") {
                 const urlParams = new URLSearchParams(window.location.search);
                 urlParams.delete('category');
+                urlParams.delete('tags');
                 urlParams.delete('paged');
                 window.location.search = urlParams.toString();
                 return;
@@ -807,6 +815,7 @@ function setupInventoryPagination() {
             
             const urlParams = new URLSearchParams(window.location.search);
             urlParams.set('category', selectedCategory);
+            urlParams.delete('tags'); // A category click replaces the tag filter.
             urlParams.delete('paged'); // Reset pagination
             
             window.location.search = urlParams.toString();
