@@ -22,6 +22,12 @@ WP_CLI::log( 'Seeding TapGoods e2e fixtures...' );
 update_option( 'tg_api_connected', '1' );
 update_option( 'tg_last_api_key', 'e2e-mock-key' );
 
+// Turn on the Advanced tab so e2e/tests/admin-shortcodes.spec.js can assert the
+// tg_ttl field carries autocomplete="off" (WPB-167 follow-up: it is a saved field,
+// not a login field, and it becomes the only text-like input on the page besides the
+// API key once that tab is visible). The tab is hidden by default in production.
+update_option( 'tg_enable_advanced', '1' );
+
 // 2. Location settings the storefront templates read (cart links, location select).
 $locations = array( 5001, 5002 );
 update_option( 'tg_locationIds', $locations );
@@ -74,6 +80,16 @@ $pages = array(
 	// a "browse everything" page. Every grid renders the same element ids, which
 	// is what WPB-180 tripped over.
 	'shop-multi'          => '[tapgoods-inventory category="tables"][tapgoods-inventory category="chairs"]',
+	// The harder multi-grid shape: two grids holding the SAME items, so every
+	// per-item id in the page exists twice. shop-multi cannot catch an id
+	// collision because its two grids have disjoint catalogues.
+	'shop-duplicate'      => '[tapgoods-inventory][tapgoods-inventory]',
+	// One item per page, so pagination actually renders against a two-item
+	// fixture catalogue and the AJAX paging path can be clicked.
+	'shop-paged'          => '[tapgoods-inventory per_page_default="1"]',
+	// A page the site curated to one tag. A visitor appending ?tags= must not be
+	// able to re-point it (the WPB-166 precedence rule: attribute beats URL).
+	'shop-tag-curated'    => '[tapgoods-inventory tags="tag-round-tables"]',
 	'tg-cart'             => '[tapgoods-cart]',
 );
 
@@ -103,14 +119,35 @@ foreach ( $pages as $slug => $content ) {
 	WP_CLI::log( "Created page /{$slug}/" );
 }
 
-// PLAIN permalinks on purpose. The wp-env web container is nginx with no
-// try_files rule, so every pretty permalink returns a bare 404 before the request
-// ever reaches WordPress; /sample-page/ 404s too, so this is the environment and
-// not the plugin. The specs therefore address pages as /?page_id=N, discovered
-// through the REST API rather than hardcoded. Anything that genuinely needs pretty
-// URLs (tapgrein_parse_request routing) stays with the PHP integration suite,
-// which runs inside WordPress and does not care about the web server.
-update_option( 'permalink_structure', '' );
-flush_rewrite_rules();
+// PRETTY permalinks, because half of what this suite is for only exists under
+// them. A tag URL is /tags/<slug>/ on a customer site, and WPB-166 could not even
+// be reproduced on plain permalinks: the old code parsed the slug out of the path,
+// found nothing there, and the grid's own query var quietly filtered the page
+// correctly. Testing the one configuration where the bug did not appear is how it
+// stayed open.
+//
+// This used to say the web container was nginx with no try_files rule, so pretty
+// permalinks 404'd. That is no longer true -- wp-env serves WordPress through
+// Apache -- but it does need a .htaccess. That file is MOUNTED by .wp-env.json
+// (see e2e/htaccess) rather than generated here: writing it needs permission on
+// the WordPress root, which the wp-cli container has on macOS and does not have
+// on Linux CI, where the directory is root-owned. Generating it passed locally
+// and failed every CI run.
+update_option( 'permalink_structure', '/%postname%/' );
+flush_rewrite_rules( false );
+
+// Check the mount rather than assume it: without the rewrite block every spec
+// fails on a 404, with a confusing error far from the cause. Checked on disk and
+// not over HTTP on purpose -- this runs in the wp-cli container, which cannot
+// reach the host port the browser uses.
+$htaccess = ABSPATH . '.htaccess';
+
+if ( ! file_exists( $htaccess ) || false === strpos( (string) file_get_contents( $htaccess ), 'RewriteRule' ) ) {
+	WP_CLI::error(
+		'No rewrite rules in ' . $htaccess . '. The .htaccess mapping in .wp-env.json is missing or '
+		. 'the environment predates it -- run "npx wp-env destroy && npx wp-env start". Pretty '
+		. 'permalinks would 404 and the browser suite would fail everywhere for this one reason.'
+	);
+}
 
 WP_CLI::success( 'Seeded.' );

@@ -1,7 +1,8 @@
 {
     "plugins": ["./tapgoods-wp"],
     "mappings": {
-        "wp-content/tg-e2e": "./e2e"
+        "wp-content/tg-e2e": "./e2e",
+        ".htaccess": "./e2e/htaccess"
     },
     "config": {
         "TG_MOCK": true,

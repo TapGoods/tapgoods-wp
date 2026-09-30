@@ -69,3 +69,6 @@ dev.php
 /test-results/
 /e2e/test-results/
 /e2e/playwright-report/
+# Saved wp-admin session cookie from the "admin-setup" Playwright project
+# (e2e/tests/admin.setup.js) -- local/CI-run artifact, never a secret worth keeping.
+/e2e/.auth/

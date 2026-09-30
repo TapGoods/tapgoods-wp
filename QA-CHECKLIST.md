@@ -26,7 +26,7 @@ that quietly disagrees with the tests is worse than no checklist.
 | Connection tab: email link | manual | mailto, nothing to assert |
 | Connection tab: Reset to Default, TapGoods link opens in new tab | browser | |
 | Connection tab: Reset to Default, does it reconnect | **manual, destructive** | See the warning below |
-| Shortcodes tab: copy to clipboard | browser | Clipboard permission needed |
+| Shortcodes tab: copy to clipboard | **auto** | `e2e/tests/admin-shortcodes.spec.js` (WPB-167: also proves the boxes can't be overwritten by autofill) |
 | Shortcodes tab: click menu link | browser | |
 | Multilocation: change default location updates the front end | **auto** | `LocationAndCartUrlTest` (precedence); browser for the click-through |
 | Multilocation: change default location updates the cart link | **auto** | `LocationAndCartUrlTest` |
@@ -55,7 +55,10 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Item | Status | Where |
 |---|---|---|
 | Can't edit (only delete) | browser | |
-| View takes you to the filtered inventory grid | auto | `ParseRequestRoutingTest` for the routing; browser for the click |
+| View takes you to the filtered inventory grid | **auto** | `TagArchiveRoutingTest` for the routing and the filtered destination, `e2e/tests/tag-routing.spec.js` for the click (WPB-166) |
+
+Both tag lines claimed `ParseRequestRoutingTest`, which only ever covered
+`tg_category`: nothing routed a tag at all, and a tag URL rendered an empty grid.
 
 ## Front end
 
@@ -70,6 +73,9 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Only categories are shown, not subcategories | **auto** | `CategoryTaxonomyContractTest` |
 | Only categories in the selected location show | **auto** | `ShopCategoryMenuTest` |
 | Categories accordion starts closed on mobile, open on desktop | **auto** | `e2e/tests/category-accordion.spec.js` for what the visitor gets, `CategoryFilterMarkupTest` for the markup being identical for both so a page cache cannot serve the wrong one |
+| Quantity starts at 1, and Add with the default adds one | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js` (WPB-168); server-rendered, so it is the same for every visitor of a cached page |
+| An unusable quantity gets one dismissible inline message, never a native alert | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js` (WPB-168) |
+| Add runs once per click, on a refreshed grid and on a page of several grids | **browser, auto** | `e2e/tests/add-to-cart-qty.spec.js`, "the Add handler runs once per click": it counts each run's cart write, since one message is shown however many handlers fired. Its last test removes the bind-once guards from the served script and checks the count goes up, so the measurement cannot stop measuring |
 
 ### Multilocation
 
@@ -93,7 +99,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 | Item | Status | Where |
 |---|---|---|
 | Mobile-responsive | browser | |
-| Tags return you to the inventory grid | auto | `ParseRequestRoutingTest` |
+| Tags return you to the inventory grid | **auto** | `TagArchiveRoutingTest`, and clicked for real in `e2e/tests/tag-routing.spec.js` (WPB-166) |
 | Multiple images: clickable thumbnails, arrows work | browser | |
 | Accordion shortcode renders | browser | Third-party plugin |
 
@@ -133,7 +139,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 |---|---|---|
 | Sign in / sign up / cart links redirect to the right location | **auto** | `LocationAndCartUrlTest` |
 | Empty cart redirect and "Add More Items to Order" | browser | |
-| Add to cart UI: quantity and green button clear after 10s | browser | Timing, browser only |
+| Add to cart UI: green button clears after 10s and the quantity returns to 1 | browser | Timing, browser only. The value it returns to is pinned by `e2e/tests/add-to-cart-qty.spec.js` (WPB-168) |
 | Returns you to the same page | browser | |
 | Cart icon turns to a plus and stays | browser | |
 | Place an order, shows in TapGoods | **manual** | Real order in a real account |

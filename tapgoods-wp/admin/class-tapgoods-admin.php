@@ -12,13 +12,14 @@
 class Tapgoods_Admin {
 
 	private $plugin_name;
-	private $version;
 	private $filesystem;
 
-	public function __construct( $plugin_name, $version ) {
+	// No longer takes a $version param: every asset enqueue that used to read a stored
+	// TAPGOODSWP_VERSION now versions itself via tapgrein_asset_version() instead (see
+	// includes/tapgoods-asset-functions.php).
+	public function __construct( $plugin_name ) {
 
 		$this->plugin_name = $plugin_name;
-		$this->version     = $version;
 	}
 
 	public function conditional_includes() {
@@ -41,19 +42,49 @@ class Tapgoods_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles( $hook ) {
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), $this->version, 'all' );
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), tapgrein_asset_version( 'admin/css/tapgoods-admin.css' ), 'all' );
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-			$bootstrap_version = file_exists( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				? filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				: '1.0';
+			wp_enqueue_style(
+				$this->plugin_name . '-bootstrap',
+				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css',
+				array(),
+				tapgrein_asset_version( 'assets/css/tg-bootstrap.css' )
+			);
 
-				wp_enqueue_style( 
-				$this->plugin_name . '-bootstrap', 
-				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', 
-				array(), 
-				$bootstrap_version 
+			/*
+			 * WPB-167: the Shortcodes tab boxes moved from <input disabled> (which a
+			 * browser password manager could autofill) to
+			 * <span class="tapgoods-shortcode-display" role="textbox">, so they lost
+			 * Bootstrap's .form-control:disabled look for free (a <span> has no
+			 * :disabled state) and the browser's own default dimming of disabled input
+			 * text. Restored here, scoped to that one class rather than bare
+			 * .form-control. Values match what a real .form-control:disabled input
+			 * computes in this theme: background var(--bs-secondary-bg), #949494 text,
+			 * #cccccc border (the latter two are the browser's UA default for a
+			 * disabled control, not something Bootstrap's CSS sets). min-height: 40px
+			 * (with display:flex/align-items:center to keep the text centered) matches
+			 * wp-admin/css/forms.css's own `input[type=text] { min-height: 40px }`,
+			 * which a <span> never matches on its own, so the box stays the same size
+			 * as before this change.
+			 */
+			wp_add_inline_style(
+				$this->plugin_name . '-bootstrap',
+				'.tapgoods-shortcode-display {
+					background-color: var(--bs-secondary-bg);
+					color: #949494;
+					border-color: #cccccc;
+					display: flex;
+					align-items: center;
+					min-height: 40px;
+					-webkit-user-select: all;
+					user-select: all;
+				}
+				.tapgoods-shortcode-display:focus-visible {
+					outline: 2px solid var(--bs-primary, #0d6efd);
+					outline-offset: 1px;
+				}'
 			);
 
 			wp_enqueue_style( 
@@ -75,7 +106,7 @@ class Tapgoods_Admin {
 	public function enqueue_scripts( $hook ) {
 		if ( 'toplevel_page_tapgoods' === $hook ) {
 
-			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), $this->version, false );
+			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), tapgrein_asset_version( 'admin/js/tapgoods-admin.js' ), false );
 			wp_localize_script(
 				$this->plugin_name . '-admin',
 				'tg_ajax',

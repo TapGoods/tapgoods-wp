@@ -4,9 +4,17 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 // Priority the value from the URL over $atts['category']
 $category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : ( ! empty( $atts['category'] ) ? sanitize_text_field( $atts['category'] ) : '' );
+$category = tapgrein_sanitize_slug_list( $category );
 $category_attribute = $category ? "category=\"{$category}\"" : '';
 
-$tags                   = ! empty( $atts['tags'] ) ? "tags=\"{$atts['tags']}\"" : '';
+// Tags come from one resolver, shared with the search box and the grid, so all
+// three agree about what is filtered. An explicit tags="..." attribute wins
+// over ?tags=; the URL only applies where the page did not say. Without passing
+// it down, ?tags=<slug> reached the grid (which reads the query var itself) but
+// not the search box, so the first keystroke in search silently dropped the tag
+// filter and returned the whole catalog (WPB-166).
+$tags_value             = tapgrein_resolve_tag_filter( isset( $atts ) ? $atts : array() );
+$tags                   = $tags_value ? "tags=\"{$tags_value}\"" : '';
 $per_page_default       = isset( $atts['per_page_default'] ) ? "per_page_default=\"{$atts['per_page_default']}\"" : '';
 $show_search            = filter_var( $atts['show_search'], FILTER_VALIDATE_BOOLEAN );
 $show_filters           = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
@@ -32,13 +40,17 @@ ob_start();
 <div id="tg-shop" class="tapgoods tapgoods-inventory container-fluid">
     <?php if ( false !== $show_search ) : ?>
         <?php do_action( 'tg_before_inventory_search' ); ?>
-        <?php 
-echo do_shortcode( 
-    '[tapgoods-search nos="true" ' . esc_attr($category_attribute) . ' ' . 
-    esc_attr($show_pricing) . ' ' . 
-    esc_attr($tags) . ' ' . 
-    esc_attr($per_page_default) . ']' 
-); 
+        <?php
+// NOT esc_attr(): these are shortcode source, not HTML attribute values.
+// esc_attr() turns the quotes into &quot;, the shortcode parser reads the entity
+// as part of the value, and every attribute here arrives corrupted (WPB-166).
+// The values are sanitised where they are built, above.
+echo do_shortcode(
+    '[tapgoods-search nos="true" ' . $category_attribute . ' ' .
+    $show_pricing . ' ' .
+    $tags . ' ' .
+    $per_page_default . ']'
+);
 ?>
         <?php do_action( 'tg_after_inventory_search' ); ?>
     <?php endif; ?>
