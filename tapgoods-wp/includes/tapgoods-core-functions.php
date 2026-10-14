@@ -1058,6 +1058,70 @@ function tapgrein_get_shop_url() {
 }
 
 /**
+ * Clean a [tapgoods-search-bar] attribute value.
+ *
+ * Page builders and the classic editor turn the quotes around an attribute
+ * into curly ones, which the shortcode parser then keeps as part of the value.
+ * Stripped with a /u regex, not trim(): trim() works on bytes, and the bytes of
+ * a curly quote are shared with characters like an em dash or an ellipsis, so a
+ * placeholder starting with one would come out as broken UTF-8.
+ *
+ * @param mixed $value Raw attribute value.
+ * @return string
+ */
+function tapgrein_search_bar_att( $value ) {
+	$value   = trim( (string) $value );
+	$cleaned = preg_replace( '/^["\'“”‘’]+|["\'“”‘’]+$/u', '', $value );
+
+	return trim( null === $cleaned ? $value : $cleaned );
+}
+
+/**
+ * Split a results-page URL into what a GET search form needs (WPB-183).
+ *
+ * A browser submitting a GET form throws away the query string of its action
+ * and replaces it with the form's fields. On a site with plain permalinks the
+ * shop is "/?page_id=12", so a form pointed straight at it would land on the
+ * home page. Whatever the action URL carries is returned as hidden fields so it
+ * survives the submit.
+ *
+ * The search term itself is sent as tg_search, never as s: WordPress applies
+ * s to the main query, so "/shop/?s=chair" searches for a PAGE matching
+ * "chair", finds none and answers 404 instead of showing the shop.
+ *
+ * @param string $url Absolute results-page URL.
+ * @return array{action: string, hidden: array<string, string>}
+ */
+function tapgrein_search_bar_form_target( $url ) {
+	$url    = (string) $url;
+	$hidden = array();
+
+	$query_at = strpos( $url, '?' );
+	if ( false !== $query_at ) {
+		$fragment_at = strpos( $url, '#', $query_at );
+		$query       = false === $fragment_at
+			? substr( $url, $query_at + 1 )
+			: substr( $url, $query_at + 1, $fragment_at - $query_at - 1 );
+		$url         = substr( $url, 0, $query_at );
+
+		parse_str( $query, $params );
+		foreach ( $params as $key => $value ) {
+			// The term field is the form's own; a stale one in the URL would be
+			// sent twice. Nested array params cannot be a hidden scalar field.
+			if ( 'tg_search' === $key || 's' === $key || ! is_scalar( $value ) ) {
+				continue;
+			}
+			$hidden[ (string) $key ] = (string) $value;
+		}
+	}
+
+	return array(
+		'action' => $url,
+		'hidden' => $hidden,
+	);
+}
+
+/**
  * Every slug form a tg_tags term may be addressed by.
  *
  * Synced tags are stored with a 'tag-' prefix so WordPress cannot share a

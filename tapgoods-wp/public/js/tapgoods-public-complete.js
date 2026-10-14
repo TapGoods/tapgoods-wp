@@ -1354,7 +1354,17 @@ function initSearchInstance(searchInput) {
         }
         }, 200);
     });
-    
+
+    // Arriving from the header search bar ([tapgoods-search-bar], WPB-183). It
+    // sends the term as ?tg_search= rather than ?s=, because WordPress applies s
+    // to the page query itself and answers the shop page with a 404. Running it
+    // through this box gives the same results, filters and pagination as typing.
+    const incomingTerm = (new URLSearchParams(window.location.search).get('tg_search') || '').trim();
+    if (incomingTerm && !searchInput.value.trim()) {
+        searchInput.value = incomingTerm;
+        fetchResults(incomingTerm, 1, false);
+    }
+
     function fetchResults(query, page = 1, isDefault = false) {
         const params = new URLSearchParams({
             action: 'tg_search_grid',
