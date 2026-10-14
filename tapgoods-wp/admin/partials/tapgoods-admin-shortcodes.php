@@ -221,6 +221,56 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 		</div>
 	</div>
 </div>
+
+
+<hr class="my-4">
+<!-- Row 6 -->
+
+<div class="row mb-3">
+	<!-- Column for the title -->
+	<div class="col-md-2">
+		<h3 class="fw-bold active" style="color: var(--tg-blue);">Search Bar</h3>
+
+	</div>
+
+	<!-- Column for the content and preview -->
+	<div class="col-md-10">
+		<div class="row">
+			<!-- Content -->
+			<div class="col-md-8">
+				<form>
+					<div class="input-group mb-3">
+						<span id="tapgoods-search-bar-input" class="form-control tapgoods-shortcode-display" role="textbox" aria-readonly="true" aria-label="Search Bar shortcode" tabindex="0" data-shortcode="[tapgoods-search-bar]">[tapgoods-search-bar]</span>
+						<button type="button" onClick="copyText('tapgoods-search-bar-input')"
+								data-bs-toggle="tooltip" data-bs-placement="bottom"
+								data-bs-title="Copy to clipboard"
+								aria-label="Copy Search Bar shortcode to clipboard"
+								class="btn btn-outline-secondary">
+							<span class="dashicons dashicons-admin-page"></span>
+						</button>
+					</div>
+				</form>
+				<p class="text-muted">
+				Add a SEARCH BAR to your header or navigation. Visitors can search from any page and land on your shop page with the results.
+				</p>
+				<p style="color: var(--tg-blue);"><strong>Shortcode Modifiers:</strong></p>
+				<ul class="text-muted">
+					<li><strong>Placeholder Text:</strong> <code>[tapgoods-search-bar placeholder="Search tents, linens..."]</code></li>
+					<li><strong>Button Text Instead of Icon:</strong> <code>[tapgoods-search-bar button_text="Search"]</code></li>
+					<li><strong>Results Page:</strong> <code>[tapgoods-search-bar action_url="https://yoursite.com/shop/"]</code> (only needed if your shop page isn't found automatically)</li>
+				</ul>
+			</div>
+
+			<!-- Preview -->
+			<div class="col-md-4 text-center">
+				<div class="input-group input-group-sm">
+					<input type="text" class="form-control" placeholder="Search rentals" disabled>
+					<span class="input-group-text"><span class="dashicons dashicons-search"></span></span>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
 </div>
 
 
