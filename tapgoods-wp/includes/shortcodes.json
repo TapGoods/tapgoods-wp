@@ -91,6 +91,30 @@
             }
         }
     },
+    "tapgoods-search-bar": {
+        "name": "Search Bar",
+        "description": "Compact search box for a header or menu. Sends the visitor to the shop page with their search applied",
+        "atts": {
+            "placeholder": {
+                "att": "Placeholder",
+                "desc": "Text shown in the empty search box",
+                "default": "Search rentals",
+                "type": "input"
+            },
+            "button_text": {
+                "att": "Button Text",
+                "desc": "Label for the submit button. Leave empty to show a search icon",
+                "default": "",
+                "type": "input"
+            },
+            "action_url": {
+                "att": "Results Page URL",
+                "desc": "Page that shows the results. Defaults to the page holding [tapgoods-inventory]",
+                "default": "",
+                "type": "input"
+            }
+        }
+    },
     "tapgoods-location-select": {
         "name": "Location Select",
         "description": "Displays location select",
