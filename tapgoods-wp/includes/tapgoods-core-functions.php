@@ -624,7 +624,51 @@ function tapgrein_get_cart_url($wp_location_id) {
         'eventEnd'   => $event_end,
     );
 
+    // Send the customer to a configured page after the cart is submitted.
+    // add_query_arg() does not encode values, so encode the URL here.
+    $redirect_url = tapgrein_get_cart_redirect_url();
+    if ( '' !== $redirect_url ) {
+        $params['redirectUrl'] = rawurlencode( $redirect_url );
+    }
+
     return add_query_arg($params, $url);
+}
+
+/**
+ * Get the URL the TapGoods cart redirects to after submission.
+ *
+ * The CART_URL_WITH_REDIRECT constant (wp-config.php) takes precedence over
+ * the tg_cart_url_with_redirect option set on the Connection tab.
+ *
+ * @return string A valid http(s) URL, or '' when unset or invalid.
+ */
+function tapgrein_get_cart_redirect_url() {
+	$url = defined( 'CART_URL_WITH_REDIRECT' ) ? CART_URL_WITH_REDIRECT : get_option( 'tg_cart_url_with_redirect', '' );
+	return tapgrein_validate_redirect_url( $url );
+}
+
+/**
+ * Return the URL if it is a valid absolute http(s) URL, '' otherwise.
+ *
+ * @param mixed $url Candidate URL.
+ * @return string
+ */
+function tapgrein_validate_redirect_url( $url ) {
+	if ( ! is_string( $url ) ) {
+		return '';
+	}
+
+	$url = trim( $url );
+	if ( '' === $url || false === filter_var( $url, FILTER_VALIDATE_URL ) ) {
+		return '';
+	}
+
+	$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+	if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+		return '';
+	}
+
+	return $url;
 }
 
 
