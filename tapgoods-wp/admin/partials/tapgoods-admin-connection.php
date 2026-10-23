@@ -26,6 +26,7 @@ if (isset($_POST['confirm_reset'])) {
     delete_option('tg_last_api_key');
     delete_option('tg_last_sync_progress');
     delete_option('tg_last_sync_info');
+    delete_option('tg_cart_url_with_redirect');
     delete_option('tg_sync_state');
 
     // Delete all categories and tags
@@ -50,6 +51,33 @@ if (isset($_POST['confirm_reset'])) {
     wp_add_inline_script('tapgoods-admin-complete', 'showSuccessMessage();');
     exit;
 }
+
+// Cart redirect URL (post submission). The CART_URL_WITH_REDIRECT constant in wp-config.php overrides the saved option.
+$redirect_from_config = defined( 'CART_URL_WITH_REDIRECT' );
+$redirect_message     = '';
+$redirect_error       = false;
+
+if (
+	! $redirect_from_config
+	&& isset( $_POST['tapgrein_save_cart_redirect'], $_POST['_tgnonce_cart_redirect'] )
+	&& current_user_can( 'manage_options' )
+	&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_tgnonce_cart_redirect'] ) ), 'save' )
+) {
+	$submitted_redirect = isset( $_POST['tg_cart_url_with_redirect'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['tg_cart_url_with_redirect'] ) ) ) : '';
+
+	if ( '' === $submitted_redirect ) {
+		delete_option( 'tg_cart_url_with_redirect' );
+		$redirect_message = __( 'Cart redirect URL cleared.', 'tapgoods' );
+	} elseif ( '' !== tapgrein_validate_redirect_url( $submitted_redirect ) ) {
+		update_option( 'tg_cart_url_with_redirect', esc_url_raw( $submitted_redirect ) );
+		$redirect_message = __( 'Cart redirect URL saved.', 'tapgoods' );
+	} else {
+		$redirect_error   = true;
+		$redirect_message = __( 'Please enter a valid URL starting with http:// or https://. The setting was not changed.', 'tapgoods' );
+	}
+}
+
+$redirect_value = defined( 'CART_URL_WITH_REDIRECT' ) ? (string) CART_URL_WITH_REDIRECT : (string) get_option( 'tg_cart_url_with_redirect', '' );
 ?>
 
 <h2>Connect to your TapGoods account</h2>
@@ -216,3 +244,29 @@ if ( $connected ) :
     <a href="javascript:void(0);" onclick="openPopup()">Reset to Default</a>
 </p>
 
+<hr>
+
+<form name="tapgoods_cart_redirect" id="tapgrein_cart_redirect_form" method="post" action="">
+	<?php wp_nonce_field( 'save', '_tgnonce_cart_redirect' ); ?>
+	<label for="tg_cart_url_with_redirect" class="form-label fw-bold">Cart Redirect URL Post Submission</label>
+	<div class="row">
+		<div class="col col-sm-6">
+			<input type="url" id="tg_cart_url_with_redirect" name="tg_cart_url_with_redirect" value="<?php echo esc_attr( $redirect_value ); ?>" placeholder="https://yoursite.whatever/thepageyouwantredirectedto" class="form-control round" <?php disabled( $redirect_from_config ); ?>>
+		</div>
+		<div class="col col-sm-3">
+			<button type="submit" name="tapgrein_save_cart_redirect" value="1" class="btn btn-primary bg-blue w-100 round" <?php disabled( $redirect_from_config ); ?>>SAVE</button>
+		</div>
+	</div>
+	<?php if ( $redirect_from_config ) : ?>
+		<p class="help-text">This value is set by the CART_URL_WITH_REDIRECT constant in wp-config.php and can only be changed there.</p>
+	<?php else : ?>
+		<p class="help-text">After a customer submits their cart, TapGoods sends them to this page. Leave empty to keep the default behavior.</p>
+	<?php endif; ?>
+	<?php if ( '' !== $redirect_message ) : ?>
+		<?php if ( $redirect_error ) : ?>
+			<p class="help-text" style="font-weight: bold; color: #d63638;"><?php echo esc_html( $redirect_message ); ?></p>
+		<?php else : ?>
+			<p class="tapgoods-success"><?php echo esc_html( $redirect_message ); ?></p>
+		<?php endif; ?>
+	<?php endif; ?>
+</form>
