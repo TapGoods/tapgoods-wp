@@ -12,13 +12,14 @@
 class Tapgoods_Admin {
 
 	private $plugin_name;
-	private $version;
 	private $filesystem;
 
-	public function __construct( $plugin_name, $version ) {
+	// No longer takes a $version param: every asset enqueue that used to read a stored
+	// TAPGOODSWP_VERSION now versions itself via tapgrein_asset_version() instead (see
+	// includes/tapgoods-asset-functions.php).
+	public function __construct( $plugin_name ) {
 
 		$this->plugin_name = $plugin_name;
-		$this->version     = $version;
 	}
 
 	public function conditional_includes() {
@@ -41,19 +42,49 @@ class Tapgoods_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles( $hook ) {
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), $this->version, 'all' );
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/tapgoods-admin.css', array(), tapgrein_asset_version( 'admin/css/tapgoods-admin.css' ), 'all' );
 
 		// only enqueue these styles if on our settings pages
 		if ( 'toplevel_page_tapgoods' === $hook ) {
-			$bootstrap_version = file_exists( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				? filemtime( TAPGOODS_PLUGIN_PATH . 'assets/css/tg-bootstrap.css' ) 
-				: '1.0';
+			wp_enqueue_style(
+				$this->plugin_name . '-bootstrap',
+				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css',
+				array(),
+				tapgrein_asset_version( 'assets/css/tg-bootstrap.css' )
+			);
 
-				wp_enqueue_style( 
-				$this->plugin_name . '-bootstrap', 
-				TAPGOODS_PLUGIN_URL . 'assets/css/tg-bootstrap.css', 
-				array(), 
-				$bootstrap_version 
+			/*
+			 * WPB-167: the Shortcodes tab boxes moved from <input disabled> (which a
+			 * browser password manager could autofill) to
+			 * <span class="tapgoods-shortcode-display" role="textbox">, so they lost
+			 * Bootstrap's .form-control:disabled look for free (a <span> has no
+			 * :disabled state) and the browser's own default dimming of disabled input
+			 * text. Restored here, scoped to that one class rather than bare
+			 * .form-control. Values match what a real .form-control:disabled input
+			 * computes in this theme: background var(--bs-secondary-bg), #949494 text,
+			 * #cccccc border (the latter two are the browser's UA default for a
+			 * disabled control, not something Bootstrap's CSS sets). min-height: 40px
+			 * (with display:flex/align-items:center to keep the text centered) matches
+			 * wp-admin/css/forms.css's own `input[type=text] { min-height: 40px }`,
+			 * which a <span> never matches on its own, so the box stays the same size
+			 * as before this change.
+			 */
+			wp_add_inline_style(
+				$this->plugin_name . '-bootstrap',
+				'.tapgoods-shortcode-display {
+					background-color: var(--bs-secondary-bg);
+					color: #949494;
+					border-color: #cccccc;
+					display: flex;
+					align-items: center;
+					min-height: 40px;
+					-webkit-user-select: all;
+					user-select: all;
+				}
+				.tapgoods-shortcode-display:focus-visible {
+					outline: 2px solid var(--bs-primary, #0d6efd);
+					outline-offset: 1px;
+				}'
 			);
 
 			wp_enqueue_style( 
@@ -75,7 +106,7 @@ class Tapgoods_Admin {
 	public function enqueue_scripts( $hook ) {
 		if ( 'toplevel_page_tapgoods' === $hook ) {
 
-			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), $this->version, false );
+			wp_enqueue_script( $this->plugin_name . '-admin', plugin_dir_url( __FILE__ ) . 'js/tapgoods-admin.js', array( 'jquery', $this->plugin_name . '-bootstrap' ), tapgrein_asset_version( 'admin/js/tapgoods-admin.js' ), false );
 			wp_localize_script(
 				$this->plugin_name . '-admin',
 				'tg_ajax',
@@ -203,8 +234,18 @@ class Tapgoods_Admin {
 	public static function tapgrein_api_sync() {
 		// check_ajax_referer( 'save', '_tgnonce_connection' );
 
-		$client   = Tapgoods_Connection::get_instance();
-		$response = $client->sync_from_api();
+		$client = Tapgoods_Connection::get_instance();
+
+		// This handler is registered on both wp_ajax_ and wp_ajax_nopriv_ for
+		// tapgrein_api_sync, and that action has no nonce (WPB-176), so the
+		// unauthenticated branch is reachable by anyone and not only by our own
+		// cron self-ping. The label therefore states just what is known, the
+		// endpoint and the auth state, instead of claiming the caller was cron.
+		// The five-minute self-ping is the expected source; an unexpected volume
+		// of ajax_sync_unauth runs is itself a finding.
+		$trigger = ( is_user_logged_in() ) ? 'admin_ajax_sync' : 'ajax_sync_unauth';
+
+		$response = $client->sync_from_api( $trigger );
 
 		// tapgrein_write_log( $response );
 		if ( true === $response['success'] ) {
@@ -213,6 +254,41 @@ class Tapgoods_Admin {
 			wp_send_json_error( $response['message'] );
 		}
 		die();
+	}
+
+	/**
+	 * Stream the sync activity log file as a download.
+	 *
+	 * Administrators only, and nonce-protected: the log is not reachable over HTTP
+	 * by design, so this handler is the supported way to get it off the site (see
+	 * admin/partials/tapgoods-sync-log.php for the link).
+	 *
+	 * @return void
+	 */
+	public static function tapgrein_download_sync_log() {
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to download this file.', 'tapgoods' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'tapgrein_sync_log' );
+
+		$log      = Tapgoods_Sync_Log::get_instance();
+		$contents = $log->read_all();
+
+		if ( false === $contents ) {
+			wp_die( esc_html__( 'No sync log has been written yet.', 'tapgoods' ), '', array( 'response' => 404 ) );
+		}
+
+		$filename = 'tapgoods-sync-' . gmdate( 'Ymd-His' ) . '.log';
+
+		nocache_headers();
+		header( 'Content-Type: text/plain; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Length: ' . strlen( $contents ) );
+
+		echo $contents; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- plain-text file download, not HTML.
+		exit;
 	}
 
 	/**

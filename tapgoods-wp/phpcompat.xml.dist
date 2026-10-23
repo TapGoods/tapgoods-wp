@@ -10,6 +10,9 @@
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 	<exclude-pattern>*/tests/*</exclude-pattern>
+	<!-- Bundled third-party Action Scheduler: ships in the zip, but it is not our
+	     code so we do not run the PHP-compatibility scan over it. -->
+	<exclude-pattern>*/lib/action-scheduler/*</exclude-pattern>
 
 	<rule ref="PHPCompatibilityWP"/>
 

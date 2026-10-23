@@ -150,12 +150,33 @@ jobs:
             exit 1
           fi
 
+      # archive: false uploads the zip as it is. By default upload-artifact wraps
+      # whatever it is given in a zip of its own, so the download was a zip holding
+      # the plugin zip, and WordPress rejected it with "No valid plugins were
+      # found" (it happened to a tester on WPB-180). Unarchived uploads take a
+      # single file and name the artifact after it, so `name` would be ignored.
       - name: Upload zip artifact
-        uses: actions/upload-artifact@v4
+        id: artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: tapgoods-wp-${{ steps.meta.outputs.version }}
-          path: build/*.zip
+          path: build/tapgoods-wp-${{ steps.meta.outputs.version }}.zip
+          archive: false
           if-no-files-found: error
+
+      # On a pull request this link is the deliverable, so put it where a person
+      # looks: the run summary, with the one instruction that matters.
+      - name: Link the zip in the run summary
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        run: |
+          {
+            echo "### Beta zip: ${VERSION}"
+            echo ""
+            echo "[Download tapgoods-wp-${VERSION}.zip](${ARTIFACT_URL})"
+            echo ""
+            echo "Installable as downloaded: upload it in wp-admin under Plugins, Add New, Upload Plugin. Do not unzip it first."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish pre-release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}

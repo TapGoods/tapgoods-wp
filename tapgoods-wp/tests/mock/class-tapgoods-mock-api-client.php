@@ -146,4 +146,16 @@ class Tapgoods_Mock_API_Client {
 		$prefix = $this->get_config( 'cache_prefix' ) ? $this->get_config( 'cache_prefix' ) : 'tg_api_';
 		return $prefix . md5( $name );
 	}
+
+	/**
+	 * Mirror Tapgoods_API_Request::get_last_http_code().
+	 *
+	 * Every fixture stands in for a 200, so callers that report the status of the
+	 * last request (the sync activity log) see a realistic value instead of a gap.
+	 *
+	 * @return int
+	 */
+	public function get_last_http_code() {
+		return 200;
+	}
 }

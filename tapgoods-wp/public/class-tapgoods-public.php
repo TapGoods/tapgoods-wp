@@ -7,28 +7,29 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 class Tapgoods_Public {
 
 	private $plugin_name;
-	private $version;
 
-	public function __construct( $plugin_name, $version ) {
+	// No longer takes a $version param: every asset enqueue that used to read a stored
+	// TAPGOODSWP_VERSION now versions itself via tapgrein_asset_version() instead (see
+	// includes/tapgoods-asset-functions.php).
+	public function __construct( $plugin_name ) {
 
 		$this->plugin_name = $plugin_name;
-		$this->version     = $version;
 	}
 
 	public function enqueue_styles() {
 
         // Load plugin public styles with absolute URLs to avoid relative-path issues on some hosts
         add_action( 'wp_enqueue_scripts', function() {
-            wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array(), $this->version, 'all' );
+            wp_enqueue_style( $this->plugin_name . '-public-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-public.css', array(), tapgrein_asset_version( 'public/css/tapgoods-public.css' ), 'all' );
         }, 30 );
 
         add_action( 'wp_enqueue_scripts', function() {
-            wp_enqueue_style( $this->plugin_name . '-tapgrein_custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+            wp_enqueue_style( $this->plugin_name . '-tapgrein_custom-css', plugin_dir_url( __FILE__ ) . 'css/tapgoods-custom.css', array( $this->plugin_name . '-public-css' ), tapgrein_asset_version( 'public/css/tapgoods-custom.css' ), 'all' );
         }, 50 );
 
         // Optionally include additional global styles from the plugin
         add_action( 'wp_enqueue_scripts', function() {
-            wp_enqueue_style( $this->plugin_name . '-global-styles', plugin_dir_url( __FILE__ ) . 'css/global-styles.css', array( $this->plugin_name . '-public-css' ), $this->version, 'all' );
+            wp_enqueue_style( $this->plugin_name . '-global-styles', plugin_dir_url( __FILE__ ) . 'css/global-styles.css', array( $this->plugin_name . '-public-css' ), tapgrein_asset_version( 'public/css/global-styles.css' ), 'all' );
         }, 55 );
 
 

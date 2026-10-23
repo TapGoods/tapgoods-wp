@@ -9,6 +9,23 @@ class Tapgoods_API_Request {
 
 	private $last_request_time;
 
+	/**
+	 * HTTP status of the most recent request attempt, or null if there is none.
+	 *
+	 * The client methods collapse every failure to `false`, which loses the one
+	 * detail support needs first: 401 (revoked key) against 429 (rate limited)
+	 * against 5xx (outage). Recorded here so callers can report it.
+	 *
+	 * Reset at the top of request(), so it is null rather than stale in the two
+	 * cases where no status was observed: a transport failure that threw before
+	 * any response existed, and a response served from a transient. Reporting the
+	 * previous call's 200 for either of those would be worse than reporting
+	 * nothing, because it reads as evidence that TapGoods answered.
+	 *
+	 * @var int|null
+	 */
+	private $last_http_code = null;
+
 	public function __construct( $config ) {
 
 		if ( ! is_array( $config ) ) {
@@ -36,6 +53,13 @@ class Tapgoods_API_Request {
 	}
 
 	public function request( $url, $args = array() ) {
+
+		// Forget the previous call's status before doing anything else. Without
+		// this, a transport failure (which throws before any response object
+		// exists) would leave the last SUCCESSFUL code in place, and a caller
+		// reporting it would say "status=200" about a request that never reached
+		// TapGoods. A missing status has to read as missing.
+		$this->last_http_code = null;
 
 		// Check if the cache is enabled via config
 		if ( false !== $this->get_config( 'cache_enabled' ) ) {
@@ -100,7 +124,10 @@ class Tapgoods_API_Request {
 
 		$args = array_merge_recursive(
 			array(
-				'timeout'     => '10',
+				// The TapGoods API can take several seconds per getInventories page on
+				// large catalogs; 10s was too tight and surfaced as "URL failed to
+				// respond" (WPB-165). Default 30s, overridable via TG_HTTP_TIMEOUT.
+				'timeout'     => (string) ( defined( 'TG_HTTP_TIMEOUT' ) ? (int) TG_HTTP_TIMEOUT : 30 ),
 				'redirection' => '3',
 				'httpversion' => '1.1',
 				'blocking'    => true,
@@ -156,9 +183,19 @@ class Tapgoods_API_Request {
 			die();
 		}
 
-		$res = new Tapgoods_API_Response( $response );
-		$this->cookies = $res->get_cookies();
+		$res                  = new Tapgoods_API_Response( $response );
+		$this->last_http_code = $res->get_http_code();
+		$this->cookies        = $res->get_cookies();
 		return $res;
+	}
+
+	/**
+	 * HTTP status of the most recent live request.
+	 *
+	 * @return int|null
+	 */
+	public function get_last_http_code() {
+		return $this->last_http_code;
 	}
 
 	public function build_url( $endpoint, $params = null, $override = '', ) {

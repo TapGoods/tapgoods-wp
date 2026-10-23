@@ -202,11 +202,19 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 
 		$url = $this->build_url( $endpoint );
 
+		// The response is a FLAT list of NestedSfCategory, so two fields decide what
+		// each entry actually is: visibleOnSf separates real storefront categories from
+		// the internal buckets kept alongside them, and parentId separates roots from
+		// sub-categories that also appear nested under their parent. Without both, a
+		// client cannot tell any of them apart. See
+		// Tapgoods_Connection::storefront_category_list().
 		$fields = array(
 			'id',
 			'name',
 			'slug',
-			'sfSubCategories {id,name,sfCategories{id}}',
+			'visibleOnSf',
+			'parentId',
+			'sfSubCategories {id,name,visibleOnSf,sfCategories{id}}',
 		);
 
 		$variables = new stdClass();
@@ -291,9 +299,27 @@ class Tapgoods_API_Client extends Tapgoods_API_Request {
 		}
 
 		$response = $request->get_response();
-		$data     = $response['data']['getInventories'];
 
-		return $data;
+		// GraphQL reports failures (rate limit, query complexity, an expired
+		// token) as HTTP 200 with an `errors` array and `data: null`, so the
+		// status check above does not see them. Returning the missing node would
+		// hand the sync a null page, which it reads as "this location has no more
+		// items", and finalize would then permanently delete every item of that
+		// location as obsolete. A page we could not read must be an error (false),
+		// never an empty page. The other queries in this class already do this.
+		if ( ! is_array( $response ) ) {
+			return false;
+		}
+
+		if ( array_key_exists( 'errors', $response ) && ! empty( $response['errors'] ) ) {
+			return false;
+		}
+
+		if ( ! isset( $response['data']['getInventories'] ) || ! is_array( $response['data']['getInventories'] ) ) {
+			return false;
+		}
+
+		return $response['data']['getInventories'];
 	}
 
 	// Takes location id and the ID of a product, addon, or bundle and returns bool if the item was found from the API

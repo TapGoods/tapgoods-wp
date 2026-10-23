@@ -1,0 +1,24 @@
+# WordPress's standard rewrite block, mounted into the wp-env WordPress root by
+# .wp-env.json so that pretty permalinks work in the browser suite.
+#
+# Mounted rather than generated. seed.php used to write it with
+# save_mod_rewrite_rules(), which works on macOS -- where the bind mount ignores
+# ownership -- and fails on Linux CI, where /var/www/html is root-owned and the
+# wp-cli container runs as the host user. The suite then failed everywhere for
+# that one reason. A mounted file needs no write permission anywhere.
+#
+# Content is verbatim what WordPress generates for any permalink structure; it
+# is the structure in the database, not this file, that decides the URL shape.
+# Anything outside the BEGIN/END markers would be preserved by WordPress, and
+# there is nothing here to preserve.
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress

@@ -29,4 +29,6 @@
 
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<exclude-pattern>*/tests/*</exclude-pattern>
+	<!-- Bundled third-party Action Scheduler: shipped, but not linted as our code. -->
+	<exclude-pattern>*/lib/action-scheduler/*</exclude-pattern>
 </ruleset>
