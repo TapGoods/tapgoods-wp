@@ -1341,6 +1341,68 @@ function tapgrein_resolve_tag_filter( $atts = array() ) {
 }
 
 /**
+ * Turn a page-size shortcode value into a WP_Query posts_per_page.
+ *
+ * Shortcode values arrive as strings, sometimes still wrapped in straight or
+ * curly quotes by the editor. "all" (or -1) means every item, no pagination,
+ * and comes back as -1, which is what WP_Query reads as "no limit". A positive
+ * whole number comes back as itself. Anything else returns $fallback.
+ *
+ * @param mixed $value    Raw attribute value.
+ * @param int   $fallback Returned when $value is not a usable page size.
+ * @return int Positive page size, or -1 for all items.
+ */
+function tapgrein_normalize_per_page( $value, $fallback = 12 ) {
+	if ( ! is_scalar( $value ) ) {
+		return $fallback;
+	}
+
+	$clean = strtolower( trim( (string) $value, " \t\n\r\0\x0B\"'“”" ) );
+
+	if ( 'all' === $clean || '-1' === $clean ) {
+		return -1;
+	}
+
+	if ( preg_match( '/^\d+$/', $clean ) && (int) $clean > 0 ) {
+		return (int) $clean;
+	}
+
+	return $fallback;
+}
+
+/**
+ * Resolve how many items the inventory grid shows per page (WPB-187).
+ *
+ * The items_per_page attribute takes 12, 24, 36 or "all". "all" shows every
+ * item with no pagination. When the attribute is missing or holds anything
+ * else, the older per_page_default attribute decides, and when that is missing
+ * too the page size is 12 (3 columns x 4 rows).
+ *
+ * Returns -1 for "all" so the value can go straight into WP_Query and on down
+ * to the grid and search shortcodes as per_page_default="-1".
+ *
+ * @param array $atts Shortcode attributes.
+ * @return int Page size, or -1 for all items.
+ */
+function tapgrein_resolve_items_per_page( $atts = array() ) {
+	$atts = is_array( $atts ) ? $atts : array();
+
+	$fallback = isset( $atts['per_page_default'] )
+		? tapgrein_normalize_per_page( $atts['per_page_default'], 12 )
+		: 12;
+
+	if ( isset( $atts['items_per_page'] ) && '' !== $atts['items_per_page'] ) {
+		$requested = tapgrein_normalize_per_page( $atts['items_per_page'], 0 );
+
+		if ( in_array( $requested, array( 12, 24, 36, -1 ), true ) ) {
+			return $requested;
+		}
+	}
+
+	return $fallback;
+}
+
+/**
  * Put a stored term slug into a query string without double-encoding it.
  *
  * WordPress stores a non-latin slug already percent-encoded, and add_query_arg()

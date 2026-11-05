@@ -45,6 +45,7 @@ $shortcodes_info = Tapgoods_Shortcodes::get_shortcodes();
 					<li><strong>Filter by Tags:</strong> <code>[tapgoods-inventory tags="your-tag, your-tag"]</code></li>
 					<li><strong>Hide Inventory Filters:</strong> <code>[tapgoods-inventory show_filters="false"]</code></li>
 					<li><strong>Hide Item Pricing:</strong> <code>[tapgoods-inventory show_pricing="false"]</code></li>
+					<li><strong>Items Per Page:</strong> <code>[tapgoods-inventory items_per_page="24"]</code> (12, 24, 36, or <code>all</code> to show every item without pagination)</li>
 					<li><strong>Combine Modifiers:</strong> <code>[tapgoods-inventory tags="Blush-Wedding" show_filters="false"]</code></li>
 				</ul>
 			</div>

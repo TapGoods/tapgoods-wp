@@ -15,7 +15,9 @@ $category_attribute = $category ? "category=\"{$category}\"" : '';
 // filter and returned the whole catalog (WPB-166).
 $tags_value             = tapgrein_resolve_tag_filter( isset( $atts ) ? $atts : array() );
 $tags                   = $tags_value ? "tags=\"{$tags_value}\"" : '';
-$per_page_default       = isset( $atts['per_page_default'] ) ? "per_page_default=\"{$atts['per_page_default']}\"" : '';
+// items_per_page="12|24|36|all" (WPB-187), falling back to per_page_default.
+// Handed to the search box and the grid as one resolved number, -1 for "all".
+$per_page_default       = 'per_page_default="' . (int) tapgrein_resolve_items_per_page( $atts ) . '"';
 $show_search            = filter_var( $atts['show_search'], FILTER_VALIDATE_BOOLEAN );
 $show_filters           = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
 $show_pricing = 'show_pricing="true"'; 

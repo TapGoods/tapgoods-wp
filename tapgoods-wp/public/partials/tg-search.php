@@ -11,10 +11,9 @@ $posts_per_page_options = apply_filters(
     array('12', '24', '48') // Default options
 );
 
-// Get the 'per_page_default' attribute or set it to '12' if not present
-$tg_per_page = isset($atts['per_page_default']) 
-    ? (int) preg_replace('/[^0-9]/', '', trim($atts['per_page_default'], '“”"')) // Clean the value by removing non-numeric characters and quotes, then convert to integer
-    : 12; // Default value is 12 if the attribute is not set
+// Page size the AJAX search uses, resolved exactly as the grid resolves it, so a
+// search on an "all" page also returns every match (-1) rather than 12 (WPB-187).
+$tg_per_page = tapgrein_resolve_items_per_page( isset( $atts ) ? $atts : array() );
 
 
 
