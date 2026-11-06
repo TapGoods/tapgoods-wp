@@ -11254,6 +11254,22 @@ a > .tapgoods code {
   min-width: 300px;
   margin-bottom: 15px;
 }
+/*
+ * WPB-187: keep the grid beside the category menu. From 1200px the menu is
+ * col-sm-4 (33.33%) but never narrower than 300px, while the grid was a fixed
+ * col-sm-8 (66.67%). In a content area under ~900px wide the menu's minimum
+ * pushed the sum past 100% and the grid wrapped underneath it. The grid now
+ * takes whatever width the menu leaves. `~`, not `+`: tg-filter.php prints a
+ * <script> between the aside and the section. Below 1200px both columns are
+ * 100% wide by design and still stack.
+ */
+@media (min-width: 1200px) {
+  .tapgoods#tg-shop .tg-filter ~ #tg-inventory-grid-container {
+    flex: 1 1 0%;
+    width: auto;
+    min-width: 0;
+  }
+}
 .tapgoods#tg-shop .tg-filter h4, .tapgoods#tg-shop .tg-filter .h4 {
   font-size: 14px;
   font-weight: bolder;
