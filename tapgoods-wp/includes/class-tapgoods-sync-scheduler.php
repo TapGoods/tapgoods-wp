@@ -24,7 +24,7 @@
  * the state machine), so Action Scheduler never adds its own retry on top. A
  * transient failure drops the run back to IDLE for the watchdog to re-arm; an
  * exhausted retry budget latches ERROR and NOTHING re-enqueues until an admin
- * clears it.
+ * clears it (the Clear Errors button, or clicking Sync).
  *
  * GRACEFUL FALLBACK: every method is a no-op (returns false) when the `as_*()`
  * functions are unavailable, so callers can fall back to the legacy self-ping
@@ -146,7 +146,8 @@ class Tapgoods_Sync_Scheduler {
 	 * WordPress. tapgrein_cron_exec is the thin wrapper that executes the plan
 	 * (enqueue + log). Ordering matters and is deliberate:
 	 *
-	 *   1. latched ERROR  => enqueue nothing (terminal until an admin clears it;
+	 *   1. latched ERROR  => enqueue nothing (terminal until an admin clears it or
+	 *                        clicks Sync;
 	 *                        re-arming would be the retry storm the design avoids).
 	 *   2. in progress     => ALWAYS enqueue (keep the chain alive). The throttle
 	 *                        must never stall a run that is already flowing.
@@ -279,8 +280,8 @@ class Tapgoods_Sync_Scheduler {
 	 *
 	 *   - PREP / ACTIVE (is_running) => work remains => chain the next slice.
 	 *   - COMPLETED                  => the run finished => stop.
-	 *   - ERROR (latched)            => stop; only an admin "clear errors" (or the
-	 *                                   watchdog on a retryable IDLE) restarts it.
+	 *   - ERROR (latched)            => stop; only an admin (Clear Errors, or clicking
+	 *                                   Sync) restarts it.
 	 *   - IDLE after a retryable failure => stop chaining; the five-minute cron
 	 *                                   watchdog re-arms it. Keeping retries off the
 	 *                                   immediate chain is what avoids an AS retry

@@ -106,6 +106,12 @@ class Tapgoods_Connection {
 	 */
 	const CAT_LIST_CACHE_TTL = 3600;
 
+	/**
+	 * Error shown on the Sync Status panel when the saved API key cannot be
+	 * decrypted in the request running the sync (see guard_api_key()).
+	 */
+	const KEY_UNREADABLE_MESSAGE = "We couldn't read your saved TapGoods API key. Re-enter it on the TapGoods settings page, then click Sync.";
+
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
 			$key = $this->get_key();
@@ -436,20 +442,13 @@ class Tapgoods_Connection {
 		}
 		$log->begin_run($trigger, array('entry' => 'sync_inventory_in_batches', 'manual' => $manual_trigger ? 1 : 0));
 
-		$current_key = $this->get_key();
-		$stored_key  = get_option('tg_last_api_key');
-
-		// Handle API key change (only meaningful when no run is in flight).
-		if ($current_key !== $stored_key && ! $this->sync_state()->is_running()) {
-			// Never the key itself, only that it changed and what that cost.
-			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
-			$this->tapgrein_delete_data();
-			update_option('tg_last_api_key', $current_key);
-		}
-
 		$state = $this->sync_state();
 
-		// A latched ERROR blocks everything until an admin clears it.
+		// A latched ERROR blocks everything until an admin clears it (Clear Errors,
+		// or clicking Sync). Checked BEFORE anything that can delete data: a run
+		// that is not going to sync must not be able to empty the catalog either.
+		// The key-change wipe used to run ahead of this check, and on a live site
+		// every blocked run deleted the whole catalog and then refused to rebuild it.
 		if ($state->has_error() && Tapgoods_Sync_State::STATE_ERROR === $state->get_state()) {
 			$log->warn('sync.run.blocked', array('reason' => 'error_state', 'state' => $state->get_state()));
 			$log->end_run('skipped', array('state' => $state->get_state()));
@@ -472,6 +471,15 @@ class Tapgoods_Connection {
 			);
 			$log->end_run('skipped', array('state' => $state->get_state()));
 			return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+		}
+
+		// The API key is checked inside the lock, so only the one request that is
+		// about to sync can decide to delete local data for a key change.
+		$key_failure = $this->guard_api_key($state);
+		if (null !== $key_failure) {
+			$this->release_run_lock();
+			$log->end_run(self::run_end_status(false, $state), array('state' => $state->get_state()));
+			return $key_failure;
 		}
 
 		// Arm the abnormal-termination safety net now, before PREP: a fatal (e.g.
@@ -573,6 +581,101 @@ class Tapgoods_Connection {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Check the API key before a run uses it, and apply a key change.
+	 *
+	 * Called inside the run lock, after the error-latch check. Returns null when
+	 * the run may go on, or a result envelope when it must stop.
+	 *
+	 * Two rules, both from a live site that lost its catalog over and over:
+	 *
+	 *  - A saved key this request cannot decrypt is not a key change. Decryption
+	 *    depends on LOGGED_IN_SALT, and get_key() returns false when it fails. The
+	 *    old check compared that false with the last key, saw a difference and
+	 *    deleted every product. false cannot be stored back (an option saves it as
+	 *    ''), so every later run saw another "change" and deleted again, then got a
+	 *    401 because it had no usable key. Now the run stops as an ordinary failure
+	 *    (retried, then latched with a message saying what to do), deleting nothing
+	 *    and sending nothing to the API.
+	 *  - Only a change from one readable key to another deletes local data. With no
+	 *    previous key on record there is nothing to compare against, so the key is
+	 *    just recorded: that covers a fresh install, a site after Reset to Default
+	 *    (already empty), and sites whose last key was blanked by the bug above and
+	 *    still have their catalog.
+	 *
+	 * @param Tapgoods_Sync_State $state Sync state.
+	 * @return array|null Result envelope when the run must stop, null to continue.
+	 */
+	private function guard_api_key($state) {
+		$log         = $this->sync_log();
+		$current_key = $this->get_key();
+
+		if (self::saved_key_unreadable($current_key, get_option('tg_key'))) {
+			// Never the key itself, only that it could not be read.
+			$log->error('sync.key.unreadable', array('action' => 'kept_local_data'));
+			$will_retry = $state->mark_error(self::KEY_UNREADABLE_MESSAGE);
+			$log->warn('sync.retry', array('will_retry' => $will_retry ? 1 : 0, 'failures' => $state->get_failure_count(), 'state' => $state->get_state()));
+			return array('success' => false, 'message' => self::KEY_UNREADABLE_MESSAGE);
+		}
+
+		$action = self::key_change_action($current_key, get_option('tg_last_api_key'), $state->is_running());
+		if ('wipe' === $action) {
+			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
+			$this->tapgrein_delete_data();
+			update_option('tg_last_api_key', $current_key);
+		} elseif ('record' === $action) {
+			$log->info('sync.key.recorded', array('reason' => 'no_previous_key'));
+			update_option('tg_last_api_key', $current_key);
+		}
+
+		return null;
+	}
+
+	/**
+	 * What a run should do about the API key: 'none', 'record' or 'wipe'.
+	 *
+	 * Pure, so the whole decision is unit-tested (ConnectionKeyGuardTest). Local
+	 * data is deleted only when both keys are readable and differ, and no run is in
+	 * flight (an in-flight run finishes first; the next fresh run makes the call).
+	 *
+	 * @param mixed $current_key get_key(): a string, or false/null/'' when there is
+	 *                           no key or it cannot be decrypted.
+	 * @param mixed $stored_key  The tg_last_api_key option.
+	 * @param bool  $is_running  Whether a run is in flight.
+	 * @return string
+	 */
+	public static function key_change_action($current_key, $stored_key, $is_running) {
+		if (! self::is_usable_key($current_key) || $current_key === $stored_key || $is_running) {
+			return 'none';
+		}
+		if (! self::is_usable_key($stored_key)) {
+			return 'record';
+		}
+		return 'wipe';
+	}
+
+	/**
+	 * Whether a key is saved but get_key() could not turn it into a usable key.
+	 *
+	 * Distinguishes "saved but unreadable" (stop the run, keep the catalog) from
+	 * "nothing saved" (not connected; the run fails at the API as it always has).
+	 *
+	 * @param mixed $current_key      get_key().
+	 * @param mixed $saved_ciphertext The tg_key option.
+	 * @return bool
+	 */
+	public static function saved_key_unreadable($current_key, $saved_ciphertext) {
+		return ! self::is_usable_key($current_key) && is_string($saved_ciphertext) && '' !== $saved_ciphertext;
+	}
+
+	/**
+	 * @param mixed $key Candidate API key.
+	 * @return bool
+	 */
+	private static function is_usable_key($key) {
+		return is_string($key) && '' !== trim($key);
 	}
 
 	/**
@@ -3357,6 +3460,13 @@ class Tapgoods_Connection {
 		$location_info = $this->sync_location_settings(true);
 
 		if (current_user_can('manage_options')) {
+			// Clicking Sync is an admin asking for a sync, so it clears a latched
+			// error first. Before, the button queued a slice that the latch then
+			// refused: it did nothing, with no sign why. On a live site an admin
+			// clicked it over and over while a ten-minute API outage kept the
+			// site un-synced for three and a half days.
+			$this->clear_latched_error('manual_sync');
+
 			// NON-BLOCKING: with Action Scheduler driving the sync, "Sync Now" just
 			// enqueues the FIRST slice and returns immediately; Action Scheduler then
 			// chains the rest in the background (see Tapgoods_Sync_Scheduler). This
@@ -3417,6 +3527,25 @@ class Tapgoods_Connection {
 		}
 	}
 	
+
+	/**
+	 * Clear a latched ERROR, if there is one, and log that it was cleared.
+	 *
+	 * Only the latch: a recovered failure's leftover message is not touched (the
+	 * Clear Errors button does that).
+	 *
+	 * @param string $reason Why it was cleared, for the activity log.
+	 * @return bool True when a latched error was cleared.
+	 */
+	private function clear_latched_error($reason) {
+		$state = $this->sync_state();
+		if (! $state->has_latched_error()) {
+			return false;
+		}
+		$this->sync_log()->info('sync.errors.cleared', array('reason' => $reason, 'failures' => $state->get_failure_count()));
+		$state->clear_errors();
+		return true;
+	}
 
 	/**
 	 * AJAX handler: clear a latched sync error so cron can start syncing again.
