@@ -22,10 +22,10 @@ if (isset($atts['show_pricing'])) {
     $show_pricing = filter_var($normalized_value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
 }
 
-// Get the 'per_page_default' attribute or set it to '12' if not present
-$per_page_default = isset($atts['per_page_default']) 
-    ? (int) preg_replace('/[^0-9]/', '', trim($atts['per_page_default'], '“”"')) // Clean the value by removing non-numeric characters and quotes, then convert to integer
-    : 12; // Default value is 12 if the attribute is not set
+// Page size from items_per_page / per_page_default, 12 when neither is set.
+// -1 means "all": WP_Query returns every item and max_num_pages stays 0, so the
+// pagination below does not render (WPB-187).
+$per_page_default = tapgrein_resolve_items_per_page( isset( $atts ) ? $atts : array() );
 
 $tg_per_page = isset( $_GET['tg-per-page'] ) ? absint( wp_unslash( $_GET['tg-per-page'] ) ) : 0;
 

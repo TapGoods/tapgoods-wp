@@ -18,6 +18,12 @@
             "per_page_default": {
                 "default": 12
             },
+            "items_per_page": {
+                "att": "Items Per Page",
+                "desc": "Items shown per page: 12 (default), 24, 36, or all (every item, no pagination)",
+                "default": "",
+                "type": "input"
+            },
             "show_search": {
                 "att": "Show Search",
                 "desc": "Displays a search input above the product grid, defaults to true",

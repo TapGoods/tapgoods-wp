@@ -39,25 +39,3 @@ $selected_location = $cookie_location !== '' ? $cookie_location : $default_locat
 // Location selector functionality is now handled automatically by Tapgoods_Enqueue class
 // No inline script needed - the system detects shortcodes and adds appropriate scripts
 ?>
-
-<?php
-// AJAX handler to set the default location (optional if required for server sync)
-add_action('wp_ajax_set_default_location', 'tapgrein_set_default_location');
-add_action('wp_ajax_nopriv_set_default_location', 'tapgrein_set_default_location');
-
-
-function tapgrein_set_default_location2() {
-//        error_log("AJAX action 'set_default_location' triggered.");
-    if (isset($_POST['location_id'])) {
-        $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : '';
-
-//            error_log("Received location_id: $location_id");
-        wp_send_json_success("Location set to $location_id");
-    } else {
-//            error_log("No location_id provided.");
-        wp_send_json_error('Location ID not provided.');
-    }
-    wp_die();
-}
-
-?>
