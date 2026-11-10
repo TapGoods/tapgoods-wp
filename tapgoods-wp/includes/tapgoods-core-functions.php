@@ -1381,7 +1381,7 @@ function tapgrein_normalize_per_page( $value, $fallback = 12 ) {
  * Returns -1 for "all" so the value can go straight into WP_Query and on down
  * to the grid and search shortcodes as per_page_default="-1".
  *
- * @param array $atts Shortcode attributes.
+ * @param mixed $atts Shortcode attributes; anything that is not an array counts as none.
  * @return int Page size, or -1 for all items.
  */
 function tapgrein_resolve_items_per_page( $atts = array() ) {
