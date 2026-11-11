@@ -721,6 +721,33 @@ class Tapgoods_Connection {
 		$prev_suspend = $this->suspend_cache_addition(true);
 
 		try {
+			// LOCATIONS STEP: first, once per run, and only when the site is missing
+			// location data for the locations this run syncs. Location settings (the
+			// location picker, the default location, each storefront's colours,
+			// address and cart domain) used to be written only by the Sync button, so
+			// a catalog filled by background slices (connect a key, let cron run) had
+			// every item and no locations. A failure here is logged and the run goes
+			// on: a location problem must not stop the catalog sync, and the next run
+			// retries because the data is still missing. The flag is set whatever the
+			// outcome, so a failing location API costs one attempt per run, not one
+			// per slice.
+			if (empty($cursor['locations_done'])) {
+				$this->sync_missing_location_settings(
+					$cursor['location_ids'],
+					function () use ($start_time, $pages_this_run) {
+						return $this->slice_budget_spent($start_time, $pages_this_run);
+					}
+				);
+				$cursor['locations_done'] = true;
+				$state->save_cursor($cursor);
+
+				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+					$log->info('sync.checkpoint', array('after' => 'locations', 'phase' => $cursor['phase'], 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+					$this->active_run = false;
+					return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+				}
+			}
+
 			// CATEGORIES PHASE: bounded and resumable, mirroring the paging loop.
 			// Terms are synced up front so they exist before items are paged and each
 			// item's own tapgrein_assign_terms() can find them. A large business has
@@ -1796,7 +1823,105 @@ class Tapgoods_Connection {
 	}
 
 	
-	public function sync_location_settings($force_update = false) {
+	/**
+	 * What a run should do about stored location data: 'none', 'fill' or 'refresh'.
+	 *
+	 * Pure, so the decision is unit-tested on its own (ConnectionLocationSyncTest).
+	 *
+	 *  - 'refresh': the stored location ids are not the run's ids. Nothing is stored
+	 *    yet (a fresh connect, or after Reset to Default), or the key now belongs to
+	 *    another business. The business and its ids are read again first.
+	 *  - 'fill': the ids match, but a location has no stored settings or there is no
+	 *    valid default location.
+	 *  - 'none': everything the storefront reads is there. This is the usual answer,
+	 *    and it costs three option reads and no API call.
+	 *
+	 * @param array $run_ids          Location ids this run syncs (from the API).
+	 * @param mixed $stored_ids       The tg_locationIds option.
+	 * @param mixed $stored_settings  The tg_location_settings option, keyed by location id.
+	 * @param mixed $default_location The tapgreino_default_location option.
+	 * @return string
+	 */
+	public static function location_sync_action($run_ids, $stored_ids, $stored_settings, $default_location) {
+		$run_ids = array_map('strval', array_values((array) $run_ids));
+		if (empty($run_ids)) {
+			return 'none';
+		}
+
+		$stored_ids = is_array($stored_ids) ? array_map('strval', $stored_ids) : array();
+		if (! empty(array_diff($run_ids, $stored_ids)) || ! empty(array_diff($stored_ids, $run_ids))) {
+			return 'refresh';
+		}
+
+		$settings = is_array($stored_settings) ? $stored_settings : array();
+		foreach ($run_ids as $id) {
+			if (empty($settings[$id])) {
+				return 'fill';
+			}
+		}
+
+		if (! in_array((string) $default_location, $run_ids, true)) {
+			return 'fill';
+		}
+
+		return 'none';
+	}
+
+	/**
+	 * Fetch the location settings a run is missing, before it syncs any inventory.
+	 *
+	 * Never throws: a location failure is logged and the caller carries on with the
+	 * catalog. Called once per run from run_sync_slice().
+	 *
+	 * @param array         $location_ids Location ids this run syncs.
+	 * @param callable|null $out_of_time  Returns true once the slice budget is spent.
+	 * @return string The action taken (see location_sync_action()).
+	 */
+	private function sync_missing_location_settings($location_ids, $out_of_time = null) {
+		$action = self::location_sync_action(
+			$location_ids,
+			get_option('tg_locationIds', array()),
+			get_option('tg_location_settings', array()),
+			get_option('tapgreino_default_location', '')
+		);
+		if ('none' === $action) {
+			return $action;
+		}
+
+		$log = $this->sync_log();
+		$log->info('sync.location.missing', array('action' => $action, 'locations' => count((array) $location_ids)));
+
+		try {
+			$this->sync_location_settings('refresh' === $action, $out_of_time);
+		} catch (Throwable $e) {
+			$log->warn('sync.location.error', array('reason' => 'exception', 'class' => get_class($e), 'message' => $e->getMessage()));
+		}
+
+		return $action;
+	}
+
+	/**
+	 * Fetch and store the business's location settings.
+	 *
+	 * Writes tg_locationIds and tg_businessId (through get_business()), one
+	 * tg_location_{id} option per location, tg_location_settings (all of them,
+	 * keyed by id) and a valid tapgreino_default_location. The Sync button calls it
+	 * forced; a sync run calls it first when location data is missing.
+	 *
+	 * Nothing stored is deleted before new data has arrived. A forced refresh used
+	 * to delete the stored ids before asking the API, and then wrote back whatever
+	 * it managed to fetch, so one failed request during a Sync click left a site
+	 * with its catalog and no locations. Now a failed business lookup keeps what is
+	 * stored, a location whose details could not be fetched keeps its previous
+	 * settings, and a pass that fetched nothing writes nothing.
+	 *
+	 * @param bool          $force_update Read the business again and bypass the per-location cache.
+	 * @param callable|null $out_of_time  Optional. Returns true once the caller's time budget is
+	 *                                    spent. Checked before each location's fetch; the pass
+	 *                                    stops there and stores what it has.
+	 * @return bool True when settings were stored.
+	 */
+	public function sync_location_settings($force_update = false, $out_of_time = null) {
 		$log = $this->sync_log();
 		$settings_started = microtime(true);
 		$log->info('sync.location.start', array('force' => $force_update ? 1 : 0));
@@ -1805,19 +1930,10 @@ class Tapgoods_Connection {
 		$location_ids = get_option('tg_locationIds', false);
 		$business_id = get_option('tg_businessId', false);
 
-		if ($force_update) {
-			$this->console_log('Force update enabled. Clearing cached location_ids and business_id.');
-			delete_option('tg_locationIds');
-			delete_option('tg_businessId');
-			$location_ids = false;
-			$business_id = false;
-		}
-	
-	//	$this->console_log('Obtained location_ids: ' . print_r($location_ids, true));
-	//	$this->console_log('Obtained business_id: ' . print_r($business_id, true));
-	
-		if (empty($location_ids) || empty($business_id)) {
-			$this->console_log('location_ids or business_id are empty. Trying to obtain the business.');
+		// get_business() overwrites the stored ids only when the API answers, so a
+		// forced refresh that fails leaves them as they were.
+		if ($force_update || empty($location_ids) || empty($business_id)) {
+			$this->console_log('Refreshing the business and its location ids.');
 			$business = $this->get_business();
 	//		$this->console_log('Result of get_business: ' . print_r($business, true));
 	
@@ -1832,15 +1948,24 @@ class Tapgoods_Connection {
 	//		$this->console_log('After get_business, business_id: ' . print_r($business_id, true));
 		}
 	
-		if (false === $location_ids || false === $business_id) {
+		if (! is_array($location_ids) || false === $business_id) {
 			$log->error('sync.location.error', array('reason' => 'invalid_ids', 'elapsed_ms' => self::elapsed_ms($settings_started)));
 			return false;
 		}
 	
-		// Array para almacenar los detalles de las ubicaciones
-		$location_info = [];
-	
+		$previous      = get_option('tg_location_settings', array());
+		$previous      = is_array($previous) ? $previous : array();
+		$location_info = array();
+		$fetched       = 0;
+
 		foreach ($location_ids as $location_id) {
+			// Bounded by the caller's clock as well as by the location count: on a
+			// slow host one request per location can outlast what the host allows.
+			if (is_callable($out_of_time) && call_user_func($out_of_time)) {
+				$log->warn('sync.location.deadline', array('fetched' => $fetched, 'requested' => count($location_ids), 'elapsed_ms' => self::elapsed_ms($settings_started)));
+				break;
+			}
+
 			$location_transient = $client->transient_name('location_info_' . $location_id);
 	
 			// Si se fuerza la actualización, elimina el transient actual
@@ -1877,12 +2002,26 @@ class Tapgoods_Connection {
 			update_option('tg_location_' . $location_id, $location_details);
 			$this->console_log('Saved location details to tg_location_' . $location_id);
 	
-			// Almacena los datos en el array de información general
 			$location_info[$location_id] = $location_details;
+			++$fetched;
 		}
-	
-		// Actualiza la opción tg_location_settings con todos los datos
-		update_option('tg_location_settings', $location_info);
+
+		if (0 === $fetched) {
+			$log->error('sync.location.error', array('reason' => 'no_details', 'requested' => count($location_ids), 'elapsed_ms' => self::elapsed_ms($settings_started)));
+			return false;
+		}
+
+		// A location this pass did not fetch keeps its previous settings. Locations
+		// the business no longer has are dropped. Kept in the business's order.
+		$merged = array();
+		foreach ($location_ids as $location_id) {
+			if (isset($location_info[$location_id])) {
+				$merged[$location_id] = $location_info[$location_id];
+			} elseif (! empty($previous[$location_id])) {
+				$merged[$location_id] = $previous[$location_id];
+			}
+		}
+		update_option('tg_location_settings', $merged);
 		$this->console_log('Updated tg_location_settings option.');
 	
 		// Verifica y actualiza el valor por defecto si es necesario
@@ -1897,7 +2036,8 @@ class Tapgoods_Connection {
 		$log->info(
 			'sync.location.done',
 			array(
-				'locations'  => count($location_info),
+				'locations'  => count($merged),
+				'fetched'    => $fetched,
 				'requested'  => count($location_ids),
 				'elapsed_ms' => self::elapsed_ms($settings_started),
 			)

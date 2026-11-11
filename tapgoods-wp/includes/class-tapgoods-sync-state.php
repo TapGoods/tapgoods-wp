@@ -154,6 +154,7 @@ class Tapgoods_Sync_State {
 			'next_page'              => 1,
 			'run_token'              => '',
 			'total_items'            => 0,
+			'locations_done'         => false,
 			'categories_done'        => false,
 			'cat_location_index'     => 0,
 			'cat_item_index'         => 0,
