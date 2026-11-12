@@ -11,8 +11,8 @@
  *   PREP      - counting how many paging calls the full sync will need.
  *   ACTIVE    - paging through inventory and writing it into WordPress.
  *   COMPLETED - the last run finished successfully.
- *   ERROR     - the last run failed and exhausted its retries; needs a manual
- *               "clear errors" before cron will start it again.
+ *   ERROR     - the last run failed and exhausted its retries; needs an admin to
+ *               click Clear Errors or Sync before cron will start it again.
  *
  * A failure does not go straight to ERROR: the run is retried up to
  * MAX_RETRIES times first (the state drops back to IDLE so the next cron tick
@@ -154,6 +154,7 @@ class Tapgoods_Sync_State {
 			'next_page'              => 1,
 			'run_token'              => '',
 			'total_items'            => 0,
+			'locations_done'         => false,
 			'categories_done'        => false,
 			'cat_location_index'     => 0,
 			'cat_item_index'         => 0,

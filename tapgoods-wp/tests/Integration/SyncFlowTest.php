@@ -136,6 +136,32 @@ final class SyncFlowTest extends WP_UnitTestCase {
 		$this->assertSame( '12.00', get_post_meta( $table->ID, 'tg_dailyPrice', true ) );
 	}
 
+	public function test_background_sync_fills_missing_location_data_first() {
+		// Only the Sync button used to write location data, so a catalog filled by
+		// background slices (connect a key, let cron run) had no locations at all.
+		foreach ( array( 'tg_locationIds', 'tg_businessId', 'tg_location_settings', 'tapgreino_default_location', 'tg_location_5001', 'tg_location_5002' ) as $option ) {
+			delete_option( $option );
+		}
+
+		$result = $this->connection()->sync_inventory_in_batches( false, 'as_slice' );
+		$this->assertTrue( $result['success'] );
+
+		$this->assertEquals( array( 5001, 5002 ), get_option( 'tg_locationIds' ) );
+		$this->assertEquals( 1042, get_option( 'tg_businessId' ) );
+		$settings = get_option( 'tg_location_settings' );
+		$this->assertSame( array( 5001, 5002 ), array_keys( $settings ) );
+		$this->assertSame( 'Downtown Warehouse', $settings[5001]['name'] );
+		$this->assertNotEmpty( get_option( 'tg_location_5002' ) );
+		$this->assertEquals( 5001, get_option( 'tapgreino_default_location' ) );
+
+		// First: the location step finishes before categories or inventory start.
+		$log  = $this->sync_log_contents();
+		$done = strpos( $log, 'sync.location.done' );
+		$this->assertNotFalse( $done, $log );
+		$this->assertLessThan( strpos( $log, 'sync.categories.start' ), $done );
+		$this->assertLessThan( strpos( $log, 'sync.batch.page' ), $done );
+	}
+
 	public function test_finalize_cleanup_converges_with_many_stale_terms() {
 		// Regression guard for the AS 300s finalize loop: seed far more stale
 		// (0-post) terms than one bounded cleanup batch (FINALIZE_DELETE_BATCH),

@@ -106,6 +106,12 @@ class Tapgoods_Connection {
 	 */
 	const CAT_LIST_CACHE_TTL = 3600;
 
+	/**
+	 * Error shown on the Sync Status panel when the saved API key cannot be
+	 * decrypted in the request running the sync (see guard_api_key()).
+	 */
+	const KEY_UNREADABLE_MESSAGE = "We couldn't read your saved TapGoods API key. Re-enter it on the TapGoods settings page, then click Sync.";
+
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
 			$key = $this->get_key();
@@ -436,20 +442,13 @@ class Tapgoods_Connection {
 		}
 		$log->begin_run($trigger, array('entry' => 'sync_inventory_in_batches', 'manual' => $manual_trigger ? 1 : 0));
 
-		$current_key = $this->get_key();
-		$stored_key  = get_option('tg_last_api_key');
-
-		// Handle API key change (only meaningful when no run is in flight).
-		if ($current_key !== $stored_key && ! $this->sync_state()->is_running()) {
-			// Never the key itself, only that it changed and what that cost.
-			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
-			$this->tapgrein_delete_data();
-			update_option('tg_last_api_key', $current_key);
-		}
-
 		$state = $this->sync_state();
 
-		// A latched ERROR blocks everything until an admin clears it.
+		// A latched ERROR blocks everything until an admin clears it (Clear Errors,
+		// or clicking Sync). Checked BEFORE anything that can delete data: a run
+		// that is not going to sync must not be able to empty the catalog either.
+		// The key-change wipe used to run ahead of this check, and on a live site
+		// every blocked run deleted the whole catalog and then refused to rebuild it.
 		if ($state->has_error() && Tapgoods_Sync_State::STATE_ERROR === $state->get_state()) {
 			$log->warn('sync.run.blocked', array('reason' => 'error_state', 'state' => $state->get_state()));
 			$log->end_run('skipped', array('state' => $state->get_state()));
@@ -472,6 +471,15 @@ class Tapgoods_Connection {
 			);
 			$log->end_run('skipped', array('state' => $state->get_state()));
 			return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+		}
+
+		// The API key is checked inside the lock, so only the one request that is
+		// about to sync can decide to delete local data for a key change.
+		$key_failure = $this->guard_api_key($state);
+		if (null !== $key_failure) {
+			$this->release_run_lock();
+			$log->end_run(self::run_end_status(false, $state), array('state' => $state->get_state()));
+			return $key_failure;
 		}
 
 		// Arm the abnormal-termination safety net now, before PREP: a fatal (e.g.
@@ -576,6 +584,101 @@ class Tapgoods_Connection {
 	}
 
 	/**
+	 * Check the API key before a run uses it, and apply a key change.
+	 *
+	 * Called inside the run lock, after the error-latch check. Returns null when
+	 * the run may go on, or a result envelope when it must stop.
+	 *
+	 * Two rules, both from a live site that lost its catalog over and over:
+	 *
+	 *  - A saved key this request cannot decrypt is not a key change. Decryption
+	 *    depends on LOGGED_IN_SALT, and get_key() returns false when it fails. The
+	 *    old check compared that false with the last key, saw a difference and
+	 *    deleted every product. false cannot be stored back (an option saves it as
+	 *    ''), so every later run saw another "change" and deleted again, then got a
+	 *    401 because it had no usable key. Now the run stops as an ordinary failure
+	 *    (retried, then latched with a message saying what to do), deleting nothing
+	 *    and sending nothing to the API.
+	 *  - Only a change from one readable key to another deletes local data. With no
+	 *    previous key on record there is nothing to compare against, so the key is
+	 *    just recorded: that covers a fresh install, a site after Reset to Default
+	 *    (already empty), and sites whose last key was blanked by the bug above and
+	 *    still have their catalog.
+	 *
+	 * @param Tapgoods_Sync_State $state Sync state.
+	 * @return array|null Result envelope when the run must stop, null to continue.
+	 */
+	private function guard_api_key($state) {
+		$log         = $this->sync_log();
+		$current_key = $this->get_key();
+
+		if (self::saved_key_unreadable($current_key, get_option('tg_key'))) {
+			// Never the key itself, only that it could not be read.
+			$log->error('sync.key.unreadable', array('action' => 'kept_local_data'));
+			$will_retry = $state->mark_error(self::KEY_UNREADABLE_MESSAGE);
+			$log->warn('sync.retry', array('will_retry' => $will_retry ? 1 : 0, 'failures' => $state->get_failure_count(), 'state' => $state->get_state()));
+			return array('success' => false, 'message' => self::KEY_UNREADABLE_MESSAGE);
+		}
+
+		$action = self::key_change_action($current_key, get_option('tg_last_api_key'), $state->is_running());
+		if ('wipe' === $action) {
+			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
+			$this->tapgrein_delete_data();
+			update_option('tg_last_api_key', $current_key);
+		} elseif ('record' === $action) {
+			$log->info('sync.key.recorded', array('reason' => 'no_previous_key'));
+			update_option('tg_last_api_key', $current_key);
+		}
+
+		return null;
+	}
+
+	/**
+	 * What a run should do about the API key: 'none', 'record' or 'wipe'.
+	 *
+	 * Pure, so the whole decision is unit-tested (ConnectionKeyGuardTest). Local
+	 * data is deleted only when both keys are readable and differ, and no run is in
+	 * flight (an in-flight run finishes first; the next fresh run makes the call).
+	 *
+	 * @param mixed $current_key get_key(): a string, or false/null/'' when there is
+	 *                           no key or it cannot be decrypted.
+	 * @param mixed $stored_key  The tg_last_api_key option.
+	 * @param bool  $is_running  Whether a run is in flight.
+	 * @return string
+	 */
+	public static function key_change_action($current_key, $stored_key, $is_running) {
+		if (! self::is_usable_key($current_key) || $current_key === $stored_key || $is_running) {
+			return 'none';
+		}
+		if (! self::is_usable_key($stored_key)) {
+			return 'record';
+		}
+		return 'wipe';
+	}
+
+	/**
+	 * Whether a key is saved but get_key() could not turn it into a usable key.
+	 *
+	 * Distinguishes "saved but unreadable" (stop the run, keep the catalog) from
+	 * "nothing saved" (not connected; the run fails at the API as it always has).
+	 *
+	 * @param mixed $current_key      get_key().
+	 * @param mixed $saved_ciphertext The tg_key option.
+	 * @return bool
+	 */
+	public static function saved_key_unreadable($current_key, $saved_ciphertext) {
+		return ! self::is_usable_key($current_key) && is_string($saved_ciphertext) && '' !== $saved_ciphertext;
+	}
+
+	/**
+	 * @param mixed $key Candidate API key.
+	 * @return bool
+	 */
+	private static function is_usable_key($key) {
+		return is_string($key) && '' !== trim($key);
+	}
+
+	/**
 	 * Process one bounded slice of the current run and checkpoint.
 	 *
 	 * Walks the resumable cursor: a bounded category/tag pass (one location per
@@ -618,6 +721,33 @@ class Tapgoods_Connection {
 		$prev_suspend = $this->suspend_cache_addition(true);
 
 		try {
+			// LOCATIONS STEP: first, once per run, and only when the site is missing
+			// location data for the locations this run syncs. Location settings (the
+			// location picker, the default location, each storefront's colours,
+			// address and cart domain) used to be written only by the Sync button, so
+			// a catalog filled by background slices (connect a key, let cron run) had
+			// every item and no locations. A failure here is logged and the run goes
+			// on: a location problem must not stop the catalog sync, and the next run
+			// retries because the data is still missing. The flag is set whatever the
+			// outcome, so a failing location API costs one attempt per run, not one
+			// per slice.
+			if (empty($cursor['locations_done'])) {
+				$this->sync_missing_location_settings(
+					$cursor['location_ids'],
+					function () use ($start_time, $pages_this_run) {
+						return $this->slice_budget_spent($start_time, $pages_this_run);
+					}
+				);
+				$cursor['locations_done'] = true;
+				$state->save_cursor($cursor);
+
+				if ($this->slice_budget_spent($start_time, $pages_this_run)) {
+					$log->info('sync.checkpoint', array('after' => 'locations', 'phase' => $cursor['phase'], 'pages' => $state->get_pages_completed() . '/' . $state->get_total_pages(), 'elapsed_ms' => self::elapsed_ms($slice_started)));
+					$this->active_run = false;
+					return array('success' => true, 'in_progress' => true, 'message' => $this->in_progress_message());
+				}
+			}
+
 			// CATEGORIES PHASE: bounded and resumable, mirroring the paging loop.
 			// Terms are synced up front so they exist before items are paged and each
 			// item's own tapgrein_assign_terms() can find them. A large business has
@@ -1693,7 +1823,105 @@ class Tapgoods_Connection {
 	}
 
 	
-	public function sync_location_settings($force_update = false) {
+	/**
+	 * What a run should do about stored location data: 'none', 'fill' or 'refresh'.
+	 *
+	 * Pure, so the decision is unit-tested on its own (ConnectionLocationSyncTest).
+	 *
+	 *  - 'refresh': the stored location ids are not the run's ids. Nothing is stored
+	 *    yet (a fresh connect, or after Reset to Default), or the key now belongs to
+	 *    another business. The business and its ids are read again first.
+	 *  - 'fill': the ids match, but a location has no stored settings or there is no
+	 *    valid default location.
+	 *  - 'none': everything the storefront reads is there. This is the usual answer,
+	 *    and it costs three option reads and no API call.
+	 *
+	 * @param array $run_ids          Location ids this run syncs (from the API).
+	 * @param mixed $stored_ids       The tg_locationIds option.
+	 * @param mixed $stored_settings  The tg_location_settings option, keyed by location id.
+	 * @param mixed $default_location The tapgreino_default_location option.
+	 * @return string
+	 */
+	public static function location_sync_action($run_ids, $stored_ids, $stored_settings, $default_location) {
+		$run_ids = array_map('strval', array_values((array) $run_ids));
+		if (empty($run_ids)) {
+			return 'none';
+		}
+
+		$stored_ids = is_array($stored_ids) ? array_map('strval', $stored_ids) : array();
+		if (! empty(array_diff($run_ids, $stored_ids)) || ! empty(array_diff($stored_ids, $run_ids))) {
+			return 'refresh';
+		}
+
+		$settings = is_array($stored_settings) ? $stored_settings : array();
+		foreach ($run_ids as $id) {
+			if (empty($settings[$id])) {
+				return 'fill';
+			}
+		}
+
+		if (! in_array((string) $default_location, $run_ids, true)) {
+			return 'fill';
+		}
+
+		return 'none';
+	}
+
+	/**
+	 * Fetch the location settings a run is missing, before it syncs any inventory.
+	 *
+	 * Never throws: a location failure is logged and the caller carries on with the
+	 * catalog. Called once per run from run_sync_slice().
+	 *
+	 * @param array         $location_ids Location ids this run syncs.
+	 * @param callable|null $out_of_time  Returns true once the slice budget is spent.
+	 * @return string The action taken (see location_sync_action()).
+	 */
+	private function sync_missing_location_settings($location_ids, $out_of_time = null) {
+		$action = self::location_sync_action(
+			$location_ids,
+			get_option('tg_locationIds', array()),
+			get_option('tg_location_settings', array()),
+			get_option('tapgreino_default_location', '')
+		);
+		if ('none' === $action) {
+			return $action;
+		}
+
+		$log = $this->sync_log();
+		$log->info('sync.location.missing', array('action' => $action, 'locations' => count((array) $location_ids)));
+
+		try {
+			$this->sync_location_settings('refresh' === $action, $out_of_time);
+		} catch (Throwable $e) {
+			$log->warn('sync.location.error', array('reason' => 'exception', 'class' => get_class($e), 'message' => $e->getMessage()));
+		}
+
+		return $action;
+	}
+
+	/**
+	 * Fetch and store the business's location settings.
+	 *
+	 * Writes tg_locationIds and tg_businessId (through get_business()), one
+	 * tg_location_{id} option per location, tg_location_settings (all of them,
+	 * keyed by id) and a valid tapgreino_default_location. The Sync button calls it
+	 * forced; a sync run calls it first when location data is missing.
+	 *
+	 * Nothing stored is deleted before new data has arrived. A forced refresh used
+	 * to delete the stored ids before asking the API, and then wrote back whatever
+	 * it managed to fetch, so one failed request during a Sync click left a site
+	 * with its catalog and no locations. Now a failed business lookup keeps what is
+	 * stored, a location whose details could not be fetched keeps its previous
+	 * settings, and a pass that fetched nothing writes nothing.
+	 *
+	 * @param bool          $force_update Read the business again and bypass the per-location cache.
+	 * @param callable|null $out_of_time  Optional. Returns true once the caller's time budget is
+	 *                                    spent. Checked before each location's fetch; the pass
+	 *                                    stops there and stores what it has.
+	 * @return bool True when settings were stored.
+	 */
+	public function sync_location_settings($force_update = false, $out_of_time = null) {
 		$log = $this->sync_log();
 		$settings_started = microtime(true);
 		$log->info('sync.location.start', array('force' => $force_update ? 1 : 0));
@@ -1702,19 +1930,10 @@ class Tapgoods_Connection {
 		$location_ids = get_option('tg_locationIds', false);
 		$business_id = get_option('tg_businessId', false);
 
-		if ($force_update) {
-			$this->console_log('Force update enabled. Clearing cached location_ids and business_id.');
-			delete_option('tg_locationIds');
-			delete_option('tg_businessId');
-			$location_ids = false;
-			$business_id = false;
-		}
-	
-	//	$this->console_log('Obtained location_ids: ' . print_r($location_ids, true));
-	//	$this->console_log('Obtained business_id: ' . print_r($business_id, true));
-	
-		if (empty($location_ids) || empty($business_id)) {
-			$this->console_log('location_ids or business_id are empty. Trying to obtain the business.');
+		// get_business() overwrites the stored ids only when the API answers, so a
+		// forced refresh that fails leaves them as they were.
+		if ($force_update || empty($location_ids) || empty($business_id)) {
+			$this->console_log('Refreshing the business and its location ids.');
 			$business = $this->get_business();
 	//		$this->console_log('Result of get_business: ' . print_r($business, true));
 	
@@ -1729,15 +1948,24 @@ class Tapgoods_Connection {
 	//		$this->console_log('After get_business, business_id: ' . print_r($business_id, true));
 		}
 	
-		if (false === $location_ids || false === $business_id) {
+		if (! is_array($location_ids) || false === $business_id) {
 			$log->error('sync.location.error', array('reason' => 'invalid_ids', 'elapsed_ms' => self::elapsed_ms($settings_started)));
 			return false;
 		}
 	
-		// Array para almacenar los detalles de las ubicaciones
-		$location_info = [];
-	
+		$previous      = get_option('tg_location_settings', array());
+		$previous      = is_array($previous) ? $previous : array();
+		$location_info = array();
+		$fetched       = 0;
+
 		foreach ($location_ids as $location_id) {
+			// Bounded by the caller's clock as well as by the location count: on a
+			// slow host one request per location can outlast what the host allows.
+			if (is_callable($out_of_time) && call_user_func($out_of_time)) {
+				$log->warn('sync.location.deadline', array('fetched' => $fetched, 'requested' => count($location_ids), 'elapsed_ms' => self::elapsed_ms($settings_started)));
+				break;
+			}
+
 			$location_transient = $client->transient_name('location_info_' . $location_id);
 	
 			// Si se fuerza la actualización, elimina el transient actual
@@ -1774,12 +2002,26 @@ class Tapgoods_Connection {
 			update_option('tg_location_' . $location_id, $location_details);
 			$this->console_log('Saved location details to tg_location_' . $location_id);
 	
-			// Almacena los datos en el array de información general
 			$location_info[$location_id] = $location_details;
+			++$fetched;
 		}
-	
-		// Actualiza la opción tg_location_settings con todos los datos
-		update_option('tg_location_settings', $location_info);
+
+		if (0 === $fetched) {
+			$log->error('sync.location.error', array('reason' => 'no_details', 'requested' => count($location_ids), 'elapsed_ms' => self::elapsed_ms($settings_started)));
+			return false;
+		}
+
+		// A location this pass did not fetch keeps its previous settings. Locations
+		// the business no longer has are dropped. Kept in the business's order.
+		$merged = array();
+		foreach ($location_ids as $location_id) {
+			if (isset($location_info[$location_id])) {
+				$merged[$location_id] = $location_info[$location_id];
+			} elseif (! empty($previous[$location_id])) {
+				$merged[$location_id] = $previous[$location_id];
+			}
+		}
+		update_option('tg_location_settings', $merged);
 		$this->console_log('Updated tg_location_settings option.');
 	
 		// Verifica y actualiza el valor por defecto si es necesario
@@ -1794,7 +2036,8 @@ class Tapgoods_Connection {
 		$log->info(
 			'sync.location.done',
 			array(
-				'locations'  => count($location_info),
+				'locations'  => count($merged),
+				'fetched'    => $fetched,
 				'requested'  => count($location_ids),
 				'elapsed_ms' => self::elapsed_ms($settings_started),
 			)
@@ -3357,6 +3600,13 @@ class Tapgoods_Connection {
 		$location_info = $this->sync_location_settings(true);
 
 		if (current_user_can('manage_options')) {
+			// Clicking Sync is an admin asking for a sync, so it clears a latched
+			// error first. Before, the button queued a slice that the latch then
+			// refused: it did nothing, with no sign why. On a live site an admin
+			// clicked it over and over while a ten-minute API outage kept the
+			// site un-synced for three and a half days.
+			$this->clear_latched_error('manual_sync');
+
 			// NON-BLOCKING: with Action Scheduler driving the sync, "Sync Now" just
 			// enqueues the FIRST slice and returns immediately; Action Scheduler then
 			// chains the rest in the background (see Tapgoods_Sync_Scheduler). This
@@ -3417,6 +3667,25 @@ class Tapgoods_Connection {
 		}
 	}
 	
+
+	/**
+	 * Clear a latched ERROR, if there is one, and log that it was cleared.
+	 *
+	 * Only the latch: a recovered failure's leftover message is not touched (the
+	 * Clear Errors button does that).
+	 *
+	 * @param string $reason Why it was cleared, for the activity log.
+	 * @return bool True when a latched error was cleared.
+	 */
+	private function clear_latched_error($reason) {
+		$state = $this->sync_state();
+		if (! $state->has_latched_error()) {
+			return false;
+		}
+		$this->sync_log()->info('sync.errors.cleared', array('reason' => $reason, 'failures' => $state->get_failure_count()));
+		$state->clear_errors();
+		return true;
+	}
 
 	/**
 	 * AJAX handler: clear a latched sync error so cron can start syncing again.
