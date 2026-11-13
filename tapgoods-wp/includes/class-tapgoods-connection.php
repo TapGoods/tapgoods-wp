@@ -112,6 +112,12 @@ class Tapgoods_Connection {
 	 */
 	const KEY_UNREADABLE_MESSAGE = "We couldn't read your saved TapGoods API key. Re-enter it on the TapGoods settings page, then click Sync.";
 
+	/**
+	 * Error shown on the Sync Status panel when a run has no API key to send
+	 * (see guard_api_key()).
+	 */
+	const KEY_MISSING_MESSAGE = 'No TapGoods API key is saved. Enter it on the TapGoods settings page, click Connect, then click Sync.';
+
 	private function __construct( $key = null ) {
 		if ( null === $key ) {
 			$key = $this->get_key();
@@ -487,7 +493,9 @@ class Tapgoods_Connection {
 		// paging. on_sync_shutdown() gates its own work on $active_run.
 		$this->active_run = true;
 		$this->maybe_register_shutdown();
-		$log->info('sync.lock.acquired', array('state' => $state->get_state()));
+		// fp: which saved key this run sends (key_fingerprint()), so a 401 can be
+		// matched against the connect.test line of the key that was saved.
+		$log->info('sync.lock.acquired', array('state' => $state->get_state(), 'fp' => self::key_fingerprint($this->key_in_use())));
 
 		// NOTE: per-slice memory management (object-cache suspension + per-batch runtime
 		// resets) lives inside run_sync_slice(), which is where the memory-heavy paging /
@@ -620,17 +628,203 @@ class Tapgoods_Connection {
 			return array('success' => false, 'message' => self::KEY_UNREADABLE_MESSAGE);
 		}
 
+		// No key to send: never connected, or after Reset to Default. The run used
+		// to call TapGoods anyway with an empty bearer token, and the 401 that came
+		// back read like a wrong key or a bad token format when there was no key at
+		// all. Only the real API needs one: the offline mock and injected test
+		// clients run without.
+		if (! self::is_usable_key($this->key_in_use()) && $this->get_connection() instanceof Tapgoods_API_Client) {
+			$log->error('sync.key.missing', array('action' => 'skipped_api'));
+			$will_retry = $state->mark_error(self::KEY_MISSING_MESSAGE);
+			$log->warn('sync.retry', array('will_retry' => $will_retry ? 1 : 0, 'failures' => $state->get_failure_count(), 'state' => $state->get_state()));
+			return array('success' => false, 'message' => self::KEY_MISSING_MESSAGE);
+		}
+
 		$action = self::key_change_action($current_key, get_option('tg_last_api_key'), $state->is_running());
 		if ('wipe' === $action) {
-			$log->warn('sync.key.changed', array('action' => 'cleared_local_data'));
+			$log->warn('sync.key.changed', array('action' => 'cleared_local_data', 'fp' => self::key_fingerprint($current_key)));
 			$this->tapgrein_delete_data();
 			update_option('tg_last_api_key', $current_key);
 		} elseif ('record' === $action) {
-			$log->info('sync.key.recorded', array('reason' => 'no_previous_key'));
+			$log->info('sync.key.recorded', array('reason' => 'no_previous_key', 'fp' => self::key_fingerprint($current_key)));
 			update_option('tg_last_api_key', $current_key);
 		}
 
 		return null;
+	}
+
+	/**
+	 * The API key this request's client sends.
+	 *
+	 * The client is built once per request from the key read when this singleton
+	 * was created, so this, not get_key(), is what goes out in the Authorization
+	 * header.
+	 *
+	 * @return mixed
+	 */
+	private function key_in_use() {
+		$client = $this->get_connection();
+		if (is_object($client) && method_exists($client, 'get_config')) {
+			return $client->get_config('api_key');
+		}
+		return $this->key;
+	}
+
+	/**
+	 * A short, stable fingerprint of an API key, safe to write to the log.
+	 *
+	 * The first 8 hex characters of its SHA-256: two log lines with the same
+	 * fingerprint sent the same key, and nothing about the key can be recovered
+	 * from it. 'none' when there is no usable key. Not trimmed, so a key saved
+	 * with stray whitespace shows up as a different key.
+	 *
+	 * @param mixed $key API key.
+	 * @return string
+	 */
+	public static function key_fingerprint($key) {
+		if (! self::is_usable_key($key)) {
+			return 'none';
+		}
+		return substr(hash('sha256', $key), 0, 8);
+	}
+
+	/**
+	 * Fingerprint of a saved (encrypted) tg_key value: 'none' when nothing is
+	 * saved or the saved key is empty, 'unreadable' when this request cannot
+	 * decrypt it, otherwise key_fingerprint() of the key.
+	 *
+	 * @param mixed $ciphertext The tg_key option value.
+	 * @return string
+	 */
+	public static function saved_key_fingerprint($ciphertext) {
+		if (! is_string($ciphertext) || '' === $ciphertext) {
+			return 'none';
+		}
+		$plain = (new Tapgoods_Encryption())->tapgrein_decrypt($ciphertext);
+		if (! is_string($plain)) {
+			return 'unreadable';
+		}
+		return self::key_fingerprint($plain);
+	}
+
+	/**
+	 * Which log line a write to the saved key gets, from the fingerprints of the
+	 * old and new values: key.added, key.changed, key.resaved (the same key saved
+	 * again), key.removed, or null when there is nothing to report (an empty key
+	 * saved over no key).
+	 *
+	 * Compared by fingerprint, not by stored value: every save encrypts with a
+	 * fresh IV, so saving the same key twice never stores the same value.
+	 *
+	 * @param string $previous_fp saved_key_fingerprint() of the old value.
+	 * @param string $new_fp      saved_key_fingerprint() of the new value.
+	 * @return string|null
+	 */
+	public static function key_save_event($previous_fp, $new_fp) {
+		$had = 'none' !== $previous_fp;
+		$has = 'none' !== $new_fp;
+		if (! $has) {
+			return $had ? 'key.removed' : null;
+		}
+		if (! $had) {
+			return 'key.added';
+		}
+		// Two unreadable values cannot be told apart, so they count as a change.
+		return ($previous_fp === $new_fp && 'unreadable' !== $new_fp) ? 'key.resaved' : 'key.changed';
+	}
+
+	/**
+	 * `add_option_tg_key`: a key saved where none was stored (first Connect, or
+	 * Connect after Reset to Default).
+	 *
+	 * @param string $option Option name.
+	 * @param mixed  $value  The new (encrypted) value.
+	 * @return void
+	 */
+	public static function on_key_option_added($option, $value) {
+		self::log_key_write(null, $value);
+	}
+
+	/**
+	 * `update_option_tg_key`: the saved key was overwritten.
+	 *
+	 * @param mixed $old_value The previous (encrypted) value.
+	 * @param mixed $value     The new (encrypted) value.
+	 * @return void
+	 */
+	public static function on_key_option_updated($old_value, $value) {
+		self::log_key_write($old_value, $value);
+	}
+
+	/**
+	 * `delete_option`: fires for every option, before it is deleted, which is the
+	 * only point where the key being removed can still be fingerprinted
+	 * (`delete_option_tg_key` fires after the row is gone).
+	 *
+	 * @param string $option Option name.
+	 * @return void
+	 */
+	public static function on_option_deleting($option) {
+		if ('tg_key' === $option) {
+			self::log_key_write(get_option('tg_key'), null);
+		}
+	}
+
+	/**
+	 * Log one write to the saved key: which key by fingerprint (never the key),
+	 * the one it replaced, and the WordPress user who made it (0 when no user is
+	 * logged in, e.g. WP-CLI).
+	 *
+	 * @param mixed $old_ciphertext Previous tg_key value.
+	 * @param mixed $new_ciphertext New tg_key value.
+	 * @return void
+	 */
+	private static function log_key_write($old_ciphertext, $new_ciphertext) {
+		$previous = self::saved_key_fingerprint($old_ciphertext);
+		$current  = self::saved_key_fingerprint($new_ciphertext);
+		$event    = self::key_save_event($previous, $current);
+		if (null === $event) {
+			return;
+		}
+
+		$context = array();
+		if ('key.removed' !== $event) {
+			$context['fp'] = $current;
+		}
+		if ('key.changed' === $event || 'key.removed' === $event) {
+			$context['previous_fp'] = $previous;
+		}
+		$context['user'] = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+
+		Tapgoods_Sync_Log::get_instance()->info($event, $context);
+	}
+
+	/**
+	 * HTTP status of this connection's last API request, or null.
+	 *
+	 * @return int|null
+	 */
+	public function last_http_status() {
+		return $this->client_http_status($this->client);
+	}
+
+	/**
+	 * How a Connect attempt ended: 'ok', 'failed' or 'error'.
+	 *
+	 * test_connection() returns validate_key()'s business data on success, false
+	 * when TapGoods refused the key, and the caught exception when there was no
+	 * answer at all (timeout, DNS). The Connect handler used to treat that
+	 * exception as success, saving the key as connected without TapGoods ever
+	 * having checked it.
+	 *
+	 * @param mixed $response test_connection().
+	 * @return string
+	 */
+	public static function connect_outcome($response) {
+		if ($response instanceof Throwable || (function_exists('is_wp_error') && is_wp_error($response))) {
+			return 'error';
+		}
+		return empty($response) ? 'failed' : 'ok';
 	}
 
 	/**
@@ -675,7 +869,7 @@ class Tapgoods_Connection {
 	 * @return bool
 	 */
 	private static function is_usable_key($key) {
-		return is_string($key) && '' !== trim($key);
+		return Tapgoods_API_Request::is_usable_api_key($key);
 	}
 
 	/**

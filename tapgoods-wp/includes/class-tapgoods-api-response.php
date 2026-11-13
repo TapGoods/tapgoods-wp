@@ -24,6 +24,27 @@ class Tapgoods_API_Response {
 		}
 	}
 
+	/**
+	 * A response for a request that was never sent.
+	 *
+	 * An error with no HTTP status, whose body has the GraphQL error shape, so
+	 * every caller takes the failure path it already has: the client methods check
+	 * is_error() and validate_key() checks for an `errors` key. A WP_Error would
+	 * not do: the client methods call ->is_error() on the result first, and that
+	 * fatals on a WP_Error.
+	 *
+	 * @param string $message Why the request was not sent.
+	 * @return Tapgoods_API_Response
+	 */
+	public static function not_sent( $message ) {
+		$res            = ( new ReflectionClass( __CLASS__ ) )->newInstanceWithoutConstructor();
+		$res->http_code = null;
+		$res->headers   = array();
+		$res->error     = true;
+		$res->response  = array( 'errors' => array( array( 'message' => (string) $message ) ) );
+		return $res;
+	}
+
 	public function is_error() {
 		return $this->error;
 	}
