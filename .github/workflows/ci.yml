@@ -73,6 +73,28 @@ jobs:
           path: tapgoods-wp/coverage/clover.xml
           if-no-files-found: ignore
 
+  # The plugin says "Requires PHP: 7.2", and `composer compat` (PHPCompatibility)
+  # does not catch every newer-PHP syntax: a trailing comma in a parameter list
+  # (PHP 8.0 only) passed it, and the plugin failed to parse on every PHP 7
+  # site. The real 7.2 parser catches all of them. Production code only: tests
+  # and dev tooling run on PHP 8.
+  php72-lint:
+    name: PHP 7.2 syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every production file with PHP 7.2
+        run: |
+          docker run --rm -v "$PWD/tapgoods-wp":/app:ro -w /app php:7.2-cli bash -c '
+            find includes admin public lib tapgoods.php uninstall.php -name "*.php" -print0 > /tmp/files
+            if ! xargs -0 -n1 php -l < /tmp/files > /tmp/lint.txt 2>&1; then
+              grep -v "^No syntax errors" /tmp/lint.txt
+              exit 1
+            fi
+            echo "$(grep -c "^No syntax errors" /tmp/lint.txt) files parse on PHP $(php -r "echo PHP_VERSION;")"
+          '
+
   # Layer 3 - integration against real WordPress via @wordpress/env.
   integration:
     name: Integration tests (wp-env)

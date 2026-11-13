@@ -254,7 +254,7 @@ class Tapgoods_API_Request {
 		return $this->last_http_code;
 	}
 
-	public function build_url( $endpoint, $params = null, $override = '', ) {
+	public function build_url( $endpoint, $params = null, $override = '' ) {
 
 		$url = trailingslashit( $this->get_config( 'base_url' ) ) . $endpoint;
 
