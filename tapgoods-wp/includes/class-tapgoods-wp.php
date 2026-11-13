@@ -137,6 +137,12 @@ class Tapgoods {
 		// Tapgoods_Sync_Scheduler). Registered even when Action Scheduler is not
 		// loaded (the action simply never fires in that case).
 		$this->loader->add_action( Tapgoods_Sync_Scheduler::HOOK, 'Tapgoods_Sync_Scheduler', 'run_slice' );
+
+		// Log every write to the saved API key, whatever made it (Connect, Reset to
+		// Default, WP-CLI): key.added / key.changed / key.resaved / key.removed.
+		$this->loader->add_action( 'add_option_tg_key', 'Tapgoods_Connection', 'on_key_option_added', 10, 2 );
+		$this->loader->add_action( 'update_option_tg_key', 'Tapgoods_Connection', 'on_key_option_updated', 10, 2 );
+		$this->loader->add_action( 'delete_option', 'Tapgoods_Connection', 'on_option_deleting', 10, 1 );
 	}
 
 	public function tapgrein_add_cron_interval( $schedules ) {
