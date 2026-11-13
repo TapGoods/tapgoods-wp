@@ -304,6 +304,182 @@ final class ConnectionKeyGuardTest extends TestCase {
 		$this->assertStringContainsString( 'sync.key.recorded', $this->log_contents() );
 	}
 
+	// --- No key at all -----------------------------------------------------------
+
+	/**
+	 * A live log (Nov 2026): background slices logged `sync.api.error status=401`,
+	 * which read as a wrong key or a bad token format. There was no key. Those
+	 * runs logged no sync.key line, and the next run recorded its key as the
+	 * first one ever seen. They had sent an empty bearer token.
+	 */
+	public function test_a_run_with_no_saved_key_stops_before_calling_tapgoods() {
+		$http_calls = 0;
+		Functions\when( 'wp_parse_args' )->alias(
+			static function ( $args, $defaults ) {
+				return array_merge( $defaults, $args );
+			}
+		);
+		Functions\when( 'wp_remote_request' )->alias(
+			static function () use ( &$http_calls ) {
+				++$http_calls;
+				throw new \RuntimeException( 'No request may be sent without a key.' );
+			}
+		);
+
+		// Option missing (never connected, or after Reset to Default), and the ''
+		// the activator stores on a fresh install.
+		foreach ( array( 'option missing' => null, 'empty option' => '' ) as $case => $saved ) {
+			foreach ( array( Tapgoods_Connection::class, Tapgoods_Sync_State::class ) as $class ) {
+				$this->set_singleton( $class, null );
+			}
+			$this->store = array();
+			if ( null !== $saved ) {
+				$this->store['tg_key'] = $saved;
+			}
+
+			// No client injected: this is the real Tapgoods_API_Client.
+			$result = Tapgoods_Connection::get_instance()->sync_inventory_in_batches( false, 'as_slice' );
+
+			$this->assertFalse( $result['success'], $case );
+			$this->assertSame( Tapgoods_Connection::KEY_MISSING_MESSAGE, $result['message'], $case );
+			$this->assertSame( 0, $http_calls, "$case: nothing is sent to TapGoods." );
+			$this->assertSame( Tapgoods_Connection::KEY_MISSING_MESSAGE, Tapgoods_Sync_State::get_instance()->get_error_message(), "$case: the Status panel says what to do." );
+			$this->assertSame( 1, Tapgoods_Sync_State::get_instance()->get_failure_count(), "$case: an ordinary failure, retried then latched." );
+			$this->assertArrayNotHasKey( 'tg_last_api_key', $this->store, "$case: no key is recorded." );
+		}
+
+		$this->assertFalse( $this->wiped );
+		$log = $this->log_contents();
+		$this->assertSame( 2, substr_count( $log, 'sync.key.missing' ) );
+		$this->assertStringNotContainsString( 'sync.api.error', $log );
+		$this->assertStringNotContainsString( 'sync.lock.acquired', $log, 'The run stops before it starts work.' );
+	}
+
+	public function test_offline_mock_and_injected_clients_still_run_without_a_key() {
+		// No key saved. The mock and test clients need none, so the run goes on to
+		// PREP (which this client fails cleanly).
+		$this->inject_client( $this->failing_prep_client() );
+
+		Tapgoods_Connection::get_instance()->sync_inventory_in_batches( false, 'as_slice' );
+
+		$log = $this->log_contents();
+		$this->assertStringNotContainsString( 'sync.key.missing', $log );
+		$this->assertStringContainsString( 'sync.api.error', $log );
+	}
+
+	public function test_each_run_names_the_key_it_sends_by_fingerprint_only() {
+		$this->save_readable_key( 'the-saved-key' );
+		$this->store['tg_last_api_key'] = 'the-saved-key';
+		$client                         = new class() {
+			public function get_config( $param ) {
+				return 'api_key' === $param ? 'the-saved-key' : null;
+			}
+			public function get_location_ids() {
+				return false;
+			}
+		};
+		$this->inject_client( $client );
+
+		Tapgoods_Connection::get_instance()->sync_inventory_in_batches( false, 'as_slice' );
+
+		$log = $this->log_contents();
+		$this->assertMatchesRegularExpression(
+			'/sync\.lock\.acquired .*fp=' . Tapgoods_Connection::key_fingerprint( 'the-saved-key' ) . '/',
+			$log
+		);
+		$this->assertStringNotContainsString( 'the-saved-key', $log, 'Never the key itself.' );
+	}
+
+	public function test_key_fingerprint() {
+		foreach ( array( false, null, '', '   ' ) as $none ) {
+			$this->assertSame( 'none', Tapgoods_Connection::key_fingerprint( $none ) );
+		}
+
+		$fp = Tapgoods_Connection::key_fingerprint( 'abc123-key' );
+		$this->assertMatchesRegularExpression( '/^[0-9a-f]{8}$/', $fp );
+		$this->assertSame( $fp, Tapgoods_Connection::key_fingerprint( 'abc123-key' ), 'Stable.' );
+		$this->assertNotSame( $fp, Tapgoods_Connection::key_fingerprint( 'abc123-kez' ), 'A different key.' );
+		$this->assertNotSame( $fp, Tapgoods_Connection::key_fingerprint( ' abc123-key' ), 'Stray whitespace is a different key on the wire.' );
+	}
+
+	public function test_connect_outcome() {
+		$this->assertSame( 'ok', Tapgoods_Connection::connect_outcome( array( 'businessId' => 1042, 'locationIds' => array( 5001 ) ) ) );
+		$this->assertSame( 'failed', Tapgoods_Connection::connect_outcome( false ), 'TapGoods refused the key.' );
+		$this->assertSame( 'failed', Tapgoods_Connection::connect_outcome( null ) );
+		// test_connection() returns the exception it caught; that used to count as connected.
+		$this->assertSame( 'error', Tapgoods_Connection::connect_outcome( new \Exception( 'timed out' ) ) );
+		$this->assertSame( 'error', Tapgoods_Connection::connect_outcome( new \Error( 'Class not found' ) ) );
+	}
+
+	// --- Every write to the saved key is logged ----------------------------------
+
+	public function test_key_save_event() {
+		$this->assertSame( 'key.added', Tapgoods_Connection::key_save_event( 'none', 'aaaa1111' ) );
+		$this->assertSame( 'key.resaved', Tapgoods_Connection::key_save_event( 'aaaa1111', 'aaaa1111' ) );
+		$this->assertSame( 'key.changed', Tapgoods_Connection::key_save_event( 'aaaa1111', 'bbbb2222' ) );
+		$this->assertSame( 'key.removed', Tapgoods_Connection::key_save_event( 'aaaa1111', 'none' ) );
+		$this->assertNull( Tapgoods_Connection::key_save_event( 'none', 'none' ), 'An empty key over no key: nothing happened.' );
+
+		// A saved key this request cannot decrypt is still a key.
+		$this->assertSame( 'key.changed', Tapgoods_Connection::key_save_event( 'unreadable', 'aaaa1111' ) );
+		$this->assertSame( 'key.removed', Tapgoods_Connection::key_save_event( 'unreadable', 'none' ) );
+		$this->assertSame( 'key.changed', Tapgoods_Connection::key_save_event( 'unreadable', 'unreadable' ), 'Cannot tell two unreadable keys apart.' );
+	}
+
+	public function test_saved_key_fingerprint() {
+		$encryption = new Tapgoods_Encryption();
+
+		foreach ( array( null, false, '' ) as $nothing ) {
+			$this->assertSame( 'none', Tapgoods_Connection::saved_key_fingerprint( $nothing ) );
+		}
+		$this->assertSame( 'none', Tapgoods_Connection::saved_key_fingerprint( $encryption->tapgrein_encrypt( '' ) ), 'An empty key, encrypted.' );
+		$this->assertSame(
+			Tapgoods_Connection::key_fingerprint( 'the-key' ),
+			Tapgoods_Connection::saved_key_fingerprint( $encryption->tapgrein_encrypt( 'the-key' ) )
+		);
+
+		$this->save_unreadable_key( 'the-key' );
+		$this->assertSame( 'unreadable', Tapgoods_Connection::saved_key_fingerprint( $this->store['tg_key'] ) );
+	}
+
+	public function test_every_write_to_the_saved_key_is_logged_by_fingerprint() {
+		Functions\when( 'get_current_user_id' )->justReturn( 7 );
+		$encryption = new Tapgoods_Encryption();
+		$one        = $encryption->tapgrein_encrypt( 'key-number-one' );
+		$one_again  = $encryption->tapgrein_encrypt( 'key-number-one' );
+		$two        = $encryption->tapgrein_encrypt( 'key-number-two' );
+		$this->assertNotSame( $one, $one_again, 'Setup: each save stores a different value for the same key.' );
+
+		// Connect after Reset to Default (no option), Connect again with the same
+		// key, Connect with another key, then Reset to Default.
+		Tapgoods_Connection::on_key_option_added( 'tg_key', $one );
+		Tapgoods_Connection::on_key_option_updated( $one, $one_again );
+		Tapgoods_Connection::on_key_option_updated( $one_again, $two );
+		$this->store['tg_key'] = $two;
+		Tapgoods_Connection::on_option_deleting( 'tg_last_api_key' );
+		Tapgoods_Connection::on_option_deleting( 'tg_key' );
+
+		$fp1 = Tapgoods_Connection::key_fingerprint( 'key-number-one' );
+		$fp2 = Tapgoods_Connection::key_fingerprint( 'key-number-two' );
+		$this->assertMatchesRegularExpression(
+			"/INFO key\.added fp=$fp1 user=7\n"
+			. ".*INFO key\.resaved fp=$fp1 user=7\n"
+			. ".*INFO key\.changed fp=$fp2 previous_fp=$fp1 user=7\n"
+			. ".*INFO key\.removed previous_fp=$fp2 user=7\n$/",
+			$this->log_contents(),
+			'One line per write, in order; deleting another option logs nothing.'
+		);
+		$this->assertStringNotContainsString( 'key-number', $this->log_contents(), 'Never the key itself.' );
+	}
+
+	public function test_saving_an_empty_key_over_no_key_logs_nothing() {
+		Functions\when( 'get_current_user_id' )->justReturn( 1 );
+
+		Tapgoods_Connection::on_key_option_updated( '', ( new Tapgoods_Encryption() )->tapgrein_encrypt( '' ) );
+
+		$this->assertSame( '', $this->log_contents() );
+	}
+
 	// --- The Sync button --------------------------------------------------------
 
 	public function test_sync_button_clears_a_latched_error() {

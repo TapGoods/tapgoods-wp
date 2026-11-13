@@ -4,6 +4,11 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 class Tapgoods_API_Request {
 
+	/**
+	 * The error a skipped request reports (see request()).
+	 */
+	const NO_KEY_MESSAGE = 'No TapGoods API key is saved, so the request was not sent.';
+
 	private $config  = array();
 	private $cookies = array();
 
@@ -61,6 +66,23 @@ class Tapgoods_API_Request {
 		// TapGoods. A missing status has to read as missing.
 		$this->last_http_code = null;
 
+		// Nothing goes to TapGoods without a key. Without this a site with no saved
+		// key sent `Authorization: Bearer ` with nothing after it, and the 401 that
+		// came back read like a wrong key or a bad token format. This is the one
+		// place every API call passes through, so no caller can miss the check.
+		if ( ! self::is_usable_api_key( $this->get_config( 'api_key' ) ) ) {
+			if ( class_exists( 'Tapgoods_Sync_Log' ) ) {
+				Tapgoods_Sync_Log::get_instance()->error(
+					'api.key.missing',
+					array(
+						'op'     => self::operation_name( $url, $args ),
+						'action' => 'skipped_call',
+					)
+				);
+			}
+			return Tapgoods_API_Response::not_sent( self::NO_KEY_MESSAGE );
+		}
+
 		// Check if the cache is enabled via config
 		if ( false !== $this->get_config( 'cache_enabled' ) ) {
 
@@ -93,6 +115,40 @@ class Tapgoods_API_Request {
 		// Response caching is disabled
 		$response = $this->do_request( $url, $args );
 		return $response;
+	}
+
+	/**
+	 * Whether a value can be sent as the API key: a string that is not blank.
+	 *
+	 * @param mixed $key Candidate API key.
+	 * @return bool
+	 */
+	public static function is_usable_api_key( $key ) {
+		return is_string( $key ) && '' !== trim( $key );
+	}
+
+	/**
+	 * A short name for a request, for the log.
+	 *
+	 * The first field of a GraphQL query (bearerTokenValidator, getInventories,
+	 * ...), otherwise the URL path without its query string. Never the query
+	 * itself: validate_key() puts the key in it.
+	 *
+	 * @param string $url  Request URL.
+	 * @param array  $args Request args.
+	 * @return string
+	 */
+	public static function operation_name( $url, $args = array() ) {
+		if ( isset( $args['body'] ) && is_string( $args['body'] ) ) {
+			$body = json_decode( $args['body'], true );
+			if ( is_array( $body ) && isset( $body['query'] ) && is_string( $body['query'] )
+				&& preg_match( '/\{\s*([A-Za-z_][A-Za-z0-9_]*)/', $body['query'], $matches ) ) {
+				return $matches[1];
+			}
+		}
+		$path = preg_replace( '#^[a-z][a-z0-9+.-]*://[^/]*#i', '', strtok( (string) $url, '?' ) );
+		$path = trim( (string) $path, '/' );
+		return '' !== $path ? $path : 'unknown';
 	}
 
 	private function is_cacheable( $url ) {
@@ -198,7 +254,7 @@ class Tapgoods_API_Request {
 		return $this->last_http_code;
 	}
 
-	public function build_url( $endpoint, $params = null, $override = '', ) {
+	public function build_url( $endpoint, $params = null, $override = '' ) {
 
 		$url = trailingslashit( $this->get_config( 'base_url' ) ) . $endpoint;
 

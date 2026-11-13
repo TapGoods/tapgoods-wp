@@ -178,7 +178,8 @@ class Tapgoods_Admin {
 		// }
 	
 		// Connection to the API
-		$api_key = '';
+		$api_key           = '';
+		$submitted_api_key = '';
 		if ( isset( $_POST['tapgoods_api_key'] ) ) {
 			$encryption        = new Tapgoods_Encryption();
 			$submitted_api_key = sanitize_text_field( wp_unslash( $_POST['tapgoods_api_key'] ) );
@@ -195,10 +196,24 @@ class Tapgoods_Admin {
 			// setting the second param to true will cause this to fail (for testing).
 			$response = $client->test_connection( $submitted_api_key );
 		} catch ( Error $e ) {
-			self::connection_failed();
+			$response = $e;
 		}
-	
-		if ( false === $response || is_wp_error( $response ) ) {
+
+		// Logged so the sync log shows when a key was saved and whether TapGoods
+		// accepted it. fp matches the fp on the sync.lock.acquired line of every
+		// run that sends this key; the key itself is never logged.
+		$outcome = Tapgoods_Connection::connect_outcome( $response );
+		Tapgoods_Sync_Log::get_instance()->log(
+			'ok' === $outcome ? Tapgoods_Sync_Log::LEVEL_INFO : Tapgoods_Sync_Log::LEVEL_WARN,
+			'connect.test',
+			array(
+				'result' => $outcome,
+				'status' => $client->last_http_status(),
+				'fp'     => Tapgoods_Connection::key_fingerprint( $submitted_api_key ),
+			)
+		);
+
+		if ( 'ok' !== $outcome ) {
 			self::connection_failed();
 		}
 	
