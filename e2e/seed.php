@@ -29,27 +29,36 @@ update_option( 'tg_last_api_key', 'e2e-mock-key' );
 update_option( 'tg_enable_advanced', '1' );
 
 // 2. Location settings the storefront templates read (cart links, location select).
+//    Written in the same shape a completed location sync leaves behind: the ids,
+//    the business, each location's details in tg_location_{id} AND in
+//    tg_location_settings, and a default. The sync below starts with a locations
+//    step that fetches details from the API whenever any of that is missing
+//    (Tapgoods_Connection::location_sync_action()). With only tg_location_{id}
+//    seeded it decided the data was incomplete and replaced these example.test
+//    cart links with the mock's shop.example.com ones, and every add-to-cart spec
+//    failed.
 $locations = array( 5001, 5002 );
+update_option( 'tg_businessId', 1042 );
 update_option( 'tg_locationIds', $locations );
 update_option( 'tapgreino_default_location', 5001 );
 
+$location_settings = array();
 foreach ( $locations as $lid ) {
 	$name = 5001 === $lid ? 'Downtown Warehouse' : 'Airport Depot';
 	$code = 5001 === $lid ? 'DTW' : 'APT';
 
-	update_option(
-		'tg_location_' . $lid,
-		array(
-			'id'          => $lid,
-			'fullName'    => "{$name} ({$code})",
-			'cart_url'    => "https://example.test/{$lid}/cart?externalRedirect=true",
-			'add_to_cart' => "https://example.test/{$lid}/addToCart",
-			'signup_url'  => "https://example.test/{$lid}/signup",
-			'login_url'   => "https://example.test/{$lid}/login",
-			'sf_url'      => "https://example.test/{$lid}/",
-		)
+	$location_settings[ $lid ] = array(
+		'id'          => $lid,
+		'fullName'    => "{$name} ({$code})",
+		'cart_url'    => "https://example.test/{$lid}/cart?externalRedirect=true",
+		'add_to_cart' => "https://example.test/{$lid}/addToCart",
+		'signup_url'  => "https://example.test/{$lid}/signup",
+		'login_url'   => "https://example.test/{$lid}/login",
+		'sf_url'      => "https://example.test/{$lid}/",
 	);
+	update_option( 'tg_location_' . $lid, $location_settings[ $lid ] );
 }
+update_option( 'tg_location_settings', $location_settings );
 
 // 3. Run a full sync against the mock so the shop has real posts and terms.
 $conn = Tapgoods_Connection::get_instance();
