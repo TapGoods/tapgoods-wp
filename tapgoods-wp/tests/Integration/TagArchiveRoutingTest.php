@@ -853,6 +853,63 @@ final class TagArchiveRoutingTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'Table Cloth', $html );
 	}
 
+	public function test_the_fallback_archive_is_served_through_the_full_page_template() {
+		// WPB-188: template_include returned the grid partial itself, which
+		// never called get_header(), so the archive was served with no <head>.
+		wp_delete_post( $this->shop_page, true );
+		wp_cache_delete( 'tg_shop_page_id', 'tapgoods' );
+
+		$this->use_permalinks( '/%postname%/' );
+		$this->go_to( home_url( '/tags/tag-gold/' ) );
+
+		$template = apply_filters( 'template_include', get_index_template() );
+
+		$this->assertSame( TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-archive.php', $template );
+	}
+
+	public function test_the_fallback_archive_page_has_a_head_for_seo_plugins() {
+		// WPB-188, the reported symptom: no doctype, no <title>, and none of what
+		// an SEO plugin prints, so a Rank Math noindex on tag archives was never
+		// applied. SEO plugins print through wp_head, so stand one in for them.
+		wp_delete_post( $this->shop_page, true );
+		wp_cache_delete( 'tg_shop_page_id', 'tapgoods' );
+
+		$this->use_permalinks( '/%postname%/' );
+		$this->go_to( home_url( '/tags/tag-gold/' ) );
+
+		$print_robots = static function () {
+			echo '<meta name="robots" content="noindex, follow" data-test="wpb-188">';
+		};
+		$print_footer = static function () {
+			echo '<!-- wpb-188-footer -->';
+		};
+		add_action( 'wp_head', $print_robots );
+		add_action( 'wp_footer', $print_footer );
+
+		ob_start();
+		include TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-archive.php';
+		$html = (string) ob_get_clean();
+
+		remove_action( 'wp_head', $print_robots );
+		remove_action( 'wp_footer', $print_footer );
+
+		$this->assertStringContainsString( '<head', $html );
+		$this->assertStringContainsString( 'data-test="wpb-188"', $html, 'wp_head() must run on a tag archive.' );
+		$this->assertStringContainsString( '<!-- wpb-188-footer -->', $html, 'wp_footer() must run on a tag archive.' );
+
+		// The robots meta must be in the head, ahead of the grid, not in the body.
+		$this->assertLessThan( strpos( $html, 'Folding Chair' ), strpos( $html, 'data-test="wpb-188"' ) );
+		$this->assertLessThan( strpos( $html, 'Folding Chair' ), stripos( $html, '</head>' ) );
+
+		if ( current_theme_supports( 'title-tag' ) ) {
+			$this->assertStringContainsString( '<title', $html );
+		}
+
+		// And the grid itself is unchanged.
+		$this->assertStringContainsString( 'Folding Chair', $html );
+		$this->assertStringNotContainsString( 'Table Cloth', $html );
+	}
+
 	public function test_an_unknown_tag_shows_nothing_rather_than_everything() {
 		$this->go_to( add_query_arg( 'tags', 'no-such-tag', get_permalink( $this->shop_page ) ) );
 

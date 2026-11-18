@@ -7,6 +7,10 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
  *
  * Where a shop page exists, tapgrein_redirect_tag_archives() has already sent
  * the visitor there with ?tags=<slug> and this file never runs.
+ *
+ * This is the page BODY only. It is rendered inside tg-tag-archive.php, which
+ * supplies the theme header/footer and wp_head() (WPB-188); do not return it
+ * from template_include on its own.
  */
 
 // The queried term, not the URL. Parsing REQUEST_URI for the literal segment
