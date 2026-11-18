@@ -2083,13 +2083,18 @@ add_action( 'template_redirect', 'tapgrein_redirect_tag_archives' );
  *
  * tapgrein_redirect_tag_archives() has already run by the time template_include
  * fires, so this only ever renders when there was nowhere to redirect to.
+ *
+ * The template returned here is the whole page, so it must be the full-page
+ * wrapper (tg-tag-archive.php), not the grid partial: returning
+ * tg-tag-results.php directly served tag archives with no <head>, no <title>
+ * and no SEO plugin output (WPB-188).
  */
 add_filter('template_include', 'tapgrein_custom_tax_template');
 function tapgrein_custom_tax_template($template) {
     // Check if this is a taxonomy archive page for a custom taxonomy
     if (is_tax('tg_tags')) {
         // Define the correct custom template path
-        $custom_template = TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-results.php';
+        $custom_template = TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-archive.php';
 
         // Check if the custom template file exists
         if (file_exists($custom_template)) {
@@ -2101,11 +2106,11 @@ function tapgrein_custom_tax_template($template) {
 }
 
 // A wp_head hook that enqueued the public script "for tag pages" used to live
-// here. It could never do that: tg-tag-results.php never calls get_header(), so
-// wp_head() does not run on a tag archive at all. What it did run on was every
-// other page of the site, where it wrote five error_log lines per request and
-// enqueued nothing. The template enqueues and prints its own script (see
-// tg-tag-results.php), so removing it changes no behaviour and stops the noise.
+// here. At the time tag archives never ran wp_head() (fixed in WPB-188 by
+// tg-tag-archive.php); what it did run on was every other page of the site,
+// where it wrote five error_log lines per request and enqueued nothing. The
+// public script is enqueued site-wide by Tapgoods_Enqueue and tg-tag-results.php
+// still prints it itself, so nothing needs to be re-added here.
 
 
 // Ensure Yoast SEO metabox is added to tg_inventory

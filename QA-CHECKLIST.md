@@ -56,6 +56,7 @@ See `Tapgoods_Connection::filter_storefront_roots()` for why.
 |---|---|---|
 | Can't edit (only delete) | browser | |
 | View takes you to the filtered inventory grid | **auto** | `TagArchiveRoutingTest` for the routing and the filtered destination, `e2e/tests/tag-routing.spec.js` for the click (WPB-166) |
+| A tag archive with no shop page renders a full page: theme header, `<title>`, SEO plugin meta | **auto** | `TagArchiveRoutingTest::test_the_fallback_archive_page_has_a_head_for_seo_plugins` (WPB-188) |
 
 Both tag lines claimed `ParseRequestRoutingTest`, which only ever covered
 `tg_category`: nothing routed a tag at all, and a tag URL rendered an empty grid.
