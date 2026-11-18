@@ -896,7 +896,10 @@ final class TagArchiveRoutingTest extends WP_UnitTestCase {
 		// locate_template() caches both paths in globals (WP 6.4+); drop them so
 		// the filters above are read.
 		unset( $GLOBALS['wp_stylesheet_path'], $GLOBALS['wp_template_path'] );
-		add_theme_support( 'title-tag' );
+		// Set directly: add_theme_support( 'title-tag' ) after wp_loaded raises an
+		// incorrect-usage notice, which the test framework counts as a failure.
+		$had_title_tag = isset( $GLOBALS['_wp_theme_features']['title-tag'] );
+		$GLOBALS['_wp_theme_features']['title-tag'] = true;
 		add_action( 'wp_head', $print_robots );
 		add_action( 'wp_footer', $print_footer );
 
@@ -907,7 +910,9 @@ final class TagArchiveRoutingTest extends WP_UnitTestCase {
 		} finally {
 			remove_action( 'wp_head', $print_robots );
 			remove_action( 'wp_footer', $print_footer );
-			remove_theme_support( 'title-tag' );
+			if ( ! $had_title_tag ) {
+				unset( $GLOBALS['_wp_theme_features']['title-tag'] );
+			}
 			remove_filter( 'stylesheet_directory', $use_theme );
 			remove_filter( 'template_directory', $use_theme );
 			unset( $GLOBALS['wp_stylesheet_path'], $GLOBALS['wp_template_path'] );
