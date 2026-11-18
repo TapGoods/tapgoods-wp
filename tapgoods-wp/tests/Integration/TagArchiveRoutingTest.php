@@ -877,33 +877,52 @@ final class TagArchiveRoutingTest extends WP_UnitTestCase {
 		$this->use_permalinks( '/%postname%/' );
 		$this->go_to( home_url( '/tags/tag-gold/' ) );
 
+		// Render through a real classic theme's header/footer. The test suite's
+		// default theme prints a bare "Header" and never calls wp_head(), which is
+		// a stub, not something a live site ships (see the fixture's header.php).
+		$theme_dir = dirname( __DIR__ ) . '/fixtures/classic-theme';
+		$use_theme = static function () use ( $theme_dir ) {
+			return $theme_dir;
+		};
 		$print_robots = static function () {
 			echo '<meta name="robots" content="noindex, follow" data-test="wpb-188">';
 		};
 		$print_footer = static function () {
 			echo '<!-- wpb-188-footer -->';
 		};
+
+		add_filter( 'stylesheet_directory', $use_theme );
+		add_filter( 'template_directory', $use_theme );
+		// locate_template() caches both paths in globals (WP 6.4+); drop them so
+		// the filters above are read.
+		unset( $GLOBALS['wp_stylesheet_path'], $GLOBALS['wp_template_path'] );
+		add_theme_support( 'title-tag' );
 		add_action( 'wp_head', $print_robots );
 		add_action( 'wp_footer', $print_footer );
 
-		ob_start();
-		include TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-archive.php';
-		$html = (string) ob_get_clean();
+		try {
+			ob_start();
+			include TAPGREIN_PLUGIN_DIR . 'public/partials/tg-tag-archive.php';
+			$html = (string) ob_get_clean();
+		} finally {
+			remove_action( 'wp_head', $print_robots );
+			remove_action( 'wp_footer', $print_footer );
+			remove_theme_support( 'title-tag' );
+			remove_filter( 'stylesheet_directory', $use_theme );
+			remove_filter( 'template_directory', $use_theme );
+			unset( $GLOBALS['wp_stylesheet_path'], $GLOBALS['wp_template_path'] );
+		}
 
-		remove_action( 'wp_head', $print_robots );
-		remove_action( 'wp_footer', $print_footer );
-
+		$this->assertStringContainsString( 'Fixture site header', $html, 'The theme header must render on a tag archive.' );
+		$this->assertStringContainsString( 'Fixture site footer', $html, 'The theme footer must render on a tag archive.' );
 		$this->assertStringContainsString( '<head', $html );
+		$this->assertStringContainsString( '<title', $html, 'wp_head() prints the title on a title-tag theme.' );
 		$this->assertStringContainsString( 'data-test="wpb-188"', $html, 'wp_head() must run on a tag archive.' );
 		$this->assertStringContainsString( '<!-- wpb-188-footer -->', $html, 'wp_footer() must run on a tag archive.' );
 
 		// The robots meta must be in the head, ahead of the grid, not in the body.
 		$this->assertLessThan( strpos( $html, 'Folding Chair' ), strpos( $html, 'data-test="wpb-188"' ) );
 		$this->assertLessThan( strpos( $html, 'Folding Chair' ), stripos( $html, '</head>' ) );
-
-		if ( current_theme_supports( 'title-tag' ) ) {
-			$this->assertStringContainsString( '<title', $html );
-		}
 
 		// And the grid itself is unchanged.
 		$this->assertStringContainsString( 'Folding Chair', $html );
